@@ -2,7 +2,7 @@ import json
 import os
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.database import get_db
+from app.core.database import get_db
 from app.models.product import Product
 from app.models.drive_config import DriveConfig
 from app.models.product_drive import ProductDrive
