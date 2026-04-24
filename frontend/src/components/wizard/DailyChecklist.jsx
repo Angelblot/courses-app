@@ -178,15 +178,6 @@ export function DailyChecklist() {
 
   return (
     <section className="stack stack--lg">
-      <header className="step-header">
-        <div className="step-header__eyebrow">Étape 2 / 4</div>
-        <h2 className="step-header__title">Ton quotidien</h2>
-        <p className="step-header__subtitle">
-          Swipe à droite pour l'ajouter, à gauche pour passer. Toggle « J'en ai
-          déjà » pour l'exclure.
-        </p>
-      </header>
-
       {loaded && favorites.length === 0 ? (
         <EmptyState icon="package" title="Aucun produit favori">
           Ajoute-en depuis l'onglet Produits pour les retrouver ici.

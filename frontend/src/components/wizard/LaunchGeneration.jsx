@@ -27,15 +27,6 @@ export function LaunchGeneration() {
 
   return (
     <section className="stack stack--lg">
-      <header className="step-header">
-        <div className="step-header__eyebrow">Étape 4 / 4</div>
-        <h2 className="step-header__title">Lance la génération</h2>
-        <p className="step-header__subtitle">
-          On remplit les paniers en parallèle. Tu compares prix et disponibilités
-          une fois terminé.
-        </p>
-      </header>
-
       {available.length === 0 ? (
         <EmptyState icon="car" title="Aucun drive configuré">
           Ajoute tes identifiants Carrefour ou Leclerc dans l'onglet Drives.

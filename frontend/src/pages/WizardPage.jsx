@@ -1,8 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useWizardStore, WIZARD_STEPS } from '../stores/wizardStore.js';
-import { WizardStepper } from '../components/wizard/WizardStepper.jsx';
-import { WizardNav } from '../components/wizard/WizardNav.jsx';
 import { RecipePicker } from '../components/wizard/RecipePicker.jsx';
 import { DailyChecklist } from '../components/wizard/DailyChecklist.jsx';
 import { RecapList } from '../components/wizard/RecapList.jsx';
@@ -14,6 +12,13 @@ const STEP_COMPONENTS = {
   checklist: DailyChecklist,
   recap: RecapList,
   generate: LaunchGeneration,
+};
+
+const STEP_TITLES = {
+  recipes: 'Choisis tes recettes',
+  checklist: 'Ton quotidien',
+  recap: 'Récap de ta liste',
+  generate: 'Lance la génération',
 };
 
 export function WizardPage() {
@@ -35,15 +40,6 @@ export function WizardPage() {
   const current = WIZARD_STEPS[idx];
   const StepComponent = STEP_COMPONENTS[current.key];
   const isLast = idx === WIZARD_STEPS.length - 1;
-  const isFirst = idx === 0;
-
-  function handleBack() {
-    if (isFirst) {
-      navigate('/');
-      return;
-    }
-    navigate(`/wizard/${WIZARD_STEPS[idx - 1].key}`);
-  }
 
   async function handleNext() {
     if (isLast) {
@@ -54,20 +50,37 @@ export function WizardPage() {
     navigate(`/wizard/${WIZARD_STEPS[idx + 1].key}`);
   }
 
-  let nextDisabled = false;
-  let nextLabel = 'Continuer';
+  let fabLabel = 'Continuer';
+  let showFab = true;
+  let fabDisabled = false;
   if (current.key === 'recipes' && Object.keys(selectedRecipes).length === 0) {
-    nextDisabled = true;
+    showFab = false;
   }
   if (current.key === 'generate') {
-    nextLabel = generating ? 'Génération…' : 'Générer les paniers';
-    nextDisabled = generating || selectedDrives.length === 0;
+    fabLabel = generating ? 'Génération…' : 'Générer';
+    if (!generating && selectedDrives.length === 0) showFab = false;
+    fabDisabled = generating;
   }
 
   return (
     <div className="wizard">
       <div className="wizard__top">
-        <div className="wizard__exit-row">
+        <div className="wizard__top-row">
+          <div
+            className="wizard__progress"
+            role="progressbar"
+            aria-valuenow={idx + 1}
+            aria-valuemin={1}
+            aria-valuemax={WIZARD_STEPS.length}
+            aria-label={`Étape ${idx + 1} sur ${WIZARD_STEPS.length}`}
+          >
+            {WIZARD_STEPS.map((s, i) => (
+              <div
+                key={s.key}
+                className={`wizard__progress-seg ${i <= idx ? 'is-active' : ''}`}
+              />
+            ))}
+          </div>
           <button
             type="button"
             className="wizard__exit"
@@ -76,7 +89,12 @@ export function WizardPage() {
           >
             <Icon name="x" size={18} strokeWidth={2} />
           </button>
-          <WizardStepper currentStep={current.key} />
+        </div>
+        <div className="wizard__top-meta">
+          <span className="wizard__step-count">
+            Étape {idx + 1}/{WIZARD_STEPS.length}
+          </span>
+          <span className="wizard__step-title">{STEP_TITLES[current.key]}</span>
         </div>
       </div>
 
@@ -86,17 +104,22 @@ export function WizardPage() {
         </div>
       </div>
 
-      <div className="wizard__footer">
-        <div className="container">
-          <WizardNav
-            onBack={handleBack}
-            onNext={handleNext}
-            nextLabel={nextLabel}
-            nextDisabled={nextDisabled}
-            backLabel={isFirst ? 'Accueil' : 'Retour'}
+      {showFab && (
+        <button
+          type="button"
+          className="wizard__fab"
+          onClick={handleNext}
+          disabled={fabDisabled}
+          aria-label={fabLabel}
+        >
+          <span className="wizard__fab-label">{fabLabel}</span>
+          <Icon
+            name={isLast ? 'check' : 'arrowRight'}
+            size={20}
+            strokeWidth={2.5}
           />
-        </div>
-      </div>
+        </button>
+      )}
     </div>
   );
 }

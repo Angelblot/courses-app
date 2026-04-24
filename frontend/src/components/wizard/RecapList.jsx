@@ -49,15 +49,6 @@ export function RecapList() {
 
   return (
     <section className="stack stack--lg">
-      <header className="step-header">
-        <div className="step-header__eyebrow">Étape 3 / 4</div>
-        <h2 className="step-header__title">Récap de ta liste</h2>
-        <p className="step-header__subtitle">
-          Les quantités sont <strong>mutualisées</strong> entre tes recettes. Vérifie
-          avant de lancer la génération.
-        </p>
-      </header>
-
       {items.length === 0 ? (
         <EmptyState icon="list" title="Rien à acheter">
           Reviens aux étapes précédentes pour sélectionner des recettes ou

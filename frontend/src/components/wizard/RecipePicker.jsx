@@ -142,14 +142,6 @@ export function RecipePicker() {
 
   return (
     <section className="stack stack--lg">
-      <header className="step-header">
-        <div className="step-header__eyebrow">Étape 1 / 4</div>
-        <h2 className="step-header__title">Choisis tes recettes</h2>
-        <p className="step-header__subtitle">
-          Swipe à droite pour garder, à gauche pour passer. Ajuste les personnes sur la carte.
-        </p>
-      </header>
-
       {loaded && recipes.length === 0 ? (
         <EmptyState icon="bowl" title="Aucune recette">
           Ajoute ta première recette dans l'onglet Recettes.
