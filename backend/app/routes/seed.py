@@ -13,7 +13,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.post("/seed")
 def seed_database(db: Session = Depends(get_db)):
-    seed_path = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data.json")
+    seed_path = os.path.join(os.path.dirname(__file__), "..", "seed_data.json")
     if not os.path.exists(seed_path):
         return {"status": "error", "detail": "seed_data.json not found"}
 
