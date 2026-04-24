@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -6,11 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.core import database as db_module
 from app.core.config import Settings, get_settings
-from app.core.database import init_db, SessionLocal
+from app.core.database import init_db
 from app.routes import api_router
 from app.routes.seed import seed_database
-from app.services.categories import seed_category_aliases
+from app.services.categories import seed_categories, seed_category_aliases
 
 
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
@@ -35,11 +37,15 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def _startup() -> None:
         init_db()
         # Auto-seed si la DB est vide (utile sur Render free sans disque persistant)
-        db = SessionLocal()
+        db = db_module.SessionLocal()
         try:
-            result = seed_database(db)
-            if result.get("seeded"):
-                print(f"[AUTO-SEED] {result['seeded']}")
+            if os.getenv("SKIP_PRODUCT_SEED") != "1":
+                result = seed_database(db)
+                if result.get("seeded"):
+                    print(f"[AUTO-SEED] {result['seeded']}")
+            inserted_cat = seed_categories(db)
+            if inserted_cat:
+                print(f"[AUTO-SEED] categories: {inserted_cat}")
             inserted = seed_category_aliases(db)
             if inserted:
                 print(f"[AUTO-SEED] category_aliases: {inserted}")

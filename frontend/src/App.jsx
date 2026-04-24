@@ -5,6 +5,7 @@ import { WizardPage } from './pages/WizardPage.jsx';
 import { RecipesPage } from './pages/RecipesPage.jsx';
 import { ProductsPage } from './pages/ProductsPage.jsx';
 import { ListsPage } from './pages/ListsPage.jsx';
+import { CategoriesPage } from './pages/CategoriesPage.jsx';
 import { DrivesPage } from './pages/DrivesPage.jsx';
 import { ResultsPage } from './pages/ResultsPage.jsx';
 
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/recipes" element={<RecipesPage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/lists" element={<ListsPage />} />
+          <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/drives" element={<DrivesPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

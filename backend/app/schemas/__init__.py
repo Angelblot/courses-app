@@ -1,4 +1,5 @@
 from app.schemas.cart import CartItem, CartResult
+from app.schemas.category import CategoryCreate, CategoryOut, CategoryUpdate
 from app.schemas.drive_config import (
     DriveConfigCreate,
     DriveConfigOut,
@@ -16,6 +17,9 @@ from app.schemas.shopping_list import (
 __all__ = [
     "CartItem",
     "CartResult",
+    "CategoryCreate",
+    "CategoryOut",
+    "CategoryUpdate",
     "DriveConfigCreate",
     "DriveConfigOut",
     "DriveConfigUpdate",

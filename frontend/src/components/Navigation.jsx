@@ -27,6 +27,11 @@ const ListIcon = (p) => (
     <circle cx="5" cy="18" r="1" fill="currentColor" />
   </svg>
 );
+const CategoryIcon = (p) => (
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <circle cx="12" cy="12" r="8" />
+  </svg>
+);
 const CarIcon = (p) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}>
     <path d="M4 14h16l-1.5-5a2 2 0 0 0-1.9-1.4H7.4A2 2 0 0 0 5.5 9L4 14z" />
@@ -41,6 +46,7 @@ const TABS = [
   { to: '/recipes', label: 'Recettes', Icon: BookIcon },
   { to: '/products', label: 'Produits', Icon: BagIcon },
   { to: '/lists', label: 'Listes', Icon: ListIcon },
+  { to: '/categories', label: 'Catégories', Icon: CategoryIcon },
   { to: '/drives', label: 'Drives', Icon: CarIcon },
 ];
 

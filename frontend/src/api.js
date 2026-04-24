@@ -34,6 +34,16 @@ export const ProductsAPI = {
 
 export const CategoriesAPI = {
   list: () => api('/api/categories/'),
+  create: (data) => api('/api/categories/', { method: 'POST', body: data }),
+  update: (key, data) => api(`/api/categories/${encodeURIComponent(key)}`, { method: 'PUT', body: data }),
+  delete: (key) =>
+    fetch(`${API_URL}/api/categories/${encodeURIComponent(key)}`, { method: 'DELETE' }).then(async (res) => {
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err);
+      }
+      return null;
+    }),
 };
 
 export const ListsAPI = {

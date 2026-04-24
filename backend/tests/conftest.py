@@ -7,6 +7,7 @@ sys.path.insert(0, str(BACKEND_ROOT))
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("ENCRYPTION_KEY", "test-key-insecure-for-tests-only-0123456789")
+os.environ.setdefault("SKIP_PRODUCT_SEED", "1")
 
 import pytest
 from fastapi.testclient import TestClient

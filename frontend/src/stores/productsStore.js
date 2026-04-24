@@ -44,6 +44,23 @@ export const useProductsStore = create((set, get) => ({
     set({ activeCategory: normalized });
   },
 
+  reloadCategories: async () => {
+    try {
+      const categories = await CategoriesAPI.list();
+      set((state) => {
+        const stillExists = state.activeCategory
+          ? categories.some((c) => c.key === state.activeCategory)
+          : true;
+        return {
+          categories,
+          activeCategory: stillExists ? state.activeCategory : null,
+        };
+      });
+    } catch (err) {
+      useUIStore.getState().notifyError(err);
+    }
+  },
+
   create: async (payload) => {
     try {
       const created = await ProductsAPI.create(payload);
