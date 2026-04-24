@@ -7,8 +7,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import Settings, get_settings
-from app.core.database import init_db
+from app.core.database import init_db, SessionLocal
 from app.routes import api_router
+from app.routes.seed import seed_database
 
 
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
@@ -32,6 +33,16 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     @app.on_event("startup")
     def _startup() -> None:
         init_db()
+        # Auto-seed si la DB est vide (utile sur Render free sans disque persistant)
+        db = SessionLocal()
+        try:
+            result = seed_database(db)
+            if result.get("seeded"):
+                print(f"[AUTO-SEED] {result['seeded']}")
+        except Exception as e:
+            print(f"[AUTO-SEED] Erreur: {e}")
+        finally:
+            db.close()
 
     app.include_router(api_router)
 
