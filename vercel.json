@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://courses-app-backend-3gwn.onrender.com/api/$1"
+    }
+  ]
+}
