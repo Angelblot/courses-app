@@ -41,25 +41,40 @@ export function Navigation() {
     <>
       <nav className="bottom-nav" aria-label="Navigation principale">
         <div className="bottom-nav__inner">
-          <NavLink
-            to="/recipes"
-            className={({ isActive }) =>
-              `bottom-nav__btn ${isActive ? 'bottom-nav__btn--active' : ''}`
-            }
-          >
-            <span className="bottom-nav__icon" aria-hidden="true"><BookIcon /></span>
-            <span>Recettes</span>
-          </NavLink>
+          <div className="bottom-nav__side bottom-nav__side--left">
+            <NavLink
+              to="/recipes"
+              className={({ isActive }) =>
+                `bottom-nav__btn ${isActive ? 'bottom-nav__btn--active' : ''}`
+              }
+            >
+              <span className="bottom-nav__icon" aria-hidden="true"><BookIcon /></span>
+              <span>Recettes</span>
+            </NavLink>
 
-          <NavLink
-            to="/products"
-            className={({ isActive }) =>
-              `bottom-nav__btn ${isActive ? 'bottom-nav__btn--active' : ''}`
-            }
-          >
-            <span className="bottom-nav__icon" aria-hidden="true"><BagIcon /></span>
-            <span>Produits</span>
-          </NavLink>
+            <NavLink
+              to="/products"
+              className={({ isActive }) =>
+                `bottom-nav__btn ${isActive ? 'bottom-nav__btn--active' : ''}`
+              }
+            >
+              <span className="bottom-nav__icon" aria-hidden="true"><BagIcon /></span>
+              <span>Produits</span>
+            </NavLink>
+          </div>
+
+          <div className="bottom-nav__side bottom-nav__side--right">
+            <button
+              type="button"
+              className={`bottom-nav__btn ${isMoreActive ? 'bottom-nav__btn--active' : ''}`}
+              aria-haspopup="dialog"
+              aria-expanded={moreOpen}
+              onClick={() => setMoreOpen(true)}
+            >
+              <span className="bottom-nav__icon" aria-hidden="true"><GridIcon /></span>
+              <span>Plus</span>
+            </button>
+          </div>
 
           <div className="bottom-nav__center">
             <button
@@ -72,17 +87,6 @@ export function Navigation() {
             </button>
             <span className="bottom-nav__action-label">Wizard</span>
           </div>
-
-          <button
-            type="button"
-            className={`bottom-nav__btn ${isMoreActive ? 'bottom-nav__btn--active' : ''}`}
-            aria-haspopup="dialog"
-            aria-expanded={moreOpen}
-            onClick={() => setMoreOpen(true)}
-          >
-            <span className="bottom-nav__icon" aria-hidden="true"><GridIcon /></span>
-            <span>Plus</span>
-          </button>
         </div>
       </nav>
 
