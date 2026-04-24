@@ -11,11 +11,14 @@ from app.models.purchase_line import PurchaseLine
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+from pathlib import Path
+
 @router.post("/seed")
 def seed_database(db: Session = Depends(get_db)):
-    seed_path = os.path.join(os.path.dirname(__file__), "..", "seed_data.json")
+    seed_path = str(Path(__file__).resolve().parent.parent / "seed_data.json")
+    print(f"[SEED] Looking for seed_data at: {seed_path}")
     if not os.path.exists(seed_path):
-        return {"status": "error", "detail": "seed_data.json not found"}
+        return {"status": "error", "detail": f"seed_data.json not found at {seed_path}"}
 
     with open(seed_path, "r") as f:
         data = json.load(f)
