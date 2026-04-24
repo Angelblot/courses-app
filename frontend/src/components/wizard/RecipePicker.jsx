@@ -72,7 +72,7 @@ function RecipeSwipeCard({ recipe, servings, onServingsChange }) {
   );
 }
 
-function ResumePanel({ recipes, selectedRecipes, onReset }) {
+function ResumePanel({ recipes, selectedRecipes, onReset, onContinue }) {
   const picked = recipes.filter((r) => selectedRecipes[r.id] != null);
   return (
     <div className="swipe-resume">
@@ -97,14 +97,26 @@ function ResumePanel({ recipes, selectedRecipes, onReset }) {
           ))}
         </div>
       )}
-      <button type="button" className="swipe-resume__reset" onClick={onReset}>
-        Reprendre le tri
-      </button>
+      <div className="swipe-resume__actions">
+        <button type="button" className="swipe-resume__reset" onClick={onReset}>
+          Reprendre le tri
+        </button>
+        {picked.length > 0 && onContinue && (
+          <button
+            type="button"
+            className="swipe-resume__continue"
+            onClick={onContinue}
+          >
+            Continuer
+            <Icon name="arrowRight" size={16} strokeWidth={2.5} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-export function RecipePicker() {
+export function RecipePicker({ onContinue }) {
   const recipes = useRecipesStore((s) => s.items);
   const loaded = useRecipesStore((s) => s.loaded);
   const load = useRecipesStore((s) => s.load);
@@ -166,6 +178,7 @@ export function RecipePicker() {
               recipes={recipes}
               selectedRecipes={selectedRecipes}
               onReset={handleReset}
+              onContinue={onContinue}
             />
           }
         />

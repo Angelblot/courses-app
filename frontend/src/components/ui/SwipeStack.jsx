@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Icon } from './Icon.jsx';
 
 const SWIPE_THRESHOLD = 90;
 
@@ -69,24 +68,9 @@ export function SwipeStack({
   if (!topItem) return emptyState || null;
 
   const visible = items.slice(idx, idx + 3);
-  const total = items.length;
-  const done = idx;
 
   return (
     <div className="swipe-wrap">
-      <div className="swipe-progress">
-        <span>
-          {Math.min(done + 1, total)} / {total}
-        </span>
-        <div className="swipe-progress__bar">
-          <div
-            className="swipe-progress__fill"
-            style={{ width: `${((done + 1) / total) * 100}%` }}
-          />
-        </div>
-        <span>Swipe</span>
-      </div>
-
       <div className="swipe-stack">
         {visible
           .slice()
@@ -144,25 +128,6 @@ export function SwipeStack({
               </div>
             );
           })}
-      </div>
-
-      <div className="swipe-actions">
-        <button
-          type="button"
-          className="swipe-action-btn swipe-action-btn--reject"
-          onClick={() => commitSwipe('left')}
-          aria-label="Passer"
-        >
-          <Icon name="x" size={26} />
-        </button>
-        <button
-          type="button"
-          className="swipe-action-btn swipe-action-btn--accept"
-          onClick={() => commitSwipe('right')}
-          aria-label="Garder"
-        >
-          <Icon name="check" size={26} strokeWidth={2.5} />
-        </button>
       </div>
     </div>
   );

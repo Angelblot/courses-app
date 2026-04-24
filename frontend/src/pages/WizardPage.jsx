@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useWizardStore, WIZARD_STEPS } from '../stores/wizardStore.js';
 import { RecipePicker } from '../components/wizard/RecipePicker.jsx';
@@ -26,6 +26,8 @@ export function WizardPage() {
   const navigate = useNavigate();
 
   const selectedRecipes = useWizardStore((s) => s.selectedRecipes);
+  const quotidien = useWizardStore((s) => s.quotidien);
+  const extras = useWizardStore((s) => s.extras);
   const selectedDrives = useWizardStore((s) => s.selectedDrives);
   const generating = useWizardStore((s) => s.generating);
   const launch = useWizardStore((s) => s.launch);
@@ -35,31 +37,39 @@ export function WizardPage() {
     if (idx < 0) navigate('/wizard/recipes', { replace: true });
   }, [idx, navigate]);
 
-  if (idx < 0) return null;
-
-  const current = WIZARD_STEPS[idx];
-  const StepComponent = STEP_COMPONENTS[current.key];
+  const current = idx >= 0 ? WIZARD_STEPS[idx] : null;
   const isLast = idx === WIZARD_STEPS.length - 1;
 
-  async function handleNext() {
+  const handleNext = useCallback(async () => {
     if (isLast) {
       const sessionId = await launch();
       if (sessionId) navigate(`/results/${sessionId}`);
       return;
     }
     navigate(`/wizard/${WIZARD_STEPS[idx + 1].key}`);
-  }
+  }, [isLast, idx, launch, navigate]);
 
-  let fabLabel = 'Continuer';
-  let showFab = true;
+  if (idx < 0 || !current) return null;
+
+  const StepComponent = STEP_COMPONENTS[current.key];
+
+  let showFab = false;
   let fabDisabled = false;
-  if (current.key === 'recipes' && Object.keys(selectedRecipes).length === 0) {
-    showFab = false;
-  }
-  if (current.key === 'generate') {
-    fabLabel = generating ? 'Génération…' : 'Générer';
-    if (!generating && selectedDrives.length === 0) showFab = false;
+  let fabAriaLabel = 'Continuer';
+  let fabIconName = 'arrowRight';
+
+  if (current.key === 'checklist') {
+    const hasNeeded = Object.values(quotidien).some((v) => v === 'needed');
+    showFab = hasNeeded || extras.length > 0;
+  } else if (current.key === 'recap') {
+    showFab = Object.keys(selectedRecipes).length > 0
+      || Object.values(quotidien).some((v) => v === 'needed')
+      || extras.length > 0;
+  } else if (current.key === 'generate') {
+    showFab = selectedDrives.length > 0;
     fabDisabled = generating;
+    fabAriaLabel = generating ? 'Génération…' : 'Lancer la génération';
+    fabIconName = 'check';
   }
 
   return (
@@ -100,7 +110,11 @@ export function WizardPage() {
 
       <div key={current.key} className="wizard__content wizard__content--enter">
         <div className="container">
-          <StepComponent />
+          {current.key === 'recipes' ? (
+            <StepComponent onContinue={handleNext} />
+          ) : (
+            <StepComponent />
+          )}
         </div>
       </div>
 
@@ -110,14 +124,9 @@ export function WizardPage() {
           className="wizard__fab"
           onClick={handleNext}
           disabled={fabDisabled}
-          aria-label={fabLabel}
+          aria-label={fabAriaLabel}
         >
-          <span className="wizard__fab-label">{fabLabel}</span>
-          <Icon
-            name={isLast ? 'check' : 'arrowRight'}
-            size={20}
-            strokeWidth={2.5}
-          />
+          <Icon name={fabIconName} size={24} strokeWidth={2.5} />
         </button>
       )}
     </div>
