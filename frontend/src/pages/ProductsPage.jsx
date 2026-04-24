@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useProductsStore } from '../stores/productsStore.js';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { ProductForm } from '../components/products/ProductForm.jsx';
 import { ProductCard } from '../components/products/ProductCard.jsx';
 import { ProductDetailModal } from '../components/products/ProductDetailModal.jsx';
-
-const UNCATEGORIZED = 'Sans catégorie';
+import { CategoryChipBar } from '../components/products/CategoryChipBar.jsx';
 
 const DRIVE_LABELS = {
   carrefour: 'Carrefour',
@@ -50,18 +50,39 @@ export function ProductsPage() {
   const items = useProductsStore((s) => s.items);
   const loaded = useProductsStore((s) => s.loaded);
   const load = useProductsStore((s) => s.load);
+  const categories = useProductsStore((s) => s.categories);
+  const activeCategory = useProductsStore((s) => s.activeCategory);
+  const setActiveCategory = useProductsStore((s) => s.setActiveCategory);
   const create = useProductsStore((s) => s.create);
   const update = useProductsStore((s) => s.update);
   const remove = useProductsStore((s) => s.remove);
   const toggleFavorite = useProductsStore((s) => s.toggleFavorite);
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [detailProduct, setDetailProduct] = useState(null);
-  const [activeCategory, setActiveCategory] = useState('all');
   const [activeDrive, setActiveDrive] = useState('all');
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('category');
+    if (fromUrl) setActiveCategory(fromUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (activeCategory) next.set('category', activeCategory);
+        else next.delete('category');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [activeCategory, setSearchParams]);
 
   const drives = useMemo(() => {
     const set = new Set();
@@ -76,54 +97,54 @@ export function ProductsPage() {
     return items.filter((p) => (p.drive_names || []).includes(activeDrive));
   }, [items, activeDrive]);
 
-  const categories = useMemo(() => {
+  const rawCategoryLabels = useMemo(() => {
     const set = new Set();
     driveFiltered.forEach((p) => {
       if (p.category && p.category.trim()) set.add(p.category.trim());
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
+    return Array.from(set);
   }, [driveFiltered]);
 
+  const categoriesWithCounts = useMemo(() => {
+    const counts = {};
+    driveFiltered.forEach((p) => {
+      const key = p.category_key || 'autre';
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return (categories || []).map((c) => ({ ...c, count: counts[c.key] || 0 }));
+  }, [categories, driveFiltered]);
+
+  const activeCategoryEntry = useMemo(
+    () => (categories || []).find((c) => c.key === activeCategory) || null,
+    [categories, activeCategory],
+  );
+
   const filtered = useMemo(() => {
-    if (activeCategory === 'all') return driveFiltered;
-    if (activeCategory === UNCATEGORIZED) {
-      return driveFiltered.filter((p) => !p.category || !p.category.trim());
-    }
-    return driveFiltered.filter((p) => p.category === activeCategory);
+    if (!activeCategory) return driveFiltered;
+    return driveFiltered.filter((p) => p.category_key === activeCategory);
   }, [driveFiltered, activeCategory]);
 
   const groups = useMemo(() => {
     const map = new Map();
     filtered.forEach((p) => {
-      const cat = p.category && p.category.trim() ? p.category.trim() : UNCATEGORIZED;
-      if (!map.has(cat)) map.set(cat, []);
-      map.get(cat).push(p);
+      const key = p.category_key || 'autre';
+      const label = p.category_label || 'Autres';
+      if (!map.has(key)) map.set(key, { label, items: [] });
+      map.get(key).items.push(p);
     });
+    const order = new Map((categories || []).map((c, idx) => [c.key, idx]));
     return Array.from(map.entries())
       .sort((a, b) => {
-        if (a[0] === UNCATEGORIZED) return 1;
-        if (b[0] === UNCATEGORIZED) return -1;
-        return a[0].localeCompare(b[0]);
+        const oa = order.has(a[0]) ? order.get(a[0]) : 999;
+        const ob = order.has(b[0]) ? order.get(b[0]) : 999;
+        return oa - ob;
       })
-      .map(([category, list]) => ({
-        category,
+      .map(([key, { label, items: list }]) => ({
+        key,
+        label,
         items: list.sort((x, y) => x.name.localeCompare(y.name)),
       }));
-  }, [filtered]);
-
-  const chipData = useMemo(() => {
-    const byCat = {};
-    driveFiltered.forEach((p) => {
-      const cat = p.category && p.category.trim() ? p.category.trim() : UNCATEGORIZED;
-      byCat[cat] = (byCat[cat] || 0) + 1;
-    });
-    return {
-      all: driveFiltered.length,
-      perCategory: [...categories, ...(byCat[UNCATEGORIZED] ? [UNCATEGORIZED] : [])].map(
-        (c) => ({ label: c, count: byCat[c] || 0 }),
-      ),
-    };
-  }, [driveFiltered, categories]);
+  }, [filtered, categories]);
 
   const driveChipData = useMemo(() => {
     const byDrive = {};
@@ -143,6 +164,7 @@ export function ProductsPage() {
   function handleEdit(product) { setEditing(product); setShowForm(true); }
   function handleViewDetails(product) { setDetailProduct(product); }
   function handleCloseDetails() { setDetailProduct(null); }
+  function handleCategoryFilter(key) { setActiveCategory(key); }
 
   async function handleSubmit(payload) {
     if (editing) await update(editing.id, payload);
@@ -170,7 +192,7 @@ export function ProductsPage() {
         <span className="section-header__count">
           {items.length} produit{items.length > 1 ? 's' : ''}
           {activeDrive !== 'all' && ` · drive ${driveLabel(activeDrive)}`}
-          {activeCategory !== 'all' && ` · ${filtered.length} dans « ${activeCategory} »`}
+          {activeCategoryEntry && ` · ${filtered.length} dans « ${activeCategoryEntry.label} »`}
         </span>
       </div>
 
@@ -178,7 +200,7 @@ export function ProductsPage() {
         <ProductForm
           key={editing?.id || 'new'}
           initialValue={editing}
-          categories={categories}
+          categories={rawCategoryLabels}
           title={editing ? `Éditer « ${editing.name} »` : 'Nouveau produit'}
           onSubmit={handleSubmit}
           onCancel={handleCloseForm}
@@ -212,29 +234,11 @@ export function ProductsPage() {
       )}
 
       {items.length > 0 && (
-        <div className="filter-chips" role="tablist" aria-label="Filtrer par catégorie">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeCategory === 'all'}
-            className={`filter-chip ${activeCategory === 'all' ? 'filter-chip--active' : ''}`}
-            onClick={() => setActiveCategory('all')}
-          >
-            Tous <span className="filter-chip__count">{chipData.all}</span>
-          </button>
-          {chipData.perCategory.map((c) => (
-            <button
-              key={c.label}
-              type="button"
-              role="tab"
-              aria-selected={activeCategory === c.label}
-              className={`filter-chip ${activeCategory === c.label ? 'filter-chip--active' : ''}`}
-              onClick={() => setActiveCategory(c.label)}
-            >
-              {c.label} <span className="filter-chip__count">{c.count}</span>
-            </button>
-          ))}
-        </div>
+        <CategoryChipBar
+          categories={categoriesWithCounts}
+          activeKey={activeCategory}
+          onChange={handleCategoryFilter}
+        />
       )}
 
       {loaded && items.length === 0 ? (
@@ -248,9 +252,9 @@ export function ProductsPage() {
       ) : (
         <div className="stack stack--lg">
           {groups.map((group) => (
-            <section key={group.category} className="category-group">
+            <section key={group.key} className="category-group">
               <header className="category-group__header">
-                <h3 className="category-group__title">{group.category}</h3>
+                <h3 className="category-group__title">{group.label}</h3>
                 <span className="category-group__count">
                   {group.items.length} produit{group.items.length > 1 ? 's' : ''}
                 </span>
@@ -264,6 +268,7 @@ export function ProductsPage() {
                     onDelete={handleDelete}
                     onEdit={handleEdit}
                     onViewDetails={handleViewDetails}
+                    onCategoryClick={handleCategoryFilter}
                     isEditing={editing?.id === p.id}
                   />
                 ))}

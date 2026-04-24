@@ -1,6 +1,20 @@
 import { Button } from '../ui/Button.jsx';
 import { Icon } from '../ui/Icon.jsx';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
+import { CategoryMiniChip } from './CategoryMiniChip.jsx';
+
+const CATEGORY_ICONS = {
+  fruits_legumes: 'apple',
+  pls: 'milk',
+  charcuterie: 'ham',
+  boissons: 'cup-soda',
+  epicerie: 'package-2',
+  droguerie: 'spray-can',
+  parfumerie: 'sparkles',
+  maison: 'home',
+  surgeles: 'snowflake',
+  autre: 'tag',
+};
 
 const DRIVE_LABELS = {
   carrefour: 'Carrefour',
@@ -74,6 +88,7 @@ export function ProductCard({
   onDelete,
   onEdit,
   onViewDetails,
+  onCategoryClick,
   isEditing,
 }) {
   const bodyClickable = Boolean(onViewDetails || onEdit);
@@ -89,6 +104,9 @@ export function ProductCard({
   const keyword = [product.name, product.category].filter(Boolean).join(' ');
   const driveNames = Array.isArray(product.drive_names) ? product.drive_names : [];
   const trend = product.price_trend;
+  const categoryKey = product.category_key || null;
+  const categoryLabel = product.category_label || null;
+  const categoryIcon = categoryKey ? CATEGORY_ICONS[categoryKey] : null;
 
   function handleBodyClick() {
     if (onViewDetails) return onViewDetails(product);
@@ -142,7 +160,6 @@ export function ProductCard({
         </div>
         <div className="item__meta">
           {product.brand && <>{product.brand} · </>}
-          {product.category && <>{product.category} · </>}
           {product.default_quantity} {product.unit}
           {product.purchase_count > 0 && (
             <>
@@ -151,6 +168,16 @@ export function ProductCard({
             </>
           )}
         </div>
+        {categoryLabel && (
+          <div style={{ marginTop: 6 }}>
+            <CategoryMiniChip
+              categoryKey={categoryKey}
+              icon={categoryIcon}
+              label={categoryLabel}
+              onClick={onCategoryClick}
+            />
+          </div>
+        )}
         {driveNames.length > 0 && (
           <div
             className="item__drives"

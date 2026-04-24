@@ -44,12 +44,6 @@ export const useProductsStore = create((set, get) => ({
     set({ activeCategory: normalized });
   },
 
-  filteredProducts: () => {
-    const { items, activeCategory } = get();
-    if (!activeCategory) return items;
-    return items.filter((p) => p.category_key === activeCategory);
-  },
-
   create: async (payload) => {
     try {
       const created = await ProductsAPI.create(payload);
