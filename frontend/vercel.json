@@ -1,5 +1,8 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "http://localhost:8000/api/$1" }
+    {
+      "source": "/api/(.*)",
+      "destination": "https://courses-app-pll4.onrender.com/api/$1"
+    }
   ]
 }
