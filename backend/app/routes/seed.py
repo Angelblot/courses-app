@@ -13,22 +13,25 @@ from app.models.product_drive import ProductDrive
 from app.models.purchase_line import PurchaseLine
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-
+from sqlalchemy.types import DateTime, Date
 
 def _parse_dates(row: dict, model_cls) -> dict:
-    """Convertit les chaînes ISO en datetime pour les colonnes DateTime."""
+    """Convertit les chaînes ISO en datetime/date pour les colonnes SQLAlchemy."""
     from sqlalchemy import inspect as sa_inspect
-    from sqlalchemy.types import DateTime
 
     mapper = sa_inspect(model_cls)
     result = dict(row)
     for col in mapper.columns:
-        if isinstance(col.type, DateTime) and col.name in result:
-            val = result[col.name]
-            if isinstance(val, str):
-                # gère '2026-04-23 18:21:42.261352' ou '2026-04-23 18:21:42'
-                fmt = "%Y-%m-%d %H:%M:%S.%f" if "." in val else "%Y-%m-%d %H:%M:%S"
-                result[col.name] = datetime.strptime(val, fmt)
+        if col.name not in result:
+            continue
+        val = result[col.name]
+        if not isinstance(val, str):
+            continue
+        if isinstance(col.type, DateTime):
+            fmt = "%Y-%m-%d %H:%M:%S.%f" if "." in val else "%Y-%m-%d %H:%M:%S"
+            result[col.name] = datetime.strptime(val, fmt)
+        elif isinstance(col.type, Date):
+            result[col.name] = datetime.strptime(val, "%Y-%m-%d").date()
     return result
 
 
