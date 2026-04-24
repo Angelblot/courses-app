@@ -2,6 +2,7 @@ import { Button } from '../ui/Button.jsx';
 import { Icon } from '../ui/Icon.jsx';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
 import { CategoryMiniChip } from './CategoryMiniChip.jsx';
+import { ProductCardEditable } from './ProductCardEditable.jsx';
 
 const CATEGORY_ICONS = {
   fruits_legumes: 'apple',
@@ -90,7 +91,22 @@ export function ProductCard({
   onViewDetails,
   onCategoryClick,
   isEditing,
+  isInlineEditing,
+  onInlineSave,
+  onInlineCancel,
+  categoryLabels,
 }) {
+  if (isInlineEditing) {
+    return (
+      <ProductCardEditable
+        product={product}
+        categories={categoryLabels}
+        onSave={(patch) => onInlineSave(product.id, patch)}
+        onCancel={onInlineCancel}
+      />
+    );
+  }
+
   const bodyClickable = Boolean(onViewDetails || onEdit);
   const classes = [
     'item',

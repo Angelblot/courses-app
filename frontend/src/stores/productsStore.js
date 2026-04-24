@@ -62,8 +62,10 @@ export const useProductsStore = create((set, get) => ({
       set((state) => ({
         items: state.items.map((p) => (p.id === id ? { ...p, ...updated } : p)),
       }));
+      return updated;
     } catch (err) {
       useUIStore.getState().notifyError(err);
+      throw err;
     }
   },
 
@@ -76,9 +78,13 @@ export const useProductsStore = create((set, get) => ({
     }
   },
 
-  toggleFavorite: (id) => {
+  toggleFavorite: async (id) => {
     const product = get().items.find((p) => p.id === id);
     if (!product) return;
-    return get().update(id, { favorite: !product.favorite });
+    try {
+      await get().update(id, { favorite: !product.favorite });
+    } catch (_err) {
+      // Error already surfaced via toast in update().
+    }
   },
 }));

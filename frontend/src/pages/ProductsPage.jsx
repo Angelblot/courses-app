@@ -60,7 +60,7 @@ export function ProductsPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
+  const [inlineEditingId, setInlineEditingId] = useState(null);
   const [detailProduct, setDetailProduct] = useState(null);
   const [activeDrive, setActiveDrive] = useState('all');
 
@@ -159,16 +159,17 @@ export function ProductsPage() {
     };
   }, [items, drives]);
 
-  function handleOpenCreate() { setEditing(null); setShowForm(true); }
-  function handleCloseForm() { setShowForm(false); setEditing(null); }
-  function handleEdit(product) { setEditing(product); setShowForm(true); }
+  function handleOpenCreate() { setShowForm(true); }
+  function handleCloseForm() { setShowForm(false); }
+  function handleEdit(product) { setInlineEditingId(product.id); }
+  function handleInlineCancel() { setInlineEditingId(null); }
+  async function handleInlineSave(id, patch) { await update(id, patch); }
   function handleViewDetails(product) { setDetailProduct(product); }
   function handleCloseDetails() { setDetailProduct(null); }
   function handleCategoryFilter(key) { setActiveCategory(key); }
 
   async function handleSubmit(payload) {
-    if (editing) await update(editing.id, payload);
-    else await create(payload);
+    await create(payload);
   }
 
   async function handleDelete(id) {
@@ -176,7 +177,7 @@ export function ProductsPage() {
     remove(id);
   }
 
-  const formOpen = showForm || Boolean(editing);
+  const formOpen = showForm;
   const showDriveFilter = drives.length > 1;
 
   return (
@@ -198,10 +199,9 @@ export function ProductsPage() {
 
       {formOpen && (
         <ProductForm
-          key={editing?.id || 'new'}
-          initialValue={editing}
+          key="new"
           categories={rawCategoryLabels}
-          title={editing ? `Éditer « ${editing.name} »` : 'Nouveau produit'}
+          title="Nouveau produit"
           onSubmit={handleSubmit}
           onCancel={handleCloseForm}
         />
@@ -269,7 +269,10 @@ export function ProductsPage() {
                     onEdit={handleEdit}
                     onViewDetails={handleViewDetails}
                     onCategoryClick={handleCategoryFilter}
-                    isEditing={editing?.id === p.id}
+                    isInlineEditing={inlineEditingId === p.id}
+                    onInlineSave={handleInlineSave}
+                    onInlineCancel={handleInlineCancel}
+                    categoryLabels={rawCategoryLabels}
                   />
                 ))}
               </div>

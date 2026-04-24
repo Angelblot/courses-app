@@ -228,6 +228,19 @@ h1, h2, h3, h4 { line-height: 1.2; letter-spacing: -0.01em; font-weight: 700; }
 .item--clickable { cursor: pointer; }
 .item--clickable:hover { border-color: var(--color-accent); }
 .item--editing { border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-soft); }
+.item--editing .item__actions { align-self: flex-start; }
+.item--flash { animation: itemFlash 420ms var(--ease-out); }
+@keyframes itemFlash {
+  0% { background: var(--color-accent-soft); box-shadow: 0 0 0 3px var(--color-accent-soft); }
+  100% { background: var(--color-surface); }
+}
+
+.input--inline, .select--inline {
+  padding: 6px 10px;
+  min-height: 34px;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
+}
 
 .empty {
   display: flex; flex-direction: column; align-items: center;
