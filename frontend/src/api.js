@@ -1,4 +1,6 @@
-const API_URL = ''; // Même domaine (backend sert le frontend)
+const API_URL = import.meta.env.PROD
+  ? 'https://courses-app-backend-3gwn.onrender.com'
+  : ''; // Dev: Vite proxy vers localhost:8000
 
 async function api(path, options = {}) {
   const res = await fetch(`${API_URL}${path}`, {
