@@ -510,6 +510,102 @@ h1, h2, h3, h4 { line-height: 1.2; letter-spacing: -0.01em; font-weight: 700; }
 .filter-chip--active { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
 .filter-chip__count { font-size: 11px; opacity: 0.85; font-weight: 700; }
 
+.category-chip-bar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding: var(--space-2) var(--space-5);
+  margin: 0 calc(var(--space-5) * -1);
+  scrollbar-width: none;
+  background: rgba(250, 250, 248, 0.94);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid var(--color-border);
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.category-chip-bar::-webkit-scrollbar { display: none; }
+
+.category-chip {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  color: #1A1A1A;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.category-chip::before {
+  content: '';
+  position: absolute;
+  inset: -4px -2px;
+}
+.category-chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.category-chip--active {
+  background: var(--color-accent) !important;
+  color: var(--color-accent-contrast);
+  border-color: var(--color-accent);
+}
+.category-chip--reset {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+.category-chip__label { letter-spacing: -0.005em; }
+.category-chip__count {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: rgba(26, 26, 26, 0.08);
+  color: inherit;
+}
+.category-chip--active .category-chip__count {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.category-mini-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  color: #1A1A1A;
+  line-height: 1.5;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: none;
+}
+.category-mini-chip--button {
+  cursor: pointer;
+  transition: transform var(--t-fast), filter var(--t-fast);
+}
+.category-mini-chip--button:hover {
+  filter: brightness(0.96);
+}
+.category-mini-chip--button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .category-group { display: flex; flex-direction: column; gap: var(--space-2); }
 .category-group__header { display: flex; align-items: baseline; justify-content: space-between; padding: 0 var(--space-1); }
 .category-group__title { font-size: var(--font-size-md); font-weight: 700; }

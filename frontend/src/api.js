@@ -32,6 +32,10 @@ export const ProductsAPI = {
   getPriceHistory: (id) => api(`/api/products/${id}/price-history`),
 };
 
+export const CategoriesAPI = {
+  list: () => api('/api/categories/'),
+};
+
 export const ListsAPI = {
   list: () => api('/api/lists/'),
   create: (data) => api('/api/lists/', { method: 'POST', body: data }),

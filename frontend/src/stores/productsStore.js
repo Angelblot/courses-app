@@ -1,17 +1,22 @@
 import { create } from 'zustand';
-import { ProductsAPI } from '../api.js';
+import { CategoriesAPI, ProductsAPI } from '../api.js';
 import { useUIStore } from './uiStore.js';
 
 export const useProductsStore = create((set, get) => ({
   items: [],
   loading: false,
   loaded: false,
+  categories: [],
+  activeCategory: null,
 
   load: async () => {
     set({ loading: true });
     try {
-      const items = await ProductsAPI.list();
-      set({ items, loaded: true });
+      const [items, categories] = await Promise.all([
+        ProductsAPI.list(),
+        CategoriesAPI.list().catch(() => []),
+      ]);
+      set({ items, categories, loaded: true });
     } catch (err) {
       useUIStore.getState().notifyError(err);
     } finally {
@@ -31,6 +36,18 @@ export const useProductsStore = create((set, get) => ({
     } finally {
       set({ loading: false });
     }
+  },
+
+  setActiveCategory: (key) => {
+    const normalized = key && key !== 'all' ? key : null;
+    if (get().activeCategory === normalized) return;
+    set({ activeCategory: normalized });
+  },
+
+  filteredProducts: () => {
+    const { items, activeCategory } = get();
+    if (!activeCategory) return items;
+    return items.filter((p) => p.category_key === activeCategory);
   },
 
   create: async (payload) => {

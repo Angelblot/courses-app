@@ -48,3 +48,5 @@ class ProductOut(ProductBase):
     drive_ids: List[int] = []
     purchase_count: int = 0
     price_trend: Optional[str] = None
+    category_key: Optional[str] = None
+    category_label: Optional[str] = None

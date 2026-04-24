@@ -10,6 +10,7 @@ from app.core.config import Settings, get_settings
 from app.core.database import init_db, SessionLocal
 from app.routes import api_router
 from app.routes.seed import seed_database
+from app.services.categories import seed_category_aliases
 
 
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
@@ -39,6 +40,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             result = seed_database(db)
             if result.get("seeded"):
                 print(f"[AUTO-SEED] {result['seeded']}")
+            inserted = seed_category_aliases(db)
+            if inserted:
+                print(f"[AUTO-SEED] category_aliases: {inserted}")
         except Exception as e:
             print(f"[AUTO-SEED] Erreur: {e}")
         finally:

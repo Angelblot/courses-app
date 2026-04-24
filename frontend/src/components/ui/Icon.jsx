@@ -193,6 +193,66 @@ const PATHS = {
       <path d="M12 13c2-3 6-3 8-2 0 4-3 7-8 7" />
     </>
   ),
+  milk: (
+    <>
+      <path d="M9 3h6" />
+      <path d="M9 3v3l-2 3v10a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9l-2-3V3" />
+      <path d="M8 13h8" />
+    </>
+  ),
+  ham: (
+    <>
+      <path d="M14 4a6 6 0 0 1 6 6c0 3-2 5-4 5-1 0-2 .5-2 2 0 2-2 4-5 4-4 0-7-3-7-7 0-3 2-5 5-6 1-1 3-4 7-4z" />
+      <path d="M9 16a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+    </>
+  ),
+  'cup-soda': (
+    <>
+      <path d="M6 7h12l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7z" />
+      <path d="M8 7c0-2 1.5-4 4-4s4 2 4 4" />
+      <path d="M9 12h6" />
+    </>
+  ),
+  'package-2': (
+    <>
+      <path d="M3 9l9-5 9 5v8a2 2 0 0 1-1 1.7l-7 3.8a2 2 0 0 1-2 0l-7-3.8A2 2 0 0 1 3 17V9z" />
+      <path d="M3 9l9 5 9-5" />
+      <path d="M7.5 6.5l9 5" />
+    </>
+  ),
+  'spray-can': (
+    <>
+      <rect x="6" y="9" width="12" height="12" rx="2" />
+      <path d="M10 9V5a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v4" />
+      <path d="M20 4h.01" />
+      <path d="M17 6h.01" />
+      <path d="M20 7h.01" />
+      <path d="M10 14h4" />
+    </>
+  ),
+  sparkles: (
+    <>
+      <path d="M9 3v4M7 5h4M17 13v4M15 15h4" />
+      <path d="M12 8l2.5 5.5L20 16l-5.5 2.5L12 24l-2.5-5.5L4 16l5.5-2.5z" />
+    </>
+  ),
+  snowflake: (
+    <>
+      <path d="M12 2v20" />
+      <path d="M4 6l16 12" />
+      <path d="M4 18L20 6" />
+      <path d="M9 4l3 2 3-2" />
+      <path d="M9 20l3-2 3 2" />
+      <path d="M2 9l2 3-2 3" />
+      <path d="M22 9l-2 3 2 3" />
+    </>
+  ),
+  tag: (
+    <>
+      <path d="M20 13.5L13.5 20a2 2 0 0 1-2.8 0L3.5 12.8a2 2 0 0 1-.5-1.3V4.5A1.5 1.5 0 0 1 4.5 3h7a2 2 0 0 1 1.4.6l7.2 7.2a2 2 0 0 1-.1 2.7z" />
+      <circle cx="7.5" cy="7.5" r="1.2" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 20, strokeWidth = 1.75, className = '', ...rest }) {
