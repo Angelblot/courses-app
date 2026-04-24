@@ -1,12 +1,7 @@
-import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { MoreMenuSheet } from './MoreMenuSheet.jsx';
 
-const HomeIcon = (p) => (
-  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}>
-    <path d="M3 11.5 12 4l9 7.5" />
-    <path d="M5 10.5V20h14v-9.5" />
-    <path d="M10 20v-5h4v5" />
-  </svg>
-);
 const BookIcon = (p) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}>
     <path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z" />
@@ -19,57 +14,79 @@ const BagIcon = (p) => (
     <path d="M9 8V6a3 3 0 0 1 6 0v2" />
   </svg>
 );
-const ListIcon = (p) => (
-  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}>
-    <path d="M9 6h11M9 12h11M9 18h11" />
-    <circle cx="5" cy="6" r="1" fill="currentColor" />
-    <circle cx="5" cy="12" r="1" fill="currentColor" />
-    <circle cx="5" cy="18" r="1" fill="currentColor" />
+const CartIcon = (p) => (
+  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M3 4h2l2.4 11.4a2 2 0 0 0 2 1.6h7.2a2 2 0 0 0 2-1.55L20.5 8H6.2" />
+    <circle cx="10" cy="20" r="1.4" />
+    <circle cx="17" cy="20" r="1.4" />
   </svg>
 );
-const CategoryIcon = (p) => (
+const GridIcon = (p) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}>
-    <circle cx="12" cy="12" r="8" />
+    <rect x="4" y="4" width="7" height="7" rx="1.5" />
+    <rect x="13" y="4" width="7" height="7" rx="1.5" />
+    <rect x="4" y="13" width="7" height="7" rx="1.5" />
+    <rect x="13" y="13" width="7" height="7" rx="1.5" />
   </svg>
 );
-const CarIcon = (p) => (
-  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}>
-    <path d="M4 14h16l-1.5-5a2 2 0 0 0-1.9-1.4H7.4A2 2 0 0 0 5.5 9L4 14z" />
-    <path d="M4 14v4h3v-2h10v2h3v-4" />
-    <circle cx="8" cy="16" r="1.1" />
-    <circle cx="16" cy="16" r="1.1" />
-  </svg>
-);
-
-const TABS = [
-  { to: '/', label: 'Accueil', Icon: HomeIcon, end: true },
-  { to: '/recipes', label: 'Recettes', Icon: BookIcon },
-  { to: '/products', label: 'Produits', Icon: BagIcon },
-  { to: '/lists', label: 'Listes', Icon: ListIcon },
-  { to: '/categories', label: 'Catégories', Icon: CategoryIcon },
-  { to: '/drives', label: 'Drives', Icon: CarIcon },
-];
 
 export function Navigation() {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const isMoreActive = ['/', '/lists', '/categories', '/drives'].includes(pathname);
+
   return (
-    <nav className="bottom-nav" aria-label="Navigation principale">
-      <div className="bottom-nav__inner">
-        {TABS.map(({ to, label, Icon, end }) => (
+    <>
+      <nav className="bottom-nav" aria-label="Navigation principale">
+        <div className="bottom-nav__inner">
           <NavLink
-            key={to}
-            to={to}
-            end={end}
+            to="/recipes"
             className={({ isActive }) =>
               `bottom-nav__btn ${isActive ? 'bottom-nav__btn--active' : ''}`
             }
           >
-            <span className="bottom-nav__icon" aria-hidden="true">
-              <Icon />
-            </span>
-            <span>{label}</span>
+            <span className="bottom-nav__icon" aria-hidden="true"><BookIcon /></span>
+            <span>Recettes</span>
           </NavLink>
-        ))}
-      </div>
-    </nav>
+
+          <NavLink
+            to="/products"
+            className={({ isActive }) =>
+              `bottom-nav__btn ${isActive ? 'bottom-nav__btn--active' : ''}`
+            }
+          >
+            <span className="bottom-nav__icon" aria-hidden="true"><BagIcon /></span>
+            <span>Produits</span>
+          </NavLink>
+
+          <div className="bottom-nav__center">
+            <button
+              type="button"
+              className="bottom-nav__action"
+              aria-label="Lancer le wizard"
+              onClick={() => navigate('/wizard')}
+            >
+              <CartIcon />
+            </button>
+            <span className="bottom-nav__action-label">Wizard</span>
+          </div>
+
+          <button
+            type="button"
+            className={`bottom-nav__btn ${isMoreActive ? 'bottom-nav__btn--active' : ''}`}
+            aria-haspopup="dialog"
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen(true)}
+          >
+            <span className="bottom-nav__icon" aria-hidden="true"><GridIcon /></span>
+            <span>Plus</span>
+          </button>
+        </div>
+      </nav>
+
+      <MoreMenuSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
+    </>
   );
 }
