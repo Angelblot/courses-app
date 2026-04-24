@@ -147,11 +147,10 @@ export function ProductCardEditable({
     .filter(Boolean)
     .join(' ');
 
+  const hasCategories = Array.isArray(categories) && categories.length > 0;
   const categoryOptions = Array.from(
     new Set([...(categories || []), form.category].filter((c) => c && c.trim())),
   ).sort((a, b) => a.localeCompare(b));
-
-  const datalistId = `cats-${product.id}`;
 
   return (
     <article
@@ -200,20 +199,30 @@ export function ProductCardEditable({
             placeholder="Marque"
             autoComplete="off"
           />
-          <input
-            className="input input--inline"
-            list={datalistId}
-            value={form.category || ''}
-            onChange={(e) => updateField({ category: e.target.value })}
-            aria-label="Catégorie"
-            placeholder="Catégorie"
-            autoComplete="off"
-          />
-          <datalist id={datalistId}>
-            {categoryOptions.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
+          {hasCategories ? (
+            <select
+              className="input input--inline"
+              value={form.category || ''}
+              onChange={(e) => updateField({ category: e.target.value })}
+              aria-label="Catégorie"
+            >
+              <option value="">Catégorie…</option>
+              {categoryOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className="input input--inline"
+              value={form.category || ''}
+              onChange={(e) => updateField({ category: e.target.value })}
+              aria-label="Catégorie"
+              placeholder="Catégorie"
+              autoComplete="off"
+            />
+          )}
         </div>
         <div
           style={{
