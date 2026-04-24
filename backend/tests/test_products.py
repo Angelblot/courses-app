@@ -48,3 +48,14 @@ def test_favorite_only_filter(client):
 def test_product_name_required(client):
     res = client.post("/api/products/", json={"name": ""})
     assert res.status_code == 422
+
+
+def test_canonical_category_label_resolves(client):
+    res = client.post(
+        "/api/products/",
+        json={"name": "Yaourt", "category": "Produits laitiers"},
+    )
+    assert res.status_code == 201
+    product = res.json()
+    assert product["category_key"] == "pls"
+    assert product["category_label"] == "Produits laitiers"

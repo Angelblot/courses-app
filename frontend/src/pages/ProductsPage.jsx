@@ -105,6 +105,11 @@ export function ProductsPage() {
     return Array.from(set);
   }, [driveFiltered]);
 
+  const canonicalCategoryLabels = useMemo(
+    () => (categories || []).map((c) => c.label),
+    [categories],
+  );
+
   const categoriesWithCounts = useMemo(() => {
     const counts = {};
     driveFiltered.forEach((p) => {
@@ -272,7 +277,7 @@ export function ProductsPage() {
                     isInlineEditing={inlineEditingId === p.id}
                     onInlineSave={handleInlineSave}
                     onInlineCancel={handleInlineCancel}
-                    categoryLabels={rawCategoryLabels}
+                    categoryLabels={canonicalCategoryLabels}
                   />
                 ))}
               </div>

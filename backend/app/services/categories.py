@@ -32,6 +32,9 @@ CATEGORIES_CATALOG: List[Dict[str, str]] = [
 
 CATALOG_BY_KEY: Dict[str, Dict[str, str]] = {c["key"]: c for c in CATEGORIES_CATALOG}
 CATALOG_ORDER: Dict[str, int] = {c["key"]: idx for idx, c in enumerate(CATEGORIES_CATALOG)}
+CATALOG_LABEL_TO_KEY: Dict[str, str] = {
+    c["label"].casefold(): c["key"] for c in CATEGORIES_CATALOG
+}
 
 SEED_ALIASES: Dict[str, str] = {
     "BOISSONS": "boissons",
@@ -78,6 +81,9 @@ class CategoryService:
         upper = normalized.upper()
         if upper in aliases:
             return aliases[upper]
+        canonical = CATALOG_LABEL_TO_KEY.get(normalized.casefold())
+        if canonical is not None:
+            return canonical
         return "autre"
 
     def resolve(self, raw_label: Optional[str]) -> Tuple[str, str]:
