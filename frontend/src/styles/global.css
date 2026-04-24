@@ -101,10 +101,9 @@ h1, h2, h3, h4 { line-height: 1.2; letter-spacing: -0.01em; font-weight: 700; }
 .bottom-nav__side {
   display: flex; flex: 1; align-items: stretch;
 }
-.bottom-nav__side--left { justify-content: flex-start; }
-.bottom-nav__side--right { justify-content: flex-end; }
-.bottom-nav__side--left .bottom-nav__btn { flex: 1; }
-.bottom-nav__side--right .bottom-nav__btn { flex: 0 0 50%; }
+.bottom-nav__side--left { justify-content: flex-end; padding-right: 36px; }
+.bottom-nav__side--right { justify-content: flex-start; padding-left: 36px; }
+.bottom-nav__side .bottom-nav__btn { flex: 1; min-width: 0; }
 .bottom-nav__btn {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 4px; color: var(--color-text-subtle);

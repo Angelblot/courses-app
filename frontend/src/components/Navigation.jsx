@@ -2,6 +2,13 @@ import { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { MoreMenuSheet } from './MoreMenuSheet.jsx';
 
+const HomeIcon = (p) => (
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M3 11.5 12 4l9 7.5" />
+    <path d="M5 10.5V20h14v-9.5" />
+    <path d="M10 20v-5h4v5" />
+  </svg>
+);
 const BookIcon = (p) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}>
     <path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z" />
@@ -35,13 +42,24 @@ export function Navigation() {
   const { pathname } = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const isMoreActive = ['/', '/lists', '/categories', '/drives'].includes(pathname);
+  const isMoreActive = ['/lists', '/categories', '/drives'].includes(pathname);
 
   return (
     <>
       <nav className="bottom-nav" aria-label="Navigation principale">
         <div className="bottom-nav__inner">
           <div className="bottom-nav__side bottom-nav__side--left">
+            <NavLink
+              to="/"
+              end
+              className={({ isActive }) =>
+                `bottom-nav__btn ${isActive ? 'bottom-nav__btn--active' : ''}`
+              }
+            >
+              <span className="bottom-nav__icon" aria-hidden="true"><HomeIcon /></span>
+              <span>Accueil</span>
+            </NavLink>
+
             <NavLink
               to="/recipes"
               className={({ isActive }) =>
@@ -51,7 +69,9 @@ export function Navigation() {
               <span className="bottom-nav__icon" aria-hidden="true"><BookIcon /></span>
               <span>Recettes</span>
             </NavLink>
+          </div>
 
+          <div className="bottom-nav__side bottom-nav__side--right">
             <NavLink
               to="/products"
               className={({ isActive }) =>
@@ -61,9 +81,7 @@ export function Navigation() {
               <span className="bottom-nav__icon" aria-hidden="true"><BagIcon /></span>
               <span>Produits</span>
             </NavLink>
-          </div>
 
-          <div className="bottom-nav__side bottom-nav__side--right">
             <button
               type="button"
               className={`bottom-nav__btn ${isMoreActive ? 'bottom-nav__btn--active' : ''}`}
