@@ -1,7 +1,9 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+BrandType = Literal["common", "store_brand", "generic"]
 
 
 class ProductBase(BaseModel):
@@ -17,6 +19,8 @@ class ProductBase(BaseModel):
     price_ttc: Optional[float] = None
     vat_rate: Optional[float] = None
     image_url: Optional[str] = Field(None, max_length=500)
+    brand_type: BrandType = "common"
+    store_brand_affinity: Optional[str] = Field(None, max_length=50)
 
 
 class ProductCreate(ProductBase):
@@ -36,6 +40,8 @@ class ProductUpdate(BaseModel):
     price_ttc: Optional[float] = None
     vat_rate: Optional[float] = None
     image_url: Optional[str] = Field(None, max_length=500)
+    brand_type: Optional[BrandType] = None
+    store_brand_affinity: Optional[str] = Field(None, max_length=50)
 
 
 class ProductOut(ProductBase):

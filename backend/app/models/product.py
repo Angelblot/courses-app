@@ -8,7 +8,11 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.drive_config import DriveConfig
+    from app.models.product_equivalent import ProductEquivalent
     from app.models.purchase_line import PurchaseLine
+
+
+VALID_BRAND_TYPES = ("common", "store_brand", "generic")
 
 
 class Product(Base):
@@ -27,6 +31,8 @@ class Product(Base):
     price_ttc: Mapped[Optional[float]] = mapped_column(Numeric(10, 2))
     vat_rate: Mapped[Optional[float]] = mapped_column(Numeric(5, 2))
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    brand_type: Mapped[str] = mapped_column(String(20), default="common", nullable=False)
+    store_brand_affinity: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -39,6 +45,11 @@ class Product(Base):
     )
     purchase_lines: Mapped[List["PurchaseLine"]] = relationship(
         back_populates="product",
+        lazy="selectin",
+    )
+    equivalents: Mapped[List["ProductEquivalent"]] = relationship(
+        back_populates="product",
+        cascade="all, delete-orphan",
         lazy="selectin",
     )
 

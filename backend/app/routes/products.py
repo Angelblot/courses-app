@@ -3,6 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, status
 
 from app.routes.deps import product_service
+from app.schemas.equivalent import ProductEquivalentCreate, ProductEquivalentOut
 from app.schemas.product import ProductCreate, ProductOut, ProductUpdate
 from app.schemas.purchase_line import ProductPriceHistoryOut
 from app.services.product import ProductService
@@ -49,3 +50,19 @@ def update_product(
 def delete_product(product_id: int, svc: ProductService = Depends(product_service)):
     svc.delete(product_id)
     return {"ok": True}
+
+
+@router.get("/{product_id}/equivalents", response_model=List[ProductEquivalentOut])
+def get_product_equivalents(
+    product_id: int, svc: ProductService = Depends(product_service)
+):
+    return svc.get_equivalents(product_id)
+
+
+@router.put("/{product_id}/equivalents", response_model=ProductEquivalentOut)
+def set_product_equivalent(
+    product_id: int,
+    payload: ProductEquivalentCreate,
+    svc: ProductService = Depends(product_service),
+):
+    return svc.set_equivalent(product_id, **payload.model_dump())
