@@ -21,6 +21,8 @@ class ProductBase(BaseModel):
     image_url: Optional[str] = Field(None, max_length=500)
     brand_type: BrandType = "common"
     store_brand_affinity: Optional[str] = Field(None, max_length=50)
+    grammage_g: Optional[int] = Field(None, ge=0)
+    volume_ml: Optional[int] = Field(None, ge=0)
 
 
 class ProductCreate(ProductBase):
@@ -42,6 +44,8 @@ class ProductUpdate(BaseModel):
     image_url: Optional[str] = Field(None, max_length=500)
     brand_type: Optional[BrandType] = None
     store_brand_affinity: Optional[str] = Field(None, max_length=50)
+    grammage_g: Optional[int] = Field(None, ge=0)
+    volume_ml: Optional[int] = Field(None, ge=0)
 
 
 class ProductOut(ProductBase):

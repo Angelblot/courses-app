@@ -33,6 +33,8 @@ class Product(Base):
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     brand_type: Mapped[str] = mapped_column(String(20), default="common", nullable=False)
     store_brand_affinity: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    grammage_g: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
+    volume_ml: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

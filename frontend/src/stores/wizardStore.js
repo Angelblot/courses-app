@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { WizardAPI } from '../api.js';
 import { useUIStore } from './uiStore.js';
+import { convertToProductQty, isConvertible, formatIngredientQty } from '../lib/unitConverter.js';
 
 export const WIZARD_STEPS = [
   { key: 'recipes', label: 'Recettes' },
@@ -130,26 +131,35 @@ function normalizeName(name) {
   return (name || '').trim().toLowerCase();
 }
 
-function normalizeUnit(unit) {
-  return (unit || 'unité').trim().toLowerCase();
-}
-
-function unitsCompatible(a, b) {
-  return normalizeUnit(a) === normalizeUnit(b);
-}
-
+/**
+ * getRecipeUsage : pour un produit donné, calcule la quantité nécessaire
+ * dans toutes les recettes sélectionnées. Utilise unitConverter pour
+ * gérer les conversions g↔unité, ml↔unité, unités dénombrables.
+ *
+ * @param {object} options
+ * @param {number|string} options.productId
+ * @param {string} options.productName
+ * @param {string} options.productUnit
+ * @param {object} options.product - Objet produit complet (avec grammage_g, volume_ml)
+ * @param {object} options.selectedRecipes
+ * @param {Array} options.recipes
+ * @returns {{ totalQuantity: number, breakdown: Array, approximate: boolean }}
+ */
 export function getRecipeUsage({
   productId,
   productName,
   productUnit,
+  product,
   selectedRecipes,
   recipes,
 }) {
   const breakdown = [];
   let totalQuantity = 0;
-  if (!recipes || !selectedRecipes) return { totalQuantity, breakdown };
+  let anyApproximate = false;
+  if (!recipes || !selectedRecipes) return { totalQuantity, breakdown, approximate: false };
 
   const targetName = normalizeName(productName);
+  const prod = product || { id: productId, name: productName, unit: productUnit };
 
   recipes.forEach((recipe) => {
     const servings = selectedRecipes[recipe.id];
@@ -164,22 +174,30 @@ export function getRecipeUsage({
         !matchById &&
         targetName.length > 0 &&
         ingName.length > 0 &&
-        unitsCompatible(ing.unit, productUnit) &&
+        isConvertible(ing.unit, prod) &&
         (targetName === ingName ||
           targetName.includes(ingName) ||
           ingName.includes(targetName));
       if (!matchById && !matchByName) return;
-      const qty = (ing.quantity_per_serving || 0) * servings;
+
+      const baseQty = (ing.quantity_per_serving || 0) * servings;
+      const converted = convertToProductQty(baseQty, ing.unit, prod);
+      const qty = converted.qty;
+
       breakdown.push({
         recipeName: recipe.name,
         qty,
         unit: ing.unit || 'unité',
+        ingredientQty: baseQty,
+        ingredientUnit: ing.unit,
+        approximate: converted.approximate,
       });
       totalQuantity += qty;
+      if (converted.approximate) anyApproximate = true;
     });
   });
 
-  return { totalQuantity, breakdown };
+  return { totalQuantity, breakdown, approximate: anyApproximate };
 }
 
 export function buildConsolidatedItems({

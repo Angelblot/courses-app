@@ -11,6 +11,22 @@ from app.services.product import ProductService
 router = APIRouter()
 
 
+@router.get("/grammage", response_model=List[dict])
+def list_grammages(svc: ProductService = Depends(product_service)):
+    """Renvoie la liste des grammages/volumes de tous les produits."""
+    products = svc.list()
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "grammage_g": p.grammage_g,
+            "volume_ml": p.volume_ml,
+            "unit": p.unit,
+        }
+        for p in products
+    ]
+
+
 @router.get("/", response_model=List[ProductOut])
 def list_products(
     favorite_only: bool = False,

@@ -185,6 +185,7 @@ export function DailyChecklist() {
                 productId: product.id,
                 productName: product.name,
                 productUnit: product.unit,
+                product,
                 selectedRecipes,
                 recipes,
               })}
