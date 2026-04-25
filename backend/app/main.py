@@ -13,6 +13,7 @@ from app.core.database import init_db
 from app.routes import api_router
 from app.routes.seed import seed_database
 from app.services.categories import seed_categories, seed_category_aliases
+from app.services.recipes_seed import seed_recipes
 
 
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
@@ -49,6 +50,10 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             inserted = seed_category_aliases(db)
             if inserted:
                 print(f"[AUTO-SEED] category_aliases: {inserted}")
+            if os.getenv("SKIP_PRODUCT_SEED") != "1":
+                inserted_recipes = seed_recipes(db)
+                if inserted_recipes:
+                    print(f"[AUTO-SEED] recipes: {inserted_recipes}")
         except Exception as e:
             print(f"[AUTO-SEED] Erreur: {e}")
         finally:
