@@ -69,71 +69,14 @@ export const DrivesAPI = {
     api(`/api/drives/${name}/search?query=${encodeURIComponent(query)}`),
 };
 
-// Jeu de recettes de démo utilisé tant que l'endpoint /api/recipes/ n'existe pas.
-// À retirer dès que le backend expose l'API.
-const FALLBACK_RECIPES = [
-  {
-    id: 'demo-1',
-    name: 'Pâtes bolognaise',
-    description: 'Classique familial, rapide.',
-    servings_default: 4,
-    category: 'Plats',
-    image_url: null,
-    ingredients: [
-      { name: 'Spaghetti', quantity_per_serving: 100, unit: 'g', rayon: 'Épicerie', category: 'Pâtes' },
-      { name: 'Viande hachée', quantity_per_serving: 125, unit: 'g', rayon: 'Boucherie', category: 'Viande' },
-      { name: 'Sauce tomate', quantity_per_serving: 100, unit: 'g', rayon: 'Épicerie', category: 'Conserves' },
-      { name: 'Oignon', quantity_per_serving: 0.5, unit: 'unité', rayon: 'Fruits & légumes', category: 'Légumes' },
-      { name: 'Parmesan', quantity_per_serving: 15, unit: 'g', rayon: 'Crèmerie', category: 'Fromages' },
-    ],
-  },
-  {
-    id: 'demo-2',
-    name: 'Salade César',
-    description: 'Légère et gourmande.',
-    servings_default: 2,
-    category: 'Entrées',
-    image_url: null,
-    ingredients: [
-      { name: 'Salade romaine', quantity_per_serving: 0.5, unit: 'unité', rayon: 'Fruits & légumes', category: 'Légumes' },
-      { name: 'Blanc de poulet', quantity_per_serving: 120, unit: 'g', rayon: 'Boucherie', category: 'Viande' },
-      { name: 'Parmesan', quantity_per_serving: 20, unit: 'g', rayon: 'Crèmerie', category: 'Fromages' },
-      { name: 'Croûtons', quantity_per_serving: 30, unit: 'g', rayon: 'Épicerie', category: 'Apéritif' },
-    ],
-  },
-  {
-    id: 'demo-3',
-    name: 'Curry de légumes',
-    description: 'Végé, épicé, réconfortant.',
-    servings_default: 4,
-    category: 'Plats',
-    image_url: null,
-    ingredients: [
-      { name: 'Riz basmati', quantity_per_serving: 80, unit: 'g', rayon: 'Épicerie', category: 'Riz' },
-      { name: 'Lait de coco', quantity_per_serving: 100, unit: 'ml', rayon: 'Épicerie', category: 'Conserves' },
-      { name: 'Pois chiches', quantity_per_serving: 80, unit: 'g', rayon: 'Épicerie', category: 'Conserves' },
-      { name: 'Oignon', quantity_per_serving: 0.5, unit: 'unité', rayon: 'Fruits & légumes', category: 'Légumes' },
-      { name: 'Carotte', quantity_per_serving: 1, unit: 'unité', rayon: 'Fruits & légumes', category: 'Légumes' },
-      { name: 'Pâte de curry', quantity_per_serving: 15, unit: 'g', rayon: 'Épicerie', category: 'Épices' },
-    ],
-  },
-];
+const EMPTY_FALLBACK = [];
 
-// TODO backend — endpoints à créer côté FastAPI :
-//   GET    /api/recipes/                  → liste les recettes
-//   POST   /api/recipes/                  → crée une recette
-//   GET    /api/recipes/:id               → détail (avec ingrédients)
-//   PUT    /api/recipes/:id
-//   DELETE /api/recipes/:id
-// Modèle attendu :
-//   { id, name, description, servings_default, category, image_url,
-//     ingredients: [{ product_id?, name, quantity_per_serving, unit, rayon, category }] }
 export const RecipesAPI = {
   list: async () => {
     try {
       return await api('/api/recipes/');
     } catch (e) {
-      return FALLBACK_RECIPES;
+      return EMPTY_FALLBACK;
     }
   },
   get: (id) => api(`/api/recipes/${id}`),

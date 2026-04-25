@@ -6,7 +6,9 @@ from app.models.product import Product
 from app.models.product_drive import ProductDrive
 from app.models.product_equivalent import ProductEquivalent
 from app.models.purchase_line import PurchaseLine
+from app.models.recipe import Recipe, RecipeIngredient
 from app.models.shopping_list import ShoppingList
+from app.models.wizard_session import WizardSession
 
 __all__ = [
     "Category",
@@ -17,5 +19,8 @@ __all__ = [
     "ProductDrive",
     "ProductEquivalent",
     "PurchaseLine",
+    "Recipe",
+    "RecipeIngredient",
     "ShoppingList",
+    "WizardSession",
 ]
