@@ -1,11 +1,13 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 
+from app.core.database import SessionLocal
 from app.routes.deps import product_service
 from app.schemas.equivalent import ProductEquivalentCreate, ProductEquivalentOut
 from app.schemas.product import ProductCreate, ProductOut, ProductUpdate
 from app.schemas.purchase_line import ProductPriceHistoryOut
+from app.services.enrich_ean import enrich_all_products
 from app.services.product import ProductService
 
 router = APIRouter()
@@ -82,3 +84,18 @@ def set_product_equivalent(
     svc: ProductService = Depends(product_service),
 ):
     return svc.set_equivalent(product_id, **payload.model_dump())
+
+
+@router.post("/enrich-ean")
+def enrich_products_ean(background_tasks: BackgroundTasks) -> Dict:
+    """Enrichit les grammages/volumes des produits via Open Food Facts.
+
+    Parcourt tous les produits qui ont un EAN13 mais ni grammage_g ni
+    volume_ml renseignés, interroge l'API Open Food Facts pour chaque,
+    et met à jour la base de données.
+
+    L'enrichissement s'exécute en arrière-plan. La réponse retourne
+    immédiatement un accusé de réception.
+    """
+    background_tasks.add_task(enrich_all_products, SessionLocal)
+    return {"status": "started", "message": "L'enrichissement des grammages via Open Food Facts a été lancé en arrière-plan."}
