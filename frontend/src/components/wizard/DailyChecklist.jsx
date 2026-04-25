@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useProductsStore } from '../../stores/productsStore.js';
-import { useWizardStore } from '../../stores/wizardStore.js';
+import { useRecipesStore } from '../../stores/recipesStore.js';
+import { useWizardStore, getRecipeUsage } from '../../stores/wizardStore.js';
 import { Card } from '../ui/Card.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { Input } from '../ui/Input.jsx';
@@ -11,6 +12,7 @@ import { Switch } from '../ui/Switch.jsx';
 import { Icon } from '../ui/Icon.jsx';
 import { SwipeStack } from '../ui/SwipeStack.jsx';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
+import { RecipeUsageBanner } from './RecipeUsageBanner.jsx';
 
 const PRODUCT_ICONS = ['apple', 'bag', 'package', 'leaf'];
 function iconForProduct(p) {
@@ -20,7 +22,14 @@ function iconForProduct(p) {
   return PRODUCT_ICONS[key % PRODUCT_ICONS.length];
 }
 
-function ProductSwipeCard({ product, quantity, onQuantityChange, hasIt, onToggleHave }) {
+function ProductSwipeCard({
+  product,
+  quantity,
+  onQuantityChange,
+  hasIt,
+  onToggleHave,
+  recipeUsage,
+}) {
   const keyword = [product.name, product.category, product.rayon]
     .filter(Boolean)
     .join(' ');
@@ -39,6 +48,7 @@ function ProductSwipeCard({ product, quantity, onQuantityChange, hasIt, onToggle
           <Badge variant="primary">{product.rayon || product.category || 'Divers'}</Badge>
         </div>
       </div>
+      <RecipeUsageBanner recipeUsage={recipeUsage} />
       <div className="product-sw__body">
         <div>
           <h3 className="product-sw__title">{product.name}</h3>
@@ -118,6 +128,10 @@ export function DailyChecklist() {
   const loaded = useProductsStore((s) => s.loaded);
   const load = useProductsStore((s) => s.load);
 
+  const recipes = useRecipesStore((s) => s.items);
+  const loadRecipes = useRecipesStore((s) => s.load);
+
+  const selectedRecipes = useWizardStore((s) => s.selectedRecipes);
   const quotidien = useWizardStore((s) => s.quotidien);
   const quotidienQty = useWizardStore((s) => s.quotidienQty);
   const markProduct = useWizardStore((s) => s.markProduct);
@@ -131,7 +145,8 @@ export function DailyChecklist() {
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadRecipes();
+  }, [load, loadRecipes]);
 
   const favorites = useMemo(
     () => products.filter((p) => p.favorite !== false),
@@ -194,6 +209,13 @@ export function DailyChecklist() {
               onQuantityChange={(q) => setQuotidienQty(product.id, q)}
               hasIt={quotidien[product.id] === 'have'}
               onToggleHave={(v) => handleToggleHave(product, v)}
+              recipeUsage={getRecipeUsage({
+                productId: product.id,
+                productName: product.name,
+                productUnit: product.unit,
+                selectedRecipes,
+                recipes,
+              })}
             />
           )}
           emptyState={

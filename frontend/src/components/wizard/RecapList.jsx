@@ -84,18 +84,30 @@ export function RecapList() {
                     const extraEntry = extraSource
                       ? extras.find((e) => e.name === item.name)
                       : null;
+                    const hasRecipeSource = item.sources.some(
+                      (s) => s.type === 'recipe',
+                    );
                     return (
                       <li key={item.key} className="recap-item">
                         <div className="recap-item__body">
                           <div className="recap-item__name">{item.name}</div>
                           <div className="recap-item__sources">
-                            {item.sources.map((s, i) => (
-                              <span key={i} className={`source-pill source-pill--${s.type}`}>
-                                <Icon name={SOURCE_ICONS[s.type] || 'list'} size={10} />
-                                {s.label}
-                                {s.qty ? ` (${formatQty(s.qty, item.unit)})` : ''}
-                              </span>
-                            ))}
+                            {item.sources.map((s, i) => {
+                              const annotated =
+                                s.type === 'quotidien' && hasRecipeSource;
+                              return (
+                                <span
+                                  key={i}
+                                  className={`source-pill source-pill--${s.type}`}
+                                >
+                                  <Icon name={SOURCE_ICONS[s.type] || 'list'} size={10} />
+                                  {s.label}
+                                  {s.qty
+                                    ? ` (${formatQty(s.qty, item.unit)}${annotated ? ' additionnel' : ''})`
+                                    : ''}
+                                </span>
+                              );
+                            })}
                           </div>
                         </div>
                         <div className="recap-item__actions">

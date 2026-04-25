@@ -126,6 +126,58 @@ export const useWizardStore = create((set, get) => ({
   },
 }));
 
+function normalizeName(name) {
+  return (name || '').trim().toLowerCase();
+}
+
+function normalizeUnit(unit) {
+  return (unit || 'unité').trim().toLowerCase();
+}
+
+function unitsCompatible(a, b) {
+  return normalizeUnit(a) === normalizeUnit(b);
+}
+
+export function getRecipeUsage({
+  productId,
+  productName,
+  productUnit,
+  selectedRecipes,
+  recipes,
+}) {
+  const breakdown = [];
+  let totalQuantity = 0;
+  if (!recipes || !selectedRecipes) return { totalQuantity, breakdown };
+
+  const targetName = normalizeName(productName);
+
+  recipes.forEach((recipe) => {
+    const servings = selectedRecipes[recipe.id];
+    if (servings == null) return;
+    (recipe.ingredients || []).forEach((ing) => {
+      const matchById =
+        productId != null &&
+        ing.product_id != null &&
+        String(ing.product_id) === String(productId);
+      const matchByName =
+        !matchById &&
+        targetName.length > 0 &&
+        normalizeName(ing.name) === targetName &&
+        unitsCompatible(ing.unit, productUnit);
+      if (!matchById && !matchByName) return;
+      const qty = (ing.quantity_per_serving || 0) * servings;
+      breakdown.push({
+        recipeName: recipe.name,
+        qty,
+        unit: ing.unit || 'unité',
+      });
+      totalQuantity += qty;
+    });
+  });
+
+  return { totalQuantity, breakdown };
+}
+
 export function buildConsolidatedItems({
   recipes,
   selectedRecipes,
