@@ -8,7 +8,6 @@ import { Input } from '../ui/Input.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { Counter } from '../ui/Counter.jsx';
-import { Switch } from '../ui/Switch.jsx';
 import { Icon } from '../ui/Icon.jsx';
 import { SwipeStack } from '../ui/SwipeStack.jsx';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
@@ -26,8 +25,6 @@ function ProductSwipeCard({
   product,
   quantity,
   onQuantityChange,
-  hasIt,
-  onToggleHave,
   recipeUsage,
 }) {
   const keyword = [product.name, product.category, product.rayon]
@@ -65,15 +62,6 @@ function ProductSwipeCard({
             unit={product.unit}
           />
         </div>
-        <div className="product-sw__have-row" data-no-drag>
-          <Switch
-            id={`have-${product.id}`}
-            checked={hasIt}
-            onChange={onToggleHave}
-            label="J'en ai déjà"
-          />
-          <Icon name="sparkle" size={18} className="text-accent" />
-        </div>
       </div>
     </div>
   );
@@ -81,7 +69,6 @@ function ProductSwipeCard({
 
 function ResumePanel({ products, quotidien, quotidienQty, extras, onReset }) {
   const needed = products.filter((p) => quotidien[p.id] === 'needed');
-  const have = products.filter((p) => quotidien[p.id] === 'have');
   return (
     <div className="swipe-resume">
       <div className="swipe-resume__icon">
@@ -109,11 +96,6 @@ function ResumePanel({ products, quotidien, quotidienQty, extras, onReset }) {
               <span className="swipe-resume__row-meta">ajout manuel</span>
             </div>
           ))}
-        </div>
-      )}
-      {have.length > 0 && (
-        <div className="swipe-resume__label" style={{ marginTop: 4 }}>
-          {have.length} marqué{have.length > 1 ? 's' : ''} « j'en ai déjà »
         </div>
       )}
       <button type="button" className="swipe-resume__reset" onClick={onReset}>
@@ -169,14 +151,6 @@ export function DailyChecklist() {
     setSeenIds((prev) => new Set(prev).add(product.id));
   }
 
-  function handleToggleHave(product, checked) {
-    if (checked) {
-      markProduct(product.id, 'have');
-    } else if (quotidien[product.id] === 'have') {
-      markProduct(product.id, null);
-    }
-  }
-
   function handleAddExtra(e) {
     e.preventDefault();
     const name = extraDraft.trim();
@@ -207,8 +181,6 @@ export function DailyChecklist() {
               product={product}
               quantity={quotidienQty[product.id] ?? product.default_quantity ?? 1}
               onQuantityChange={(q) => setQuotidienQty(product.id, q)}
-              hasIt={quotidien[product.id] === 'have'}
-              onToggleHave={(v) => handleToggleHave(product, v)}
               recipeUsage={getRecipeUsage({
                 productId: product.id,
                 productName: product.name,

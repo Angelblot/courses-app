@@ -159,11 +159,15 @@ export function getRecipeUsage({
         productId != null &&
         ing.product_id != null &&
         String(ing.product_id) === String(productId);
+      const ingName = normalizeName(ing.name);
       const matchByName =
         !matchById &&
         targetName.length > 0 &&
-        normalizeName(ing.name) === targetName &&
-        unitsCompatible(ing.unit, productUnit);
+        ingName.length > 0 &&
+        unitsCompatible(ing.unit, productUnit) &&
+        (targetName === ingName ||
+          targetName.includes(ingName) ||
+          ingName.includes(targetName));
       if (!matchById && !matchByName) return;
       const qty = (ing.quantity_per_serving || 0) * servings;
       breakdown.push({

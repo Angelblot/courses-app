@@ -511,7 +511,6 @@ h1, h2, h3, h4 { line-height: 1.2; letter-spacing: -0.01em; font-weight: 700; }
 .product-sw__brand { color: var(--color-text-muted); font-size: var(--font-size-sm); margin-top: -6px; }
 .product-sw__qty-row { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); background: var(--color-surface-warm); border-radius: var(--radius-md); }
 .product-sw__qty-label { color: var(--color-text-muted); font-size: var(--font-size-sm); font-weight: 600; }
-.product-sw__have-row { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); background: var(--color-beige-soft); border-radius: var(--radius-md); }
 
 .recipe-usage-banner {
   padding: 8px var(--space-5);
