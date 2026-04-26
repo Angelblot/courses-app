@@ -124,6 +124,29 @@ async def enrich_products(
     db = SessionLocal()
 
     try:
+        # S'assurer que les colonnes manquantes dans l'ancien schéma SQLite existent
+        from sqlalchemy import inspect, text
+        from sqlalchemy.engine import Engine
+
+        def _ensure_columns(engine: Engine, table: str, columns: dict[str, str]) -> None:
+            """Ajoute les colonnes manquantes à une table existante (migration légère)."""
+            inspector = inspect(engine)
+            existing = {c["name"] for c in inspector.get_columns(table)}
+            with engine.connect() as conn:
+                for col_name, col_type in columns.items():
+                    if col_name not in existing:
+                        logger.info("🔧 Ajout de la colonne manquante `%s` à la table `%s`", col_name, table)
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
+                conn.commit()
+
+        _ensure_columns(db.get_bind(), "products", {
+            "image_url": "VARCHAR(500)",
+            "brand_type": "VARCHAR(20) DEFAULT 'common'",
+            "store_brand_affinity": "VARCHAR(50)",
+            "grammage_g": "INTEGER",
+            "volume_ml": "INTEGER",
+        })
+
         # Récupérer les produits à enrichir
         stmt = select(Product).where(
             Product.ean13.is_not(None),
