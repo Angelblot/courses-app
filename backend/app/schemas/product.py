@@ -48,6 +48,11 @@ class ProductUpdate(BaseModel):
     volume_ml: Optional[int] = Field(None, ge=0)
 
 
+class GrammageUpdate(BaseModel):
+    grammage_g: Optional[int] = Field(None, ge=0)
+    volume_ml: Optional[int] = Field(None, ge=0)
+
+
 class ProductOut(ProductBase):
     model_config = ConfigDict(from_attributes=True)
 

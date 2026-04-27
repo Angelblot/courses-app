@@ -143,7 +143,7 @@ function normalizeName(name) {
  * @param {object} options.product - Objet produit complet (avec grammage_g, volume_ml)
  * @param {object} options.selectedRecipes
  * @param {Array} options.recipes
- * @returns {{ totalQuantity: number, breakdown: Array, approximate: boolean }}
+ * @returns {{ totalQuantity: number, breakdown: Array, approximate: boolean, missingGrammage: boolean }}
  */
 export function getRecipeUsage({
   productId,
@@ -156,7 +156,8 @@ export function getRecipeUsage({
   const breakdown = [];
   let totalQuantity = 0;
   let anyApproximate = false;
-  if (!recipes || !selectedRecipes) return { totalQuantity, breakdown, approximate: false };
+  let missingGrammage = false;
+  if (!recipes || !selectedRecipes) return { totalQuantity, breakdown, approximate: false, missingGrammage: false };
 
   const targetName = normalizeName(productName);
   const prod = product || { id: productId, name: productName, unit: productUnit };
@@ -182,6 +183,20 @@ export function getRecipeUsage({
 
       const baseQty = (ing.quantity_per_serving || 0) * servings;
       const converted = convertToProductQty(baseQty, ing.unit, prod);
+
+      // Detect if conversion failed because product has no grammage/volume
+      if (converted.qty === 0 && baseQty > 0) {
+        const ingNorm = normalizeUnit(ing.unit);
+        const prodUnitNorm = normalizeUnit(prod.unit || 'unité');
+        // Ingredient is weight/volume but product is "unité" — needs grammage_g or volume_ml
+        if (ingNorm === 'g' && prodUnitNorm === 'unité' && prod.grammage_g == null) {
+          missingGrammage = true;
+        }
+        if (ingNorm === 'ml' && prodUnitNorm === 'unité' && prod.volume_ml == null) {
+          missingGrammage = true;
+        }
+      }
+
       const qty = converted.qty;
 
       breakdown.push({
@@ -197,7 +212,7 @@ export function getRecipeUsage({
     });
   });
 
-  return { totalQuantity, breakdown, approximate: anyApproximate };
+  return { totalQuantity, breakdown, approximate: anyApproximate, missingGrammage };
 }
 
 export function buildConsolidatedItems({

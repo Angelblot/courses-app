@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { Button } from '../ui/Button.jsx';
 import { Icon } from '../ui/Icon.jsx';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
 import { CategoryMiniChip } from './CategoryMiniChip.jsx';
 import { ProductCardEditable } from './ProductCardEditable.jsx';
+import { GrammageBottomSheet } from './GrammageBottomSheet.jsx';
+import { useProductsStore } from '../../stores/productsStore.js';
 
 const CATEGORY_ICONS = {
   fruits_legumes: 'apple',
@@ -96,6 +99,13 @@ export function ProductCard({
   onInlineCancel,
   categoryLabels,
 }) {
+  const [showGrammageSheet, setShowGrammageSheet] = useState(false);
+  const updateGrammage = useProductsStore((s) => s.updateGrammage);
+
+  function handleGrammageSave(id, g, v) {
+    updateGrammage(id, g, v);
+    setShowGrammageSheet(false);
+  }
   if (isInlineEditing) {
     return (
       <ProductCardEditable
@@ -183,6 +193,28 @@ export function ProductCard({
               {product.purchase_count} achat{product.purchase_count > 1 ? 's' : ''}
             </>
           )}
+          {product.grammage_g == null && product.volume_ml == null && (
+            <span
+              onClick={(e) => { e.stopPropagation(); setShowGrammageSheet(true); }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                marginLeft: 8,
+                padding: '1px 8px',
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 600,
+                background: '#F3F1EC',
+                color: '#6B6B6B',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                lineHeight: 1.5,
+              }}
+              title="Indiquer le poids de ce produit"
+            >
+              Poids ?
+            </span>
+          )}
         </div>
         {categoryLabel && (
           <div style={{ marginTop: 6 }}>
@@ -225,6 +257,13 @@ export function ProductCard({
           <Icon name="trash" size={16} />
         </Button>
       </div>
+      {showGrammageSheet && (
+        <GrammageBottomSheet
+          product={product}
+          onSave={handleGrammageSave}
+          onClose={() => setShowGrammageSheet(false)}
+        />
+      )}
     </article>
   );
 }

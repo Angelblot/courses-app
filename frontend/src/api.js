@@ -30,6 +30,7 @@ export const ProductsAPI = {
   update: (id, data) => api(`/api/products/${id}`, { method: 'PUT', body: data }),
   delete: (id) => api(`/api/products/${id}`, { method: 'DELETE' }),
   getPriceHistory: (id) => api(`/api/products/${id}/price-history`),
+  updateGrammage: (id, data) => api(`/api/products/${id}/grammage`, { method: 'PATCH', body: data }),
 };
 
 export const CategoriesAPI = {

@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, status
 from app.core.database import SessionLocal
 from app.routes.deps import product_service
 from app.schemas.equivalent import ProductEquivalentCreate, ProductEquivalentOut
-from app.schemas.product import ProductCreate, ProductOut, ProductUpdate
+from app.schemas.product import GrammageUpdate, ProductCreate, ProductOut, ProductUpdate
 from app.schemas.purchase_line import ProductPriceHistoryOut
 from app.services.enrich_ean import enrich_all_products
 from app.services.product import ProductService
@@ -99,3 +99,22 @@ def enrich_products_ean(background_tasks: BackgroundTasks) -> Dict:
     """
     background_tasks.add_task(enrich_all_products, SessionLocal)
     return {"status": "started", "message": "L'enrichissement des grammages via Open Food Facts a été lancé en arrière-plan."}
+
+
+@router.patch("/{product_id}/grammage", response_model=ProductOut)
+def patch_product_grammage(
+    product_id: int,
+    payload: GrammageUpdate,
+    svc: ProductService = Depends(product_service),
+):
+    """Met à jour le grammage/volume d'un produit.
+
+    Permet à l'utilisateur de renseigner manuellement le poids ou le volume
+    d'un produit quand l'enrichissement automatique (OFF) n'a rien trouvé.
+    """
+    product = svc.get(product_id)
+    patch = payload.model_dump(exclude_unset=True)
+    for key, value in patch.items():
+        setattr(product, key, value)
+    svc.repo.save(product)
+    return svc._enrich(product)

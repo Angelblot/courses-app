@@ -104,4 +104,21 @@ export const useProductsStore = create((set, get) => ({
       // Error already surfaced via toast in update().
     }
   },
+
+  updateGrammage: async (id, grammage_g, volume_ml) => {
+    try {
+      const payload = {};
+      if (grammage_g != null) payload.grammage_g = grammage_g;
+      if (volume_ml != null) payload.volume_ml = volume_ml;
+      const updated = await ProductsAPI.updateGrammage(id, payload);
+      set((state) => ({
+        items: state.items.map((p) => (p.id === id ? { ...p, ...updated } : p)),
+      }));
+      useUIStore.getState().notifySuccess('Grammage enregistré');
+      return updated;
+    } catch (err) {
+      useUIStore.getState().notifyError(err);
+      throw err;
+    }
+  },
 }));
