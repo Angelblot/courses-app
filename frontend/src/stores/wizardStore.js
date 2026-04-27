@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { WizardAPI } from '../api.js';
+import { WizardAPI, ResolverAPI } from '../api.js';
 import { useUIStore } from './uiStore.js';
 import { convertToProductQty, isConvertible, formatIngredientQty } from '../lib/unitConverter.js';
 
@@ -136,6 +136,9 @@ function normalizeName(name) {
  * dans toutes les recettes sélectionnées. Utilise unitConverter pour
  * gérer les conversions g↔unité, ml↔unité, unités dénombrables.
  *
+ * Retourne aussi des informations de substitution si le produit est lié
+ * à des ingrédients de recettes (via le resolver).
+ *
  * @param {object} options
  * @param {number|string} options.productId
  * @param {string} options.productName
@@ -143,7 +146,8 @@ function normalizeName(name) {
  * @param {object} options.product - Objet produit complet (avec grammage_g, volume_ml)
  * @param {object} options.selectedRecipes
  * @param {Array} options.recipes
- * @returns {{ totalQuantity: number, breakdown: Array, approximate: boolean, missingGrammage: boolean }}
+ * @param {Array} options.allProducts - Tous les produits (pour lookup croisé category+grammage)
+ * @returns {{ totalQuantity: number, breakdown: Array, approximate: boolean, missingGrammage: boolean, hasSubstitutions: boolean, substitutionCount: number, substitutionIngredient: object|null }}
  */
 export function getRecipeUsage({
   productId,
@@ -152,12 +156,18 @@ export function getRecipeUsage({
   product,
   selectedRecipes,
   recipes,
+  allProducts = [],
 }) {
   const breakdown = [];
   let totalQuantity = 0;
   let anyApproximate = false;
   let missingGrammage = false;
-  if (!recipes || !selectedRecipes) return { totalQuantity, breakdown, approximate: false, missingGrammage: false };
+  let hasSubstitutions = false;
+  let substitutionCount = 0;
+  let substitutionIngredient = null;
+  if (!recipes || !selectedRecipes) {
+    return { totalQuantity, breakdown, approximate: false, missingGrammage: false, hasSubstitutions: false, substitutionCount: 0, substitutionIngredient: null };
+  }
 
   const targetName = normalizeName(productName);
   const prod = product || { id: productId, name: productName, unit: productUnit };
@@ -179,7 +189,54 @@ export function getRecipeUsage({
         (targetName === ingName ||
           targetName.includes(ingName) ||
           ingName.includes(targetName));
-      if (!matchById && !matchByName) return;
+      // Match par catégorie + grammage : si l'ingrédient a un product_id,
+      // vérifie si ce produit lié a la même catégorie ET le même grammage/volume
+      // que le produit courant (substitution : lardons ↔ allumettes, etc.)
+      let matchByCategory = false;
+      if (!matchById && !matchByName && ing.product_id != null && product) {
+        const linkedProduct = allProducts.find(
+          (p) => String(p.id) === String(ing.product_id)
+        );
+        if (linkedProduct) {
+          const sameCategory =
+            product.category != null &&
+            linkedProduct.category != null &&
+            normalizeName(product.category) === normalizeName(linkedProduct.category);
+          const sameGrammage =
+            product.grammage_g != null &&
+            linkedProduct.grammage_g != null &&
+            product.grammage_g === linkedProduct.grammage_g;
+          const sameVolume =
+            product.volume_ml != null &&
+            linkedProduct.volume_ml != null &&
+            product.volume_ml === linkedProduct.volume_ml;
+          matchByCategory = sameCategory && (sameGrammage || sameVolume);
+        }
+      }
+
+      // Track substitution candidates : ingrédient lié à un autre produit
+      // mais le produit courant pourrait le substituer
+      if (!matchById && !matchByName && !matchByCategory && ing.product_id != null && product) {
+        const linkedProduct = allProducts.find(
+          (p) => String(p.id) === String(ing.product_id)
+        );
+        if (linkedProduct && linkedProduct.id !== product.id) {
+          // L'ingrédient est lié à un produit différent — potentiel de substitution
+          if (!substitutionIngredient) {
+            substitutionIngredient = {
+              name: ing.name,
+              qty: (ing.quantity_per_serving || 0) * servings,
+              unit: ing.unit,
+              category_hint: ing.category_hint || ing.category || null,
+              recipeName: recipe.name,
+            };
+          }
+          substitutionCount++;
+          hasSubstitutions = true;
+        }
+      }
+
+      if (!matchById && !matchByName && !matchByCategory) return;
 
       const baseQty = (ing.quantity_per_serving || 0) * servings;
       const converted = convertToProductQty(baseQty, ing.unit, prod);
@@ -212,7 +269,7 @@ export function getRecipeUsage({
     });
   });
 
-  return { totalQuantity, breakdown, approximate: anyApproximate, missingGrammage };
+  return { totalQuantity, breakdown, approximate: anyApproximate, missingGrammage, hasSubstitutions, substitutionCount, substitutionIngredient };
 }
 
 export function buildConsolidatedItems({

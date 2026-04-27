@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.routes import categories, drives, lists, products, recipes, seed, wizard
+from app.routes import categories, drives, lists, products, recipes, resolver, seed, wizard
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(products.router, prefix="/products", tags=["products"])
@@ -8,6 +8,7 @@ api_router.include_router(lists.router, prefix="/lists", tags=["lists"])
 api_router.include_router(drives.router, prefix="/drives", tags=["drives"])
 api_router.include_router(categories.router, prefix="/categories", tags=["categories"])
 api_router.include_router(recipes.router, prefix="/recipes", tags=["recipes"])
+api_router.include_router(resolver.router, prefix="/resolver", tags=["resolver"])
 api_router.include_router(wizard.router, prefix="/wizard", tags=["wizard"])
 api_router.include_router(seed.router)
 

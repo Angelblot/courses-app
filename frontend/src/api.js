@@ -107,3 +107,8 @@ export const WizardAPI = {
     api(`/api/wizard/sessions/${id}/generate`, { method: 'POST', body: data }),
   getResults: (id) => api(`/api/wizard/sessions/${id}/results`),
 };
+
+export const ResolverAPI = {
+  resolve: (data) => api('/api/resolver/resolve', { method: 'POST', body: data }),
+  select: (data) => api('/api/resolver/select', { method: 'POST', body: data }),
+};

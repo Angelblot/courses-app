@@ -12,6 +12,7 @@ import { Icon } from '../ui/Icon.jsx';
 import { SwipeStack } from '../ui/SwipeStack.jsx';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
 import { RecipeUsageBanner } from './RecipeUsageBanner.jsx';
+import { ProductSubstitutionSheet } from './ProductSubstitutionSheet.jsx';
 
 const PRODUCT_ICONS = ['apple', 'bag', 'package', 'leaf'];
 function iconForProduct(p) {
@@ -26,10 +27,13 @@ function ProductSwipeCard({
   quantity,
   onQuantityChange,
   recipeUsage,
+  onSubstitutionClick,
 }) {
   const keyword = [product.name, product.category, product.rayon]
     .filter(Boolean)
     .join(' ');
+  const hasSubs = recipeUsage?.hasSubstitutions && recipeUsage?.substitutionCount > 0;
+  const subCount = recipeUsage?.substitutionCount || 0;
   return (
     <div className="product-sw">
       <div className="product-sw__hero">
@@ -44,6 +48,37 @@ function ProductSwipeCard({
         <div className="product-sw__rayon">
           <Badge variant="primary">{product.rayon || product.category || 'Divers'}</Badge>
         </div>
+        {hasSubs && (
+          <button
+            type="button"
+            className="product-sw__sub-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onSubstitutionClick) onSubstitutionClick();
+            }}
+            aria-label="Voir les alternatives"
+            style={{
+              position: 'absolute',
+              bottom: 8,
+              right: 8,
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              padding: '4px 8px',
+              fontSize: 11,
+              fontWeight: 500,
+              color: '#3b82f6',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+            }}
+          >
+            <Icon name="sparkles" size={12} strokeWidth={2.5} />
+            {subCount} alternative{subCount > 1 ? 's' : ''}
+          </button>
+        )}
       </div>
       <RecipeUsageBanner recipeUsage={recipeUsage} />
       <div className="product-sw__body">
@@ -58,7 +93,7 @@ function ProductSwipeCard({
             onChange={onQuantityChange}
             min={0}
             max={50}
-            step={product.unit === 'g' || product.unit === 'ml' ? 50 : 1}
+            step={1}
             unit={product.unit}
           />
         </div>
@@ -124,6 +159,14 @@ export function DailyChecklist() {
 
   const [seenIds, setSeenIds] = useState(() => new Set());
   const [extraDraft, setExtraDraft] = useState('');
+  const [substitutionSheet, setSubstitutionSheet] = useState({
+    open: false,
+    ingredientName: '',
+    ingredientQty: 0,
+    ingredientUnit: 'unité',
+    categoryHint: null,
+    product: null,
+  });
 
   useEffect(() => {
     load();
@@ -163,6 +206,31 @@ export function DailyChecklist() {
     setSeenIds(new Set());
   }
 
+  function handleSubstitutionClick(product, recipeUsage) {
+    const ing = recipeUsage?.substitutionIngredient;
+    if (!ing) return;
+    setSubstitutionSheet({
+      open: true,
+      ingredientName: ing.name,
+      ingredientQty: ing.qty || 0,
+      ingredientUnit: ing.unit || 'unité',
+      categoryHint: ing.category_hint || null,
+      product,
+    });
+  }
+
+  function handleSubstitutionSelect(candidate) {
+    // Save the substitution — update product quantity based on candidate
+    if (candidate && candidate.product_id) {
+      const qty = candidate.pack_count || 1;
+      setQuotidienQty(candidate.product_id, qty);
+    }
+  }
+
+  function handleCloseSubstitution() {
+    setSubstitutionSheet((prev) => ({ ...prev, open: false }));
+  }
+
   const neededCount = Object.values(quotidien).filter((v) => v === 'needed').length;
 
   return (
@@ -188,7 +256,22 @@ export function DailyChecklist() {
                 product,
                 selectedRecipes,
                 recipes,
+                allProducts: products,
               })}
+              onSubstitutionClick={() =>
+                handleSubstitutionClick(
+                  product,
+                  getRecipeUsage({
+                    productId: product.id,
+                    productName: product.name,
+                    productUnit: product.unit,
+                    product,
+                    selectedRecipes,
+                    recipes,
+                    allProducts: products,
+                  }),
+                )
+              }
             />
           )}
           emptyState={
@@ -242,6 +325,16 @@ export function DailyChecklist() {
           </ul>
         )}
       </Card>
+
+      <ProductSubstitutionSheet
+        isOpen={substitutionSheet.open}
+        onClose={handleCloseSubstitution}
+        ingredientName={substitutionSheet.ingredientName}
+        ingredientQty={substitutionSheet.ingredientQty}
+        ingredientUnit={substitutionSheet.ingredientUnit}
+        categoryHint={substitutionSheet.categoryHint}
+        onSelect={handleSubstitutionSelect}
+      />
 
       <div className="wizard-summary">
         <span className="wizard-summary__icon">

@@ -48,5 +48,6 @@ class RecipeIngredient(Base):
     unit: Mapped[str] = mapped_column(String(20), default="unité", nullable=False)
     rayon: Mapped[Optional[str]] = mapped_column(String(100))
     category: Mapped[Optional[str]] = mapped_column(String(100))
+    category_hint: Mapped[Optional[str]] = mapped_column(String(100))
 
     recipe: Mapped["Recipe"] = relationship(back_populates="ingredients")
