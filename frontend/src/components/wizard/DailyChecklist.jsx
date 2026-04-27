@@ -13,7 +13,6 @@ import { SwipeStack } from '../ui/SwipeStack.jsx';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
 import { RecipeUsageBanner } from './RecipeUsageBanner.jsx';
 import { ProductSubstitutionSheet } from './ProductSubstitutionSheet.jsx';
-import { RecipeIngredientsSection } from './RecipeIngredientsSection.jsx';
 
 const PRODUCT_ICONS = ['apple', 'bag', 'package', 'leaf'];
 function iconForProduct(p) {
@@ -35,6 +34,14 @@ function ProductSwipeCard({
     .join(' ');
   const hasSubs = recipeUsage?.hasSubstitutions && recipeUsage?.substitutionCount > 0;
   const subCount = recipeUsage?.substitutionCount || 0;
+
+  // Grammage info pour affichage complémentaire
+  const grammageInfo = product.grammage_g
+    ? `${product.grammage_g}g`
+    : product.volume_ml
+      ? `${product.volume_ml}ml`
+      : null;
+
   return (
     <div className="product-sw">
       <div className="product-sw__hero">
@@ -81,11 +88,18 @@ function ProductSwipeCard({
           </button>
         )}
       </div>
+      {/* Recipe usage banner intégré DANS la carte — contextualisé au produit swipé */}
       <RecipeUsageBanner recipeUsage={recipeUsage} />
       <div className="product-sw__body">
         <div>
           <h3 className="product-sw__title">{product.name}</h3>
           {product.brand && <div className="product-sw__brand">{product.brand}</div>}
+          {/* Grammage en petit complément */}
+          {grammageInfo && (
+            <div className="product-sw__grammage">
+              {grammageInfo} · 1 {product.unit || 'unité'}
+            </div>
+          )}
         </div>
         <div className="product-sw__qty-row" data-no-drag>
           <span className="product-sw__qty-label">Quantité</span>
@@ -251,21 +265,18 @@ export function DailyChecklist() {
 
   return (
     <section className="stack stack--lg">
-      {/* Section A: Recipe Ingredients */}
+      {/* Section: Daily Checklist — l'info recette est DANS chaque carte swipe */}
       {hasSelectedRecipes && (
-        <RecipeIngredientsSection
-          selectedRecipes={selectedRecipes}
-          recipes={recipes}
-          quotidienQty={quotidienQty}
-          setQuotidienQty={setQuotidienQty}
-          markProduct={markProduct}
-          substitutionSheet={substitutionSheet}
-          setSubstitutionSheet={setSubstitutionSheet}
-          onOpenSubstitution={handleRecipeIngredientSubstitution}
-        />
+        <div className="recipe-ingredients-header">
+          <h2 className="recipe-ingredients-header__title">
+            Tes recettes
+          </h2>
+          <p className="recipe-ingredients-header__subtitle">
+            Les ingredients necessaires sont indiques dans chaque fiche produit
+          </p>
+        </div>
       )}
 
-      {/* Section B: Daily Checklist */}
       <div className="recipe-ingredients-header">
         <h2 className="recipe-ingredients-header__title">
           Ton quotidien

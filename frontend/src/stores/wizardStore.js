@@ -136,8 +136,8 @@ function normalizeName(name) {
  * dans toutes les recettes sélectionnées. Utilise unitConverter pour
  * gérer les conversions g↔unité, ml↔unité, unités dénombrables.
  *
- * Retourne aussi des informations de substitution si le produit est lié
- * à des ingrédients de recettes (via le resolver).
+ * Utilise les vraies valeurs de la DB (grammage_g, volume_ml) pour
+ * les calculs de conversion et les affichages.
  *
  * @param {object} options
  * @param {number|string} options.productId
@@ -147,7 +147,7 @@ function normalizeName(name) {
  * @param {object} options.selectedRecipes
  * @param {Array} options.recipes
  * @param {Array} options.allProducts - Tous les produits (pour lookup croisé category+grammage)
- * @returns {{ totalQuantity: number, breakdown: Array, approximate: boolean, missingGrammage: boolean, hasSubstitutions: boolean, substitutionCount: number, substitutionIngredient: object|null }}
+ * @returns {{ totalQuantity: number, breakdown: Array, approximate: boolean, missingGrammage: boolean, hasSubstitutions: boolean, substitutionCount: number, substitutionIngredient: object|null, product: object|null }}
  */
 export function getRecipeUsage({
   productId,
@@ -166,7 +166,7 @@ export function getRecipeUsage({
   let substitutionCount = 0;
   let substitutionIngredient = null;
   if (!recipes || !selectedRecipes) {
-    return { totalQuantity, breakdown, approximate: false, missingGrammage: false, hasSubstitutions: false, substitutionCount: 0, substitutionIngredient: null };
+    return { totalQuantity, breakdown, approximate: false, missingGrammage: false, hasSubstitutions: false, substitutionCount: 0, substitutionIngredient: null, product: product || null };
   }
 
   const targetName = normalizeName(productName);
@@ -276,7 +276,16 @@ export function getRecipeUsage({
     });
   });
 
-  return { totalQuantity, breakdown, approximate: anyApproximate, missingGrammage, hasSubstitutions, substitutionCount, substitutionIngredient };
+  return {
+    totalQuantity,
+    breakdown,
+    approximate: anyApproximate,
+    missingGrammage,
+    hasSubstitutions,
+    substitutionCount,
+    substitutionIngredient,
+    product: prod,
+  };
 }
 
 export function buildConsolidatedItems({
