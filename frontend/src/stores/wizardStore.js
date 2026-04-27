@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { WizardAPI, ResolverAPI } from '../api.js';
 import { useUIStore } from './uiStore.js';
-import { convertToProductQty, isConvertible, formatIngredientQty } from '../lib/unitConverter.js';
+import { convertToProductQty, isConvertible, formatIngredientQty, normalizeUnit } from '../lib/unitConverter.js';
 
 export const WIZARD_STEPS = [
   { key: 'recipes', label: 'Recettes' },
@@ -216,11 +216,18 @@ export function getRecipeUsage({
 
       // Track substitution candidates : ingrédient lié à un autre produit
       // mais le produit courant pourrait le substituer
+      // On vérifie que les catégories sont compatibles (même rayon/famille)
       if (!matchById && !matchByName && !matchByCategory && ing.product_id != null && product) {
         const linkedProduct = allProducts.find(
           (p) => String(p.id) === String(ing.product_id)
         );
         if (linkedProduct && linkedProduct.id !== product.id) {
+          // Vérification catégorielle : les deux produits doivent être
+          // dans la même catégorie (ex: EPICERIE, P.L.S.) pour qu'une
+          // substitution soit pertinente
+          const cat1 = (product.category || '').trim().toLowerCase();
+          const cat2 = (linkedProduct.category || '').trim().toLowerCase();
+          if (cat1 !== cat2) return; // catégories trop différentes — pas de substitution
           // L'ingrédient est lié à un produit différent — potentiel de substitution
           if (!substitutionIngredient) {
             substitutionIngredient = {

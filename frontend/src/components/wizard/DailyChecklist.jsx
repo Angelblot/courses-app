@@ -13,6 +13,7 @@ import { SwipeStack } from '../ui/SwipeStack.jsx';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
 import { RecipeUsageBanner } from './RecipeUsageBanner.jsx';
 import { ProductSubstitutionSheet } from './ProductSubstitutionSheet.jsx';
+import { RecipeIngredientsSection } from './RecipeIngredientsSection.jsx';
 
 const PRODUCT_ICONS = ['apple', 'bag', 'package', 'leaf'];
 function iconForProduct(p) {
@@ -112,7 +113,7 @@ function ResumePanel({ products, quotidien, quotidienQty, extras, onReset }) {
       <div>
         <div className="swipe-resume__count">{needed.length}</div>
         <div className="swipe-resume__label">
-          produit{needed.length > 1 ? 's' : ''} à racheter
+          produit{needed.length > 1 ? 's' : ''} a racheter
         </div>
       </div>
       {needed.length > 0 && (
@@ -219,6 +220,20 @@ export function DailyChecklist() {
     });
   }
 
+  function handleRecipeIngredientSubstitution(item) {
+    const ing = item.ingredient;
+    const product = item.product;
+    if (!ing) return;
+    setSubstitutionSheet({
+      open: true,
+      ingredientName: ing.name,
+      ingredientQty: ing.qty || 0,
+      ingredientUnit: ing.unit || 'unité',
+      categoryHint: ing.category_hint || null,
+      product,
+    });
+  }
+
   function handleSubstitutionSelect(candidate) {
     // Save the substitution — update product quantity based on candidate
     if (candidate && candidate.product_id) {
@@ -232,9 +247,34 @@ export function DailyChecklist() {
   }
 
   const neededCount = Object.values(quotidien).filter((v) => v === 'needed').length;
+  const hasSelectedRecipes = Object.keys(selectedRecipes || {}).length > 0;
 
   return (
     <section className="stack stack--lg">
+      {/* Section A: Recipe Ingredients */}
+      {hasSelectedRecipes && (
+        <RecipeIngredientsSection
+          selectedRecipes={selectedRecipes}
+          recipes={recipes}
+          quotidienQty={quotidienQty}
+          setQuotidienQty={setQuotidienQty}
+          markProduct={markProduct}
+          substitutionSheet={substitutionSheet}
+          setSubstitutionSheet={setSubstitutionSheet}
+          onOpenSubstitution={handleRecipeIngredientSubstitution}
+        />
+      )}
+
+      {/* Section B: Daily Checklist */}
+      <div className="recipe-ingredients-header">
+        <h2 className="recipe-ingredients-header__title">
+          Ton quotidien
+        </h2>
+        <p className="recipe-ingredients-header__subtitle">
+          Swipe pour dire si tu as deja ces produits
+        </p>
+      </div>
+
       {loaded && favorites.length === 0 ? (
         <EmptyState icon="package" title="Aucun produit favori">
           Ajoute-en depuis l'onglet Produits pour les retrouver ici.
@@ -290,12 +330,12 @@ export function DailyChecklist() {
         <div>
           <strong>Il manque un produit ?</strong>
           <div className="text-muted" style={{ fontSize: 13, marginTop: 2 }}>
-            Ajoute-le à la volée. Tu pourras le sauver en favori plus tard.
+            Ajoute-le a la volee. Tu pourras le sauver en favori plus tard.
           </div>
         </div>
         <form onSubmit={handleAddExtra} className="inline-form">
           <Input
-            placeholder="Ex: Sopalin, bananes…"
+            placeholder="Ex: Sopalin, bananes..."
             value={extraDraft}
             onChange={(e) => setExtraDraft(e.target.value)}
             aria-label="Ajout rapide"
@@ -341,7 +381,7 @@ export function DailyChecklist() {
           <Icon name="cart" strokeWidth={2.2} />
         </span>
         <span>
-          <strong>{neededCount}</strong> produit{neededCount > 1 ? 's' : ''} à
+          <strong>{neededCount}</strong> produit{neededCount > 1 ? 's' : ''} a
           racheter · {extras.length} ajout{extras.length > 1 ? 's' : ''} manuel
           {extras.length > 1 ? 's' : ''}
         </span>

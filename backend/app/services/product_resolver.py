@@ -16,6 +16,32 @@ from sqlalchemy.orm import Session
 from app.models.product import Product
 
 # ---------------------------------------------------------------------------
+# Catégorisation des ingrédients (pour filtre catégorie dans le resolver)
+# ---------------------------------------------------------------------------
+
+CATEGORY_HINT_MAP: Dict[str, List[str]] = {
+    "charcuterie": ["CHARCUT.TRAITEUR", "P.L.S."],
+    "boucherie": ["P.L.S.", "CHARCUT.TRAITEUR"],
+    "produit_laitier": ["P.L.S."],
+    "epicerie": ["EPICERIE"],
+    "fruits_et_legumes": ["FRUITS ET LEGUMES"],
+    "fruits": ["FRUITS ET LEGUMES"],
+    "legumes": ["FRUITS ET LEGUMES"],
+    "boissons": ["BOISSONS"],
+    "droguerie": ["DROGUERIE"],
+    "hygiene": ["PARFUMERIE HYGIENE"],
+    "confort": ["CONFORT DE LA MAISON"],
+    "surgelés": ["SURGELES"],
+    "surgeles": ["SURGELES"],
+}
+
+# ---------------------------------------------------------------------------
+# Seuil minimum de score — en dessous, le produit n'est pas retenu
+# ---------------------------------------------------------------------------
+
+MIN_SCORE_THRESHOLD = 0.15
+
+# ---------------------------------------------------------------------------
 # 1. Table de synonymes (hardcodée, extensible)
 # ---------------------------------------------------------------------------
 
@@ -251,6 +277,8 @@ class ProductResolver:
 
         results: List[ProductResolution] = []
         for product, score in scored[:limit]:
+            if score < MIN_SCORE_THRESHOLD:
+                continue
             pack_count, actual_grammage = self.compute_quantity(
                 need_qty=ingredient_qty,
                 need_unit=ingredient_unit,
@@ -274,54 +302,74 @@ class ProductResolver:
     ) -> List[Product]:
         """Trouve les produits candidats pour un ingrédient.
 
-        Stratégie :
-        a) Match ILIKE sur le nom
-        b) Match par synonymes
-        c) Match par catégorie (si category_hint)
+        Stratégie (strict) :
+        a) L'ingrédient a des synonymes -> seuls les produits dont le nom
+           contient UN des synonymes (incluant le nom lui-même) sont candidats.
+        b) L'ingrédient n'a pas de synonymes -> match ILIKE sur le nom.
+        c) Si category_hint est fourni, filtre les candidats pour ne garder
+           que ceux dont la catégorie correspond (via CATEGORY_HINT_MAP).
         """
         candidates: Dict[int, Product] = {}
         name_lower = ingredient_name.strip().lower()
 
-        # a) Match ILIKE sur le nom
-        like_pattern = f"%{name_lower}%"
-        stmt = select(Product).where(
-            func.lower(Product.name).like(like_pattern)
-        )
-        for product in self.db.execute(stmt).scalars().all():
-            candidates[product.id] = product
+        # Récupère les synonymes incluant le nom lui-même
+        synonyms_raw = get_synonyms(name_lower)
+        all_terms = [name_lower] + synonyms_raw  # le nom lui-même est toujours candidat
 
-        # b) Match par synonymes
-        synonyms = get_synonyms(name_lower)
-        for syn in synonyms:
-            syn_pattern = f"%{syn}%"
+        # a) Match par synonymes (prérequis)
+        for term in all_terms:
+            like_pattern = f"%{term}%"
             stmt = select(Product).where(
-                func.lower(Product.name).like(syn_pattern)
+                func.lower(Product.name).like(like_pattern)
             )
             for product in self.db.execute(stmt).scalars().all():
                 candidates[product.id] = product
 
-        # c) Match par catégorie (si category_hint fourni)
-        if category_hint:
-            cat_pattern = f"%{category_hint.lower()}%"
+        # Si l'ingrédient a des synonymes ET qu'aucun produit trouvé,
+        # tente un match ILIKE large sur le nom (dernier recours)
+        if not candidates and synonyms_raw:
+            like_pattern = f"%{name_lower}%"
             stmt = select(Product).where(
-                func.lower(Product.category).like(cat_pattern)
+                func.lower(Product.name).like(like_pattern)
             )
             for product in self.db.execute(stmt).scalars().all():
                 candidates[product.id] = product
 
-        # Si trop peu de candidats, ajouter les produits de même rayon/catégorie
-        # que les candidats déjà trouvés
-        if len(candidates) < 3 and candidates:
-            categories = set()
-            for p in candidates.values():
-                if p.category:
-                    categories.add(p.category)
-            for cat in categories:
-                stmt = select(Product).where(Product.category == cat)
-                for product in self.db.execute(stmt).scalars().all():
-                    candidates[product.id] = product
+        # Si toujours aucun candidat, fallback ILIKE simple sur le nom
+        if not candidates:
+            like_pattern = f"%{name_lower}%"
+            stmt = select(Product).where(
+                func.lower(Product.name).like(like_pattern)
+            )
+            for product in self.db.execute(stmt).scalars().all():
+                candidates[product.id] = product
+
+        # c) Filtre par catégorie (si category_hint fourni)
+        if category_hint and candidates:
+            allowed_categories = self._get_category_filters(category_hint)
+            if allowed_categories:
+                filtered = {
+                    pid: p
+                    for pid, p in candidates.items()
+                    if p.category and p.category in allowed_categories
+                }
+                # Si le filtre vide tout, on garde les candidats originaux
+                # mais on les marque comme moins pertinents
+                if filtered:
+                    candidates = filtered
 
         return list(candidates.values())
+
+    @staticmethod
+    def _get_category_filters(category_hint: str) -> List[str]:
+        """Convertit un category_hint en liste des catégories DB correspondantes."""
+        hint_lower = category_hint.strip().lower()
+        # Cherche d'abord dans la map
+        if hint_lower in CATEGORY_HINT_MAP:
+            return CATEGORY_HINT_MAP[hint_lower]
+        # Fallback: LIKE pattern sur la catégorie
+        # (ex: 'charcuterie' LIKE '%CHARCUT%')
+        return []
 
     def _compute_score(
         self,

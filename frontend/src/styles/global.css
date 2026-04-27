@@ -539,6 +539,180 @@ h1, h2, h3, h4 { line-height: 1.2; letter-spacing: -0.01em; font-weight: 700; }
   opacity: 0.8;
 }
 
+/* ------------------------------------------------------------------ */
+/* Recipe Ingredients Section (wizard etape 2)                        */
+/* ------------------------------------------------------------------ */
+
+.recipe-ingredients-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) 0;
+}
+
+.recipe-ingredients-header__title {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.recipe-ingredients-header__subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.recipe-ingredient-card__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.recipe-ingredient-card__image-wrap {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-warm);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.recipe-ingredient-card__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.recipe-ingredient-card__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recipe-ingredient-card__name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.recipe-ingredient-card__name {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.recipe-ingredient-card__brand {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.recipe-ingredient-card__meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.recipe-ingredient-card__qty-badge {
+  font-size: 11px;
+  color: var(--color-accent);
+  font-weight: 600;
+  background: var(--color-accent-soft);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.recipe-ingredient-card__recipe-name {
+  font-size: 11px;
+  color: var(--color-text-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recipe-ingredient-card__grammage {
+  font-size: 11px;
+  color: var(--color-text-subtle);
+}
+
+.recipe-ingredient-card__sub-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-accent);
+  cursor: pointer;
+  margin-top: 2px;
+  box-shadow: var(--shadow-xs);
+  transition: border-color var(--t-fast);
+}
+
+.recipe-ingredient-card__sub-btn:hover {
+  border-color: var(--color-accent);
+}
+
+.recipe-ingredient-card__qty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.recipe-ingredient-card__qty-value {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.recipe-ingredient-card__qty-label {
+  font-size: 10px;
+  color: var(--color-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.recipe-ingredient-card__qty-btns {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.recipe-ingredient-card__qty-btns button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  background: var(--color-surface-warm);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: background var(--t-fast);
+}
+
+.recipe-ingredient-card__qty-btns button:hover {
+  background: var(--color-border);
+}
+
 .swipe-resume { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6); text-align: center; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-card); }
 .swipe-resume__icon { width: 64px; height: 64px; margin: 0 auto; display: grid; place-items: center; background: var(--color-accent-soft); color: var(--color-accent); border-radius: 50%; }
 .swipe-resume__count { font-size: var(--font-size-3xl); font-weight: 800; letter-spacing: -0.02em; }
