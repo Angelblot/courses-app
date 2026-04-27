@@ -181,19 +181,36 @@ export function getRecipeUsage({
         ing.product_id != null &&
         String(ing.product_id) === String(productId);
       const ingName = normalizeName(ing.name);
-      const matchByName =
+      // MatchByName : d'abord sans condition isConvertible (juste le nom)
+      const matchByNameStrict =
         !matchById &&
         targetName.length > 0 &&
         ingName.length > 0 &&
-        isConvertible(ing.unit, prod) &&
         (targetName === ingName ||
           targetName.includes(ingName) ||
           ingName.includes(targetName));
+      // Ensuite on applique isConvertible : si convertible, c'est un vrai match
+      let matchByName = false;
+      if (matchByNameStrict && isConvertible(ing.unit, prod)) {
+        matchByName = true;
+      }
+      // Fallback par catégorie : même si isConvertible échoue, si l'ingrédient
+      // a un category_hint correspondant au produit courant, on considère le match
+      // comme valide. Utile pour les cas où l'unité diffère mais que le nom correspond.
+      let matchByCategoryFallback = false;
+      if (matchByNameStrict && !matchByName && ing.category_hint) {
+        const catHint = normalizeName(ing.category_hint);
+        const prodCat = normalizeName(product.category || '');
+        const prodRayon = normalizeName(product.rayon || '');
+        if (catHint && (catHint === prodCat || catHint === prodRayon || prodCat.includes(catHint) || catHint.includes(prodCat))) {
+          matchByCategoryFallback = true;
+        }
+      }
       // Match par catégorie + grammage : si l'ingrédient a un product_id,
       // vérifie si ce produit lié a la même catégorie ET le même grammage/volume
       // que le produit courant (substitution : lardons ↔ allumettes, etc.)
       let matchByCategory = false;
-      if (!matchById && !matchByName && ing.product_id != null && product) {
+      if (!matchById && !matchByName && !matchByCategoryFallback && ing.product_id != null && product) {
         const linkedProduct = allProducts.find(
           (p) => String(p.id) === String(ing.product_id)
         );
@@ -238,12 +255,12 @@ export function getRecipeUsage({
               recipeName: recipe.name,
             };
           }
-          substitutionCount++;
+          substitutionCount = 1;
           hasSubstitutions = true;
         }
       }
 
-      if (!matchById && !matchByName && !matchByCategory) return;
+      if (!matchById && !matchByName && !matchByCategoryFallback && !matchByCategory) return;
 
       const baseQty = (ing.quantity_per_serving || 0) * servings;
       const converted = convertToProductQty(baseQty, ing.unit, prod);

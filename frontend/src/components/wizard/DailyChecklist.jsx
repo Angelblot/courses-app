@@ -84,7 +84,7 @@ function ProductSwipeCard({
             }}
           >
             <Icon name="sparkles" size={12} strokeWidth={2.5} />
-            {subCount} alternative{subCount > 1 ? 's' : ''}
+            Alternatives
           </button>
         )}
       </div>
@@ -266,16 +266,6 @@ export function DailyChecklist() {
   return (
     <section className="stack stack--lg">
       {/* Section: Daily Checklist — l'info recette est DANS chaque carte swipe */}
-      {hasSelectedRecipes && (
-        <div className="recipe-ingredients-header">
-          <h2 className="recipe-ingredients-header__title">
-            Tes recettes
-          </h2>
-          <p className="recipe-ingredients-header__subtitle">
-            Les ingredients necessaires sont indiques dans chaque fiche produit
-          </p>
-        </div>
-      )}
 
       <div className="recipe-ingredients-header">
         <h2 className="recipe-ingredients-header__title">
