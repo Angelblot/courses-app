@@ -210,7 +210,7 @@ export function getRecipeUsage({
       // vérifie si ce produit lié a la même catégorie ET le même grammage/volume
       // que le produit courant (substitution : lardons ↔ allumettes, etc.)
       let matchByCategory = false;
-      if (!matchById && !matchByName && !matchByCategoryFallback && ing.product_id != null && product) {
+      if (!matchById && !matchByName && ing.product_id != null && product) {
         const linkedProduct = allProducts.find(
           (p) => String(p.id) === String(ing.product_id)
         );
@@ -260,7 +260,7 @@ export function getRecipeUsage({
         }
       }
 
-      if (!matchById && !matchByName && !matchByCategoryFallback && !matchByCategory) return;
+      if (!matchById && !matchByName && !matchByCategory) return;
 
       const baseQty = (ing.quantity_per_serving || 0) * servings;
       const converted = convertToProductQty(baseQty, ing.unit, prod);
