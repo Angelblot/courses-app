@@ -112,3 +112,16 @@ export const ResolverAPI = {
   resolve: (data) => api('/api/resolver/resolve', { method: 'POST', body: data }),
   select: (data) => api('/api/resolver/select', { method: 'POST', body: data }),
 };
+
+export const FoodsAPI = {
+  list: (params) => api(`/api/foods/${toQuery(params)}`),
+  get: (id) => api(`/api/foods/${id}`),
+  create: (data) => api('/api/foods/', { method: 'POST', body: data }),
+  update: (id, data) => api(`/api/foods/${id}`, { method: 'PUT', body: data }),
+  delete: (id) => api(`/api/foods/${id}`, { method: 'DELETE' }),
+  listProducts: (id) => api(`/api/foods/${id}/products`),
+  associateProduct: (id, data) =>
+    api(`/api/foods/${id}/products`, { method: 'POST', body: data }),
+  dissociateProduct: (foodId, productId) =>
+    api(`/api/foods/${foodId}/products/${productId}`, { method: 'DELETE' }),
+};

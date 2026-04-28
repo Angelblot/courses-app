@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.models.food import Food, FoodProduct
 from app.models.list_item import ListItem
 from app.models.product import Product
 from app.models.recipe import Recipe
@@ -20,6 +21,7 @@ from app.schemas.wizard import (
     WizardSessionCreate,
     WizardSessionOut,
 )
+from app.services.food_resolver import FoodResolver
 from app.services.search_strategy import SearchStrategyService
 
 router = APIRouter()
@@ -55,6 +57,10 @@ def _consolidate(
     fusionner deux ingrédients identiques venant de recettes différentes tout
     en gardant distincts les items dont l'unité diffère.
 
+    Pour les ingrédients de recette, résout ``food_id`` → ``product_id``
+    via la couche ALIMENT (FoodResolver) afin de proposer le meilleur
+    produit disponible.
+
     Args:
         payload: Données saisies dans le wizard.
         db: Session SQLAlchemy pour charger les recettes/produits référencés.
@@ -63,6 +69,7 @@ def _consolidate(
         Liste consolidée d'items prête à être pousée vers les drives.
     """
     bucket: Dict[Tuple[str, str, int], WizardConsolidatedItem] = {}
+    resolver = FoodResolver(db)
 
     def _add(item: WizardConsolidatedItem) -> None:
         key = (item.name.lower().strip(), item.unit, item.product_id or 0)
@@ -76,6 +83,16 @@ def _consolidate(
         if recipe is None:
             continue
         for ing in recipe.ingredients:
+            # Résoudre food_id → product_id (si food_id présent)
+            product_id = ing.product_id  # fallback sur l'ancien lien direct
+            product_label = None
+            if ing.food_id is not None:
+                resolved_id = resolver.resolve_best_product(ing.food_id)
+                if resolved_id is not None:
+                    product_id = resolved_id
+                    product_obj = db.get(Product, resolved_id)
+                    if product_obj:
+                        product_label = product_obj.name
             _add(
                 WizardConsolidatedItem(
                     name=ing.name,
@@ -83,7 +100,9 @@ def _consolidate(
                     unit=ing.unit,
                     rayon=ing.rayon,
                     category=ing.category,
-                    product_id=ing.product_id,
+                    product_id=product_id,
+                    food_id=ing.food_id,
+                    product_label=product_label,
                 )
             )
 

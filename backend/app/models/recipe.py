@@ -32,13 +32,16 @@ class Recipe(Base):
 
 
 class RecipeIngredient(Base):
-    """Ingrédient d'une recette, optionnellement lié à un produit du catalogue."""
+    """Ingrédient d'une recette, lié à un aliment générique et optionnellement à un produit."""
 
     __tablename__ = "recipe_ingredients"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     recipe_id: Mapped[int] = mapped_column(
         ForeignKey("recipes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    food_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("foods.id", ondelete="SET NULL"), nullable=True, index=True
     )
     product_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True

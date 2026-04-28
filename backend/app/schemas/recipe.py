@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class RecipeIngredientBase(BaseModel):
     """Champs communs d'un ingrédient de recette."""
 
+    food_id: Optional[int] = None
     product_id: Optional[int] = None
     name: str = Field(..., min_length=1, max_length=255)
     quantity_per_serving: float = Field(0.0, ge=0)

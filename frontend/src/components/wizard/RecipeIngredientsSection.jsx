@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card } from '../ui/Card.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { Icon } from '../ui/Icon.jsx';
@@ -8,6 +8,7 @@ import { ProductSubstitutionSheet } from './ProductSubstitutionSheet.jsx';
 import { useProductsStore } from '../../stores/productsStore.js';
 import { getRecipeUsage } from '../../stores/wizardStore.js';
 import { formatIngredientQty } from '../../lib/unitConverter.js';
+import { FoodsAPI } from '../../api.js';
 
 const PRODUCT_ICONS = ['package', 'bag', 'shopping-bag', 'box'];
 
@@ -30,6 +31,19 @@ export function RecipeIngredientsSection({
 }) {
   const allProducts = useProductsStore((s) => s.items);
   const loaded = useProductsStore((s) => s.loaded);
+  const [foods, setFoods] = useState([]);
+  const [foodsLoaded, setFoodsLoaded] = useState(false);
+
+  // Load foods for ALIMENT matching
+  useEffect(() => {
+    FoodsAPI.list().then((data) => {
+      setFoods(data || []);
+      setFoodsLoaded(true);
+    }).catch(() => {
+      setFoods([]);
+      setFoodsLoaded(true);
+    });
+  }, []);
 
   // Build a deduplicated list of ingredient → product mappings from selected recipes
   const recipeItems = useMemo(() => {
@@ -60,6 +74,7 @@ export function RecipeIngredientsSection({
           selectedRecipes,
           recipes,
           allProducts,
+          foods,
         });
 
         results.push({

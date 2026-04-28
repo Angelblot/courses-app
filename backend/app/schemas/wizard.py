@@ -39,6 +39,8 @@ class WizardConsolidatedItem(BaseModel):
     rayon: Optional[str] = None
     category: Optional[str] = None
     product_id: Optional[int] = None
+    food_id: Optional[int] = None
+    product_label: Optional[str] = None
 
 
 class WizardSessionCreate(BaseModel):

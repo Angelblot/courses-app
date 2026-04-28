@@ -136,8 +136,9 @@ function normalizeName(name) {
  * dans toutes les recettes sélectionnées. Utilise unitConverter pour
  * gérer les conversions g↔unité, ml↔unité, unités dénombrables.
  *
- * Utilise les vraies valeurs de la DB (grammage_g, volume_ml) pour
- * les calculs de conversion et les affichages.
+ * Utilise d'abord la couche ALIMENT (food_id) pour matcher les ingrédients
+ * aux produits via les associations food_products. En fallback, utilise
+ * les heuristiques de matching par nom/catégorie (rétrocompatibilité).
  *
  * @param {object} options
  * @param {number|string} options.productId
@@ -147,6 +148,7 @@ function normalizeName(name) {
  * @param {object} options.selectedRecipes
  * @param {Array} options.recipes
  * @param {Array} options.allProducts - Tous les produits (pour lookup croisé category+grammage)
+ * @param {Array} options.foods - Liste des aliments avec leurs produits associés (couche ALIMENT)
  * @returns {{ totalQuantity: number, breakdown: Array, approximate: boolean, missingGrammage: boolean, hasSubstitutions: boolean, substitutionCount: number, substitutionIngredient: object|null, product: object|null }}
  */
 export function getRecipeUsage({
@@ -157,6 +159,7 @@ export function getRecipeUsage({
   selectedRecipes,
   recipes,
   allProducts = [],
+  foods = [],
 }) {
   const breakdown = [];
   let totalQuantity = 0;
@@ -176,6 +179,22 @@ export function getRecipeUsage({
     const servings = selectedRecipes[recipe.id];
     if (servings == null) return;
     (recipe.ingredients || []).forEach((ing) => {
+      // *** NOUVEAU : Matching par food_id (couche ALIMENT) ***
+      // Si l'ingrédient a un food_id, on cherche l'aliment correspondant
+      // et on vérifie si le produit courant est associé via food_products
+      let foodMatch = false;
+      if (ing.food_id != null && foods.length > 0 && product) {
+        const food = foods.find(f => f.id === ing.food_id);
+        if (food && food.products && food.products.length > 0) {
+          const matched = food.products.find(
+            fp => String(fp.product_id) === String(product.id)
+          );
+          if (matched) {
+            foodMatch = true;
+          }
+        }
+      }
+
       const matchById =
         productId != null &&
         ing.product_id != null &&
@@ -231,10 +250,14 @@ export function getRecipeUsage({
         }
       }
 
+      // Si le food_match est validé, on considère le match comme prioritaire
+      // et on ignore les anciennes heuristiques pour ce ingrédient
+      if (!foodMatch && !matchById && !matchByName && !matchByCategoryFallback && !matchByCategory) return;
+
       // Track substitution candidates : ingrédient lié à un autre produit
       // mais le produit courant pourrait le substituer
       // On vérifie que les catégories sont compatibles (même rayon/famille)
-      if (!matchById && !matchByName && !matchByCategory && ing.product_id != null && product) {
+      if (!foodMatch && !matchById && !matchByName && !matchByCategory && ing.product_id != null && product) {
         const linkedProduct = allProducts.find(
           (p) => String(p.id) === String(ing.product_id)
         );
@@ -259,8 +282,6 @@ export function getRecipeUsage({
           hasSubstitutions = true;
         }
       }
-
-      if (!matchById && !matchByName && !matchByCategory) return;
 
       const baseQty = (ing.quantity_per_serving || 0) * servings;
       const converted = convertToProductQty(baseQty, ing.unit, prod);

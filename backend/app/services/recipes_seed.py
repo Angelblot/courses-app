@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.models.food import Food
 from app.models.product import Product
 from app.models.recipe import Recipe, RecipeIngredient
 
@@ -103,6 +104,25 @@ def _find_product_id(db: Session, fragment: Optional[str]) -> Optional[int]:
     return db.execute(stmt).scalar_one_or_none()
 
 
+def _find_food_id(db: Session, name: str) -> Optional[int]:
+    """Trouve le food_id correspondant à un nom d'ingrédient.
+
+    Cherche d'abord un match exact, puis un match LIKE.
+    """
+    from sqlalchemy import func
+    normalized = name.strip().lower()
+    food = db.execute(
+        select(Food.id).where(func.lower(Food.name) == normalized)
+    ).scalar_one_or_none()
+    if food:
+        return food
+    # Fallback LIKE
+    food = db.execute(
+        select(Food.id).where(func.lower(Food.name).like(f"%{normalized}%"))
+    ).scalar_one_or_none()
+    return food
+
+
 def seed_recipes(db: Session) -> int:
     """Insère les recettes par défaut si la table est vide.
 
@@ -126,6 +146,7 @@ def seed_recipes(db: Session) -> int:
         for ing in spec["ingredients"]:
             recipe.ingredients.append(
                 RecipeIngredient(
+                    food_id=_find_food_id(db, ing["name"]),
                     product_id=_find_product_id(db, ing.get("product_match")),
                     name=ing["name"],
                     quantity_per_serving=ing["quantity_per_serving"],
