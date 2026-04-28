@@ -23,6 +23,7 @@ class ProductBase(BaseModel):
     store_brand_affinity: Optional[str] = Field(None, max_length=50)
     grammage_g: Optional[int] = Field(None, ge=0)
     volume_ml: Optional[int] = Field(None, ge=0)
+    product_type: Optional[str] = Field(None, max_length=100)
 
 
 class ProductCreate(ProductBase):
@@ -46,6 +47,7 @@ class ProductUpdate(BaseModel):
     store_brand_affinity: Optional[str] = Field(None, max_length=50)
     grammage_g: Optional[int] = Field(None, ge=0)
     volume_ml: Optional[int] = Field(None, ge=0)
+    product_type: Optional[str] = Field(None, max_length=100)
 
 
 class GrammageUpdate(BaseModel):

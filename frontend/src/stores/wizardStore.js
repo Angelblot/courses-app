@@ -136,19 +136,17 @@ function normalizeName(name) {
  * dans toutes les recettes sélectionnées. Utilise unitConverter pour
  * gérer les conversions g↔unité, ml↔unité, unités dénombrables.
  *
- * Utilise d'abord la couche ALIMENT (food_id) pour matcher les ingrédients
- * aux produits via les associations food_products. En fallback, utilise
- * les heuristiques de matching par nom/catégorie (rétrocompatibilité).
+ * Matching : product_id direct -> product_type -> nom (fallback).
+ * Le matching par product_type est traité comme un match direct
+ * (lardons et allumettes fusionnent dans le même produit).
  *
  * @param {object} options
  * @param {number|string} options.productId
  * @param {string} options.productName
  * @param {string} options.productUnit
- * @param {object} options.product - Objet produit complet (avec grammage_g, volume_ml)
+ * @param {object} options.product - Objet produit complet (avec grammage_g, volume_ml, product_type)
  * @param {object} options.selectedRecipes
  * @param {Array} options.recipes
- * @param {Array} options.allProducts - Tous les produits (pour lookup croisé category+grammage)
- * @param {Array} options.foods - Liste des aliments avec leurs produits associés (couche ALIMENT)
  * @returns {{ totalQuantity: number, breakdown: Array, approximate: boolean, missingGrammage: boolean, hasSubstitutions: boolean, substitutionCount: number, substitutionIngredient: object|null, product: object|null }}
  */
 export function getRecipeUsage({
@@ -158,130 +156,46 @@ export function getRecipeUsage({
   product,
   selectedRecipes,
   recipes,
-  allProducts = [],
-  foods = [],
 }) {
   const breakdown = [];
   let totalQuantity = 0;
   let anyApproximate = false;
   let missingGrammage = false;
-  let hasSubstitutions = false;
-  let substitutionCount = 0;
-  let substitutionIngredient = null;
   if (!recipes || !selectedRecipes) {
     return { totalQuantity, breakdown, approximate: false, missingGrammage: false, hasSubstitutions: false, substitutionCount: 0, substitutionIngredient: null, product: product || null };
   }
 
   const targetName = normalizeName(productName);
   const prod = product || { id: productId, name: productName, unit: productUnit };
+  const targetType = prod.product_type || null;
 
   recipes.forEach((recipe) => {
     const servings = selectedRecipes[recipe.id];
     if (servings == null) return;
     (recipe.ingredients || []).forEach((ing) => {
-      // *** NOUVEAU : Matching par food_id (couche ALIMENT) ***
-      // Si l'ingrédient a un food_id, on cherche l'aliment correspondant
-      // et on vérifie si le produit courant est associé via food_products
-      let foodMatch = false;
-      if (ing.food_id != null && foods.length > 0 && product) {
-        const food = foods.find(f => f.id === ing.food_id);
-        if (food && food.products && food.products.length > 0) {
-          const matched = food.products.find(
-            fp => String(fp.product_id) === String(product.id)
-          );
-          if (matched) {
-            foodMatch = true;
-          }
-        }
-      }
-
       const matchById =
         productId != null &&
         ing.product_id != null &&
         String(ing.product_id) === String(productId);
+
+      const matchByType =
+        !matchById &&
+        targetType != null &&
+        ing.product_type != null &&
+        ing.product_type === targetType;
+
       const ingName = normalizeName(ing.name);
-      // MatchByName : d'abord sans condition isConvertible (juste le nom)
       const matchByNameStrict =
         !matchById &&
+        !matchByType &&
         targetName.length > 0 &&
         ingName.length > 0 &&
         (targetName === ingName ||
           targetName.includes(ingName) ||
           ingName.includes(targetName));
-      // Ensuite on applique isConvertible : si convertible, c'est un vrai match
-      let matchByName = false;
-      if (matchByNameStrict && isConvertible(ing.unit, prod)) {
-        matchByName = true;
-      }
-      // Fallback par catégorie : même si isConvertible échoue, si l'ingrédient
-      // a un category_hint correspondant au produit courant, on considère le match
-      // comme valide. Utile pour les cas où l'unité diffère mais que le nom correspond.
-      let matchByCategoryFallback = false;
-      if (matchByNameStrict && !matchByName && ing.category_hint) {
-        const catHint = normalizeName(ing.category_hint);
-        const prodCat = normalizeName(product.category || '');
-        const prodRayon = normalizeName(product.rayon || '');
-        if (catHint && (catHint === prodCat || catHint === prodRayon || prodCat.includes(catHint) || catHint.includes(prodCat))) {
-          matchByCategoryFallback = true;
-        }
-      }
-      // Match par catégorie + grammage : si l'ingrédient a un product_id,
-      // vérifie si ce produit lié a la même catégorie ET le même grammage/volume
-      // que le produit courant (substitution : lardons ↔ allumettes, etc.)
-      let matchByCategory = false;
-      if (!matchById && !matchByName && ing.product_id != null && product) {
-        const linkedProduct = allProducts.find(
-          (p) => String(p.id) === String(ing.product_id)
-        );
-        if (linkedProduct) {
-          const sameCategory =
-            product.category != null &&
-            linkedProduct.category != null &&
-            normalizeName(product.category) === normalizeName(linkedProduct.category);
-          const sameGrammage =
-            product.grammage_g != null &&
-            linkedProduct.grammage_g != null &&
-            product.grammage_g === linkedProduct.grammage_g;
-          const sameVolume =
-            product.volume_ml != null &&
-            linkedProduct.volume_ml != null &&
-            product.volume_ml === linkedProduct.volume_ml;
-          matchByCategory = sameCategory && (sameGrammage || sameVolume);
-        }
-      }
+      const matchByName = matchByNameStrict && isConvertible(ing.unit, prod);
 
-      // Si le food_match est validé, on considère le match comme prioritaire
-      // et on ignore les anciennes heuristiques pour ce ingrédient
-      if (!foodMatch && !matchById && !matchByName && !matchByCategoryFallback && !matchByCategory) return;
-
-      // Track substitution candidates : ingrédient lié à un autre produit
-      // mais le produit courant pourrait le substituer
-      // On vérifie que les catégories sont compatibles (même rayon/famille)
-      if (!foodMatch && !matchById && !matchByName && !matchByCategory && ing.product_id != null && product) {
-        const linkedProduct = allProducts.find(
-          (p) => String(p.id) === String(ing.product_id)
-        );
-        if (linkedProduct && linkedProduct.id !== product.id) {
-          // Vérification catégorielle : les deux produits doivent être
-          // dans la même catégorie (ex: EPICERIE, P.L.S.) pour qu'une
-          // substitution soit pertinente
-          const cat1 = (product.category || '').trim().toLowerCase();
-          const cat2 = (linkedProduct.category || '').trim().toLowerCase();
-          if (cat1 !== cat2) return; // catégories trop différentes — pas de substitution
-          // L'ingrédient est lié à un produit différent — potentiel de substitution
-          if (!substitutionIngredient) {
-            substitutionIngredient = {
-              name: ing.name,
-              qty: (ing.quantity_per_serving || 0) * servings,
-              unit: ing.unit,
-              category_hint: ing.category_hint || ing.category || null,
-              recipeName: recipe.name,
-            };
-          }
-          substitutionCount = 1;
-          hasSubstitutions = true;
-        }
-      }
+      if (!matchById && !matchByType && !matchByName) return;
 
       const baseQty = (ing.quantity_per_serving || 0) * servings;
       const converted = convertToProductQty(baseQty, ing.unit, prod);
@@ -319,9 +233,9 @@ export function getRecipeUsage({
     breakdown,
     approximate: anyApproximate,
     missingGrammage,
-    hasSubstitutions,
-    substitutionCount,
-    substitutionIngredient,
+    hasSubstitutions: false,
+    substitutionCount: 0,
+    substitutionIngredient: null,
     product: prod,
   };
 }

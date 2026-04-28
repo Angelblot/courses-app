@@ -2,7 +2,9 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+from app.services.product_typology import normalize_product_type
 
 
 class RecipeIngredientBase(BaseModel):
@@ -28,6 +30,11 @@ class RecipeIngredientOut(RecipeIngredientBase):
 
     id: int
     recipe_id: int
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def product_type(self) -> Optional[str]:
+        return normalize_product_type(self.name)
 
 
 class RecipeBase(BaseModel):

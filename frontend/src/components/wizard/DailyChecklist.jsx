@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useProductsStore } from '../../stores/productsStore.js';
 import { useRecipesStore } from '../../stores/recipesStore.js';
 import { useWizardStore, getRecipeUsage } from '../../stores/wizardStore.js';
-import { FoodsAPI } from '../../api.js';
 import { Card } from '../ui/Card.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { Input } from '../ui/Input.jsx';
@@ -175,8 +174,6 @@ export function DailyChecklist() {
 
   const [seenIds, setSeenIds] = useState(() => new Set());
   const [extraDraft, setExtraDraft] = useState('');
-  const [foods, setFoods] = useState([]);
-  const [foodsLoaded, setFoodsLoaded] = useState(false);
   const [substitutionSheet, setSubstitutionSheet] = useState({
     open: false,
     ingredientName: '',
@@ -189,13 +186,6 @@ export function DailyChecklist() {
   useEffect(() => {
     load();
     loadRecipes();
-    FoodsAPI.list().then((data) => {
-      setFoods(data || []);
-      setFoodsLoaded(true);
-    }).catch(() => {
-      setFoods([]);
-      setFoodsLoaded(true);
-    });
   }, [load, loadRecipes]);
 
   const favorites = useMemo(
@@ -307,8 +297,6 @@ export function DailyChecklist() {
                 product,
                 selectedRecipes,
                 recipes,
-                allProducts: products,
-                foods,
               })}
               onSubstitutionClick={() =>
                 handleSubstitutionClick(
@@ -320,8 +308,6 @@ export function DailyChecklist() {
                     product,
                     selectedRecipes,
                     recipes,
-                    allProducts: products,
-                    foods,
                   }),
                 )
               }

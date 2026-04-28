@@ -12,7 +12,6 @@ from app.core.config import Settings, get_settings
 from app.core.database import init_db
 from app.routes import api_router
 from app.routes.seed import seed_database
-from app.routes.seed_foods import seed_aliments_db
 from app.services.categories import seed_categories, seed_category_aliases
 from app.services.recipes_seed import seed_recipes
 
@@ -55,11 +54,21 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                 inserted_recipes = seed_recipes(db)
                 if inserted_recipes:
                     print(f"[AUTO-SEED] recipes: {inserted_recipes}")
-                foods_result = seed_aliments_db(db)
-                if foods_result.get("foods"):
-                    print(f"[AUTO-SEED] foods: {foods_result}")
         except Exception as e:
             print(f"[AUTO-SEED] Erreur: {e}")
+
+        # Seed product_type pour les produits qui n'en ont pas
+        try:
+            from app.services.product_typology import normalize_product_type
+            from app.models.product import Product
+            products_no_type = db.query(Product).filter(Product.product_type.is_(None)).all()
+            for p in products_no_type:
+                p.product_type = normalize_product_type(p.name)
+            db.commit()
+            if products_no_type:
+                print(f"[AUTO-SEED] product_types: {len(products_no_type)}")
+        except Exception as e:
+            print(f"[AUTO-SEED] product_types error: {e}")
         finally:
             db.close()
 
