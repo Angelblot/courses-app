@@ -184,82 +184,90 @@ export function ProductCardEditable({
           autoComplete="off"
           spellCheck="false"
         />
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 6,
-          }}
-        >
-          <input
-            className="input input--inline"
-            value={form.brand || ''}
-            onChange={(e) => updateField({ brand: e.target.value })}
-            aria-label="Marque"
-            placeholder="Marque"
-            autoComplete="off"
-          />
-          {hasCategories ? (
-            <select
-              className="input input--inline"
-              value={form.category || ''}
-              onChange={(e) => updateField({ category: e.target.value })}
-              aria-label="Catégorie"
-            >
-              <option value="">Catégorie…</option>
-              {categoryOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          ) : (
+        <div className="edit-grid edit-grid--2col">
+          <div className="edit-field">
+            <label className="edit-label" htmlFor={`brand-${product.id}`}>
+              Marque
+            </label>
             <input
+              id={`brand-${product.id}`}
               className="input input--inline"
-              value={form.category || ''}
-              onChange={(e) => updateField({ category: e.target.value })}
-              aria-label="Catégorie"
-              placeholder="Catégorie"
+              value={form.brand || ''}
+              onChange={(e) => updateField({ brand: e.target.value })}
+              placeholder="Marque"
               autoComplete="off"
             />
-          )}
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '84px 1fr',
-            gap: 6,
-          }}
-        >
-          <input
-            className="input input--inline"
-            type="number"
-            min="1"
-            step="1"
-            inputMode="numeric"
-            value={form.default_quantity}
-            onChange={(e) => updateField({ default_quantity: e.target.value })}
-            aria-label="Quantité par défaut"
-          />
-          <select
-            className="select select--inline"
-            value={form.unit}
-            onChange={(e) => updateField({ unit: e.target.value })}
-            aria-label="Unité"
-          >
-            {Array.from(new Set([...SUGGESTED_UNITS, form.unit].filter(Boolean))).map(
-              (u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ),
+          </div>
+          <div className="edit-field">
+            <label className="edit-label" htmlFor={`category-${product.id}`}>
+              Catégorie
+            </label>
+            {hasCategories ? (
+              <select
+                id={`category-${product.id}`}
+                className="input input--inline"
+                value={form.category || ''}
+                onChange={(e) => updateField({ category: e.target.value })}
+              >
+                <option value="">Catégorie…</option>
+                {categoryOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id={`category-${product.id}`}
+                className="input input--inline"
+                value={form.category || ''}
+                onChange={(e) => updateField({ category: e.target.value })}
+                placeholder="Catégorie"
+                autoComplete="off"
+              />
             )}
-          </select>
+          </div>
+        </div>
+        <div className="edit-grid edit-grid--qty">
+          <div className="edit-field">
+            <label className="edit-label" htmlFor={`qty-${product.id}`}>
+              Qté
+            </label>
+            <input
+              id={`qty-${product.id}`}
+              className="input input--inline"
+              type="number"
+              min="1"
+              step="1"
+              inputMode="numeric"
+              value={form.default_quantity}
+              onChange={(e) => updateField({ default_quantity: e.target.value })}
+            />
+          </div>
+          <div className="edit-field">
+            <label className="edit-label" htmlFor={`unit-${product.id}`}>
+              Unité
+            </label>
+            <select
+              id={`unit-${product.id}`}
+              className="select select--inline"
+              value={form.unit}
+              onChange={(e) => updateField({ unit: e.target.value })}
+            >
+              {Array.from(new Set([...SUGGESTED_UNITS, form.unit].filter(Boolean))).map(
+                (u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
         </div>
       </div>
       <div className="item__actions" onClick={(e) => e.stopPropagation()}>
         <Button
-          variant="ghost"
+          variant="icon"
           onClick={() => {
             if (debounceRef.current) {
               clearTimeout(debounceRef.current);
@@ -270,15 +278,16 @@ export function ProductCardEditable({
           aria-label="Annuler l'édition"
           disabled={saving}
         >
-          <Icon name="x" size={16} />
+          <Icon name="x" size={20} />
         </Button>
         <Button
           variant="primary"
           onClick={() => doSave({ closeAfter: true })}
           aria-label="Enregistrer"
           disabled={saving}
+          className="btn--icon"
         >
-          <Icon name="check" size={16} />
+          <Icon name="check" size={20} />
         </Button>
       </div>
     </article>

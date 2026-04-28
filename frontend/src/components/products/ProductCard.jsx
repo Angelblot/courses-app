@@ -1,11 +1,8 @@
-import { useState } from 'react';
 import { Button } from '../ui/Button.jsx';
 import { Icon } from '../ui/Icon.jsx';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
 import { CategoryMiniChip } from './CategoryMiniChip.jsx';
 import { ProductCardEditable } from './ProductCardEditable.jsx';
-import { GrammageBottomSheet } from './GrammageBottomSheet.jsx';
-import { useProductsStore } from '../../stores/productsStore.js';
 
 const CATEGORY_ICONS = {
   fruits_legumes: 'apple',
@@ -36,7 +33,7 @@ const TREND_STYLE = {
   gap: 4,
   fontSize: 11,
   fontWeight: 600,
-  padding: '2px 8px',
+  padding: '4px 10px',
   borderRadius: 999,
   lineHeight: 1.4,
 };
@@ -99,13 +96,6 @@ export function ProductCard({
   onInlineCancel,
   categoryLabels,
 }) {
-  const [showGrammageSheet, setShowGrammageSheet] = useState(false);
-  const updateGrammage = useProductsStore((s) => s.updateGrammage);
-
-  function handleGrammageSave(id, g, v) {
-    updateGrammage(id, g, v);
-    setShowGrammageSheet(false);
-  }
   if (isInlineEditing) {
     return (
       <ProductCardEditable
@@ -133,6 +123,7 @@ export function ProductCard({
   const categoryKey = product.category_key || null;
   const categoryLabel = product.category_label || null;
   const categoryIcon = categoryKey ? CATEGORY_ICONS[categoryKey] : null;
+  const hasBadges = Boolean(categoryLabel) || Boolean(trend) || driveNames.length > 0;
 
   function handleBodyClick() {
     if (onViewDetails) return onViewDetails(product);
@@ -171,19 +162,7 @@ export function ProductCard({
         onKeyDown={handleBodyKeyDown}
         aria-label={bodyAria}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div className="item__title" style={{ flex: '1 1 auto', minWidth: 0 }}>
-            {product.name}
-          </div>
-          {trend && <PriceTrendBadge trend={trend} />}
-        </div>
+        <div className="item__title">{product.name}</div>
         <div className="item__meta">
           {product.brand && <>{product.brand} · </>}
           {product.default_quantity} {product.unit}
@@ -193,44 +172,18 @@ export function ProductCard({
               {product.purchase_count} achat{product.purchase_count > 1 ? 's' : ''}
             </>
           )}
-          {product.grammage_g == null && product.volume_ml == null && (
-            <span
-              onClick={(e) => { e.stopPropagation(); setShowGrammageSheet(true); }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                marginLeft: 8,
-                padding: '1px 8px',
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 600,
-                background: '#F3F1EC',
-                color: '#6B6B6B',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                lineHeight: 1.5,
-              }}
-              title="Indiquer le poids de ce produit"
-            >
-              Poids ?
-            </span>
-          )}
         </div>
-        {categoryLabel && (
-          <div style={{ marginTop: 6 }}>
-            <CategoryMiniChip
-              categoryKey={categoryKey}
-              icon={categoryIcon}
-              label={categoryLabel}
-              onClick={onCategoryClick}
-            />
-          </div>
-        )}
-        {driveNames.length > 0 && (
-          <div
-            className="item__drives"
-            style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}
-          >
+        {hasBadges && (
+          <div className="item__badges">
+            {categoryLabel && (
+              <CategoryMiniChip
+                categoryKey={categoryKey}
+                icon={categoryIcon}
+                label={categoryLabel}
+                onClick={onCategoryClick}
+              />
+            )}
+            {trend && <PriceTrendBadge trend={trend} />}
             {driveNames.map((d) => (
               <span key={d} className="badge badge--primary">
                 {driveLabel(d)}
@@ -241,29 +194,22 @@ export function ProductCard({
       </div>
       <div className="item__actions" onClick={(e) => e.stopPropagation()}>
         <Button
-          variant="ghost"
+          variant="icon"
           onClick={() => onToggleFavorite(product.id)}
           aria-label={product.favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
           className={product.favorite ? 'text-accent' : ''}
         >
-          <Icon name="star" size={16} />
+          <Icon name="star" size={20} />
         </Button>
         {onEdit && (
-          <Button variant="ghost" onClick={() => onEdit(product)} aria-label="Éditer">
-            <Icon name="edit" size={16} />
+          <Button variant="icon" onClick={() => onEdit(product)} aria-label="Éditer">
+            <Icon name="edit" size={20} />
           </Button>
         )}
-        <Button variant="danger" onClick={() => onDelete(product.id)} aria-label="Supprimer">
-          <Icon name="trash" size={16} />
+        <Button variant="icon" onClick={() => onDelete(product.id)} aria-label="Supprimer">
+          <Icon name="trash" size={20} />
         </Button>
       </div>
-      {showGrammageSheet && (
-        <GrammageBottomSheet
-          product={product}
-          onSave={handleGrammageSave}
-          onClose={() => setShowGrammageSheet(false)}
-        />
-      )}
     </article>
   );
 }
