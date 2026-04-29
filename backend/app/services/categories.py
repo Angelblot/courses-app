@@ -92,6 +92,7 @@ class CategoryService:
 
     def _invalidate(self) -> None:
         self._catalog_cache = None
+        self._alias_cache = None
 
     def resolve_key(self, raw_label: Optional[str]) -> str:
         """Retourne la clé canonique (ex: ``pls``) pour un libellé brut."""
@@ -196,21 +197,28 @@ class CategoryService:
 
 
 def seed_category_aliases(db: Session) -> int:
-    """Insère les alias canoniques manquants. Idempotent.
+    """Synchronise les alias canoniques avec ``SEED_ALIASES``.
+
+    Insère les alias manquants ET met à jour ceux dont la clé canonique en base
+    diverge de la définition courante (ex: ``CHARCUT.TRAITEUR`` historiquement
+    mappé sur ``pls`` doit basculer sur ``charcuterie``).
 
     Returns:
-        Nombre de nouveaux alias insérés.
+        Nombre de lignes affectées (insertions + mises à jour).
     """
-    existing = {row.label_raw for row in db.query(CategoryAlias).all()}
-    inserted = 0
+    existing = {row.label_raw: row for row in db.query(CategoryAlias).all()}
+    affected = 0
     for raw, key in SEED_ALIASES.items():
-        if raw in existing:
-            continue
-        db.add(CategoryAlias(label_raw=raw, key_canonical=key))
-        inserted += 1
-    if inserted:
+        row = existing.get(raw)
+        if row is None:
+            db.add(CategoryAlias(label_raw=raw, key_canonical=key))
+            affected += 1
+        elif row.key_canonical != key:
+            row.key_canonical = key
+            affected += 1
+    if affected:
         db.commit()
-    return inserted
+    return affected
 
 
 def seed_categories(db: Session) -> int:
