@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useWizardStore, WIZARD_STEPS } from '../stores/wizardStore.js';
 import { RecipePicker } from '../components/wizard/RecipePicker.jsx';
 import { DailyChecklist } from '../components/wizard/DailyChecklist.jsx';
+import { RecipeProductMatching } from '../components/wizard/RecipeProductMatching.jsx';
 import { RecapList } from '../components/wizard/RecapList.jsx';
 import { LaunchGeneration } from '../components/wizard/LaunchGeneration.jsx';
 import { Icon } from '../components/ui/Icon.jsx';
@@ -10,6 +11,7 @@ import { Icon } from '../components/ui/Icon.jsx';
 const STEP_COMPONENTS = {
   recipes: RecipePicker,
   checklist: DailyChecklist,
+  ingredients: RecipeProductMatching,
   recap: RecapList,
   generate: LaunchGeneration,
 };
@@ -17,6 +19,7 @@ const STEP_COMPONENTS = {
 const STEP_TITLES = {
   recipes: 'Choisis tes recettes',
   checklist: 'Ton quotidien',
+  ingredients: 'Ingrédients de tes recettes',
   recap: 'Récap de ta liste',
   generate: 'Lance la génération',
 };
@@ -61,6 +64,8 @@ export function WizardPage() {
   if (current.key === 'checklist') {
     const hasNeeded = Object.values(quotidien).some((v) => v === 'needed');
     showFab = hasNeeded || extras.length > 0;
+  } else if (current.key === 'ingredients') {
+    showFab = true;
   } else if (current.key === 'recap') {
     showFab = Object.keys(selectedRecipes).length > 0
       || Object.values(quotidien).some((v) => v === 'needed')

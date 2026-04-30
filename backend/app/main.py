@@ -67,6 +67,20 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             db.commit()
             if products_no_type:
                 print(f"[AUTO-SEED] product_types: {len(products_no_type)}")
+
+            # Charcuterie wrongly categorized as P.L.S. — fix idempotent
+            charcut_types = {"lardon", "jambon", "chorizo", "saucisse", "saucisson"}
+            wrong_charcut = (
+                db.query(Product)
+                .filter(Product.category == "P.L.S.")
+                .filter(Product.product_type.in_(charcut_types))
+                .all()
+            )
+            for p in wrong_charcut:
+                p.category = "CHARCUT.TRAITEUR"
+            if wrong_charcut:
+                db.commit()
+                print(f"[AUTO-SEED] category fixes: {len(wrong_charcut)}")
         except Exception as e:
             print(f"[AUTO-SEED] product_types error: {e}")
         finally:

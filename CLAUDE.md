@@ -75,6 +75,17 @@ cd ~/courses-app/frontend && npm run build
 sqlite3 ~/courses-app/backend/app.db
 ```
 
+## Workflow d'autonomie
+- Claude Code travaille en complète autonomie après lancement — pas de micro-management
+- Utiliser `--dangerously-skip-permissions` et `--max-turns 30` pour les tâches complexes
+- Ne pas hésiter à explorer, itérer, et utiliser `/compact` si le contexte est plein
+- En cas de blocage technique, chercher une solution par soi-même avant de demander
+
+## Validation par Hermes
+- Après chaque session, Hermes exécute les tests (`pytest`)
+- Hermes vérifie l'UX (build frontend + screenshot)
+- Le résultat est consigné dans Obsidian/Projets/Courses/Avancement.md
+
 ## Fichiers clés
 - `backend/app/main.py` — FastAPI app, routes enregistrées
 - `backend/app/models/` — SQLAlchemy models

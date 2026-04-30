@@ -6,6 +6,7 @@ import { convertToProductQty, isConvertible, formatIngredientQty, normalizeUnit 
 export const WIZARD_STEPS = [
   { key: 'recipes', label: 'Recettes' },
   { key: 'checklist', label: 'Quotidien' },
+  { key: 'ingredients', label: 'Ingrédients' },
   { key: 'recap', label: 'Récap' },
   { key: 'generate', label: 'Générer' },
 ];
@@ -271,10 +272,21 @@ export function buildConsolidatedItems({
     }
   };
 
+  // product_types already covered by a "needed" product → skip generic ingredient
+  // to avoid showing both "Lardons 200g" and "Allumettes CARREFOUR" in the recap.
+  const coveredProductTypes = new Set(
+    Object.entries(quotidien || {})
+      .filter(([, status]) => status === 'needed')
+      .map(([pid]) => (products || []).find((pr) => String(pr.id) === String(pid)))
+      .filter((p) => p && p.product_type)
+      .map((p) => p.product_type),
+  );
+
   (recipes || []).forEach((recipe) => {
     const servings = selectedRecipes[recipe.id];
     if (servings == null) return;
     (recipe.ingredients || []).forEach((ing) => {
+      if (ing.product_type && coveredProductTypes.has(ing.product_type)) return;
       push(
         { ...ing, quantity: ing.quantity_per_serving * servings },
         {
@@ -320,4 +332,82 @@ export function groupByRayon(items) {
     map.get(item.rayon).push(item);
   });
   return Array.from(map.entries()).map(([rayon, entries]) => ({ rayon, entries }));
+}
+
+/**
+ * getRecipeIngredientMatches : pour chaque ingrédient des recettes sélectionnées,
+ * regroupe par `product_type` et renvoie la liste des produits du catalogue qui
+ * matchent ce type. Permet à l'utilisateur de valider/changer le produit qui sera
+ * mis au panier pour chaque ingrédient.
+ *
+ * @param {object} options
+ * @param {object} options.selectedRecipes - Map {recipeId: servings}
+ * @param {Array}  options.recipes - Recettes complètes (avec ingredients[])
+ * @param {Array}  options.products - Catalogue produit complet
+ * @returns {Array<{
+ *   key: string,
+ *   productType: string|null,
+ *   ingredientName: string,
+ *   totalQty: number,
+ *   unit: string,
+ *   sources: Array<{ recipeId, recipeName, qty, unit }>,
+ *   matchingProducts: Array,
+ *   categoryHint: string|null,
+ * }>}
+ */
+export function getRecipeIngredientMatches({
+  selectedRecipes,
+  recipes,
+  products,
+}) {
+  if (!recipes || !selectedRecipes || !products) return [];
+
+  const groups = new Map();
+
+  recipes.forEach((recipe) => {
+    const servings = selectedRecipes[recipe.id];
+    if (servings == null) return;
+
+    (recipe.ingredients || []).forEach((ing) => {
+      const productType = ing.product_type || null;
+      const ingName = (ing.name || '').trim();
+      // Group by product_type if available, fall back to lowercased name.
+      const groupKey = productType || `name:${ingName.toLowerCase()}`;
+      const qty = (ing.quantity_per_serving || 0) * servings;
+
+      const existing = groups.get(groupKey);
+      if (existing) {
+        existing.totalQty += qty;
+        existing.sources.push({
+          recipeId: recipe.id,
+          recipeName: recipe.name,
+          qty,
+          unit: ing.unit || 'unité',
+        });
+      } else {
+        groups.set(groupKey, {
+          key: groupKey,
+          productType,
+          ingredientName: ingName,
+          totalQty: qty,
+          unit: ing.unit || 'unité',
+          sources: [{
+            recipeId: recipe.id,
+            recipeName: recipe.name,
+            qty,
+            unit: ing.unit || 'unité',
+          }],
+          categoryHint: ing.category_hint || ing.category || null,
+        });
+      }
+    });
+  });
+
+  // Resolve matching products for each group
+  return Array.from(groups.values()).map((group) => {
+    const matchingProducts = group.productType
+      ? products.filter((p) => p.product_type === group.productType)
+      : [];
+    return { ...group, matchingProducts };
+  });
 }
