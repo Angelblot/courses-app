@@ -121,6 +121,70 @@ checkTrue(
   score('Sauce de tomate', 'Sauce tomate 400g') === 1
 );
 
+// --- Départage des quasi-homonymes ---
+
+const AMBIGUITY_MARGIN = 0.05;
+
+function extraTokens(wanted, candidate) {
+  const w = new Set(normalize(wanted).split(' ').filter(Boolean));
+  return normalize(candidate)
+    .split(' ')
+    .filter((t) => t.length > 2 && !w.has(t) && !STOP_WORDS.has(t) && !/^\d+$/.test(t)).length;
+}
+
+function rank(wanted, labels) {
+  return labels
+    .map((label) => ({ label, score: score(wanted, label), extra: extraTokens(wanted, label) }))
+    .sort((a, b) => b.score - a.score || a.extra - b.extra || a.label.length - b.label.length);
+}
+
+/** Reproduit la décision de l'agent : meilleur, seuil, puis test d'ambiguïté. */
+function decide(wanted, labels) {
+  const r = rank(wanted, labels);
+  const best = r[0];
+  if (!best || best.score < MATCH_THRESHOLD) return { verdict: 'no_match' };
+  const second = r[1];
+  if (
+    second &&
+    second.score >= MATCH_THRESHOLD &&
+    best.score - second.score < AMBIGUITY_MARGIN &&
+    best.extra === second.extra
+  ) {
+    return { verdict: 'ambiguous' };
+  }
+  return { verdict: 'added', label: best.label };
+}
+
+const VARIANTES = [
+  'Lardons Fumés HERTA',
+  'Lardons Fumés BIO HERTA',
+  'Lardons Fumés Allégés en sel HERTA',
+];
+
+check(
+  'entre variantes, le produit le plus simple gagne',
+  decide('Lardons fumés Herta', VARIANTES),
+  { verdict: 'added', label: 'Lardons Fumés HERTA' }
+);
+
+check(
+  'demander la variante bio la sélectionne',
+  decide('Lardons fumés bio Herta', VARIANTES),
+  { verdict: 'added', label: 'Lardons Fumés BIO HERTA' }
+);
+
+check(
+  'deux formats également plausibles : on ne devine pas',
+  decide('Lait demi-écrémé', ['Lait demi-écrémé Carrefour', 'Lait demi-écrémé Lactel']),
+  { verdict: 'ambiguous' }
+);
+
+checkTrue(
+  'les mots superflus sont comptés hors chiffres et bruit',
+  extraTokens('Lardons fumés', 'Lardons Fumés BIO 200 g') === 1,
+  `obtenu ${extraTokens('Lardons fumés', 'Lardons Fumés BIO 200 g')}`
+);
+
 // --- Sélection sur des titres Carrefour réels ---
 // Relevés le 18/08/2026 par le mode diagnostic, retours à la ligne compris :
 // le titre affiché répète la marque avant et après le libellé.

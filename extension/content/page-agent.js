@@ -158,6 +158,42 @@ export function pageAgent(cfg, item, mode) {
    */
   const MATCH_THRESHOLD = 0.75;
 
+  /** En deçà de cet écart, deux candidats sont jugés indiscernables. */
+  const AMBIGUITY_MARGIN = 0.05;
+
+  /**
+   * Mots du candidat absents de la recherche, hors bruit.
+   *
+   * « Lardons fumés » obtient 1,0 face à « Lardons fumés », « Lardons fumés
+   * BIO » et « Lardons fumés allégés » : le score seul ne les départage pas et
+   * le premier arrivé l'emporte, au hasard du tri du site. Le nombre de mots
+   * superflus tranche — le produit le plus simple est presque toujours celui
+   * qu'on voulait.
+   */
+  function extraTokens(wanted, candidate) {
+    const w = new Set(normalize(wanted).split(' ').filter(Boolean));
+    return normalize(candidate)
+      .split(' ')
+      .filter((t) => t.length > 2 && !w.has(t) && !STOP_WORDS.has(t) && !/^\d+$/.test(t)).length;
+  }
+
+  /**
+   * Classe les candidats : score décroissant, puis le moins de mots superflus,
+   * puis le libellé le plus court.
+   */
+  function rank(wanted, candidates) {
+    return candidates
+      .map((c) => ({
+        ...c,
+        score: score(wanted, c.label),
+        extra: extraTokens(wanted, c.label),
+      }))
+      .sort(
+        (a, b) =>
+          b.score - a.score || a.extra - b.extra || a.label.length - b.label.length
+      );
+  }
+
   // --- Détection d'état de page ---
 
   function pageState() {
@@ -264,15 +300,15 @@ export function pageAgent(cfg, item, mode) {
       };
     }
 
-    // Meilleur candidat par score sur le titre.
-    let best = null;
-    for (const card of cards.slice(0, 12)) {
-      const titleEl = queryFirst(card, cfg.title);
-      const label = textOf(titleEl) || textOf(card);
-      const s = score(item.name, label);
-      if (!best || s > best.score) best = { card, label, score: s };
-    }
+    const ranked = rank(
+      item.name,
+      cards.slice(0, 12).map((card) => ({
+        card,
+        label: textOf(queryFirst(card, cfg.title)) || textOf(card),
+      }))
+    );
 
+    const best = ranked[0];
     if (!best || best.score < MATCH_THRESHOLD) {
       return {
         ok: false,
@@ -280,6 +316,26 @@ export function pageAgent(cfg, item, mode) {
         message: `Aucun résultat convaincant pour « ${item.name} »`,
         bestLabel: best?.label ?? null,
         bestScore: best?.score ?? 0,
+      };
+    }
+
+    // Deux candidats aussi plausibles l'un que l'autre : c'est à l'humain de
+    // trancher. Choisir au hasard ferait entrer le mauvais format ou la
+    // mauvaise variante sans que personne ne le voie.
+    const second = ranked[1];
+    if (
+      second &&
+      second.score >= MATCH_THRESHOLD &&
+      best.score - second.score < AMBIGUITY_MARGIN &&
+      best.extra === second.extra
+    ) {
+      return {
+        ok: false,
+        reason: 'ambiguous',
+        message: `Plusieurs produits correspondent à « ${item.name} »`,
+        candidates: ranked
+          .slice(0, 3)
+          .map((c) => ({ label: c.label.slice(0, 70), score: Number(c.score.toFixed(2)) })),
       };
     }
 

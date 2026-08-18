@@ -29,6 +29,8 @@ const REASON_LABEL = {
   no_match: 'aucun résultat convaincant',
   no_results: 'page non reconnue',
   no_add_button: "bouton d'ajout introuvable",
+  ambiguous: 'plusieurs produits possibles — à choisir toi-même',
+  click_no_effect: 'clic sans effet, rien ajouté',
   challenge: 'vérification demandée',
   inject_failed: 'injection impossible',
   no_result: 'page muette',
