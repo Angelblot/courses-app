@@ -255,37 +255,7 @@ export function ProductSubstitutionSheet({
                   }}
                 >
                   {/* Product image */}
-                  <div
-                    style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 8,
-                      backgroundColor: '#f8fafc',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {candidate.image_url ? (
-                      <img
-                        src={candidate.image_url}
-                        alt={candidate.product_name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.parentElement.innerHTML = `<span style="color:#94a3b8;font-size:20px">📦</span>`;
-                        }}
-                      />
-                    ) : (
-                      <Icon
-                        name={iconForProduct(candidate)}
-                        size={22}
-                        color="#94a3b8"
-                      />
-                    )}
-                  </div>
+                  <CandidateThumb candidate={candidate} />
 
                   {/* Product info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -421,5 +391,44 @@ export function ProductSubstitutionSheet({
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Vignette d'un produit candidat.
+ *
+ * L'image distante peut disparaître côté Open Food Facts : on bascule alors
+ * sur l'icône de typologie plutôt que d'injecter du HTML dans le DOM.
+ */
+function CandidateThumb({ candidate }) {
+  const [failed, setFailed] = useState(false);
+  const showImage = Boolean(candidate.image_url) && !failed;
+
+  return (
+    <div
+      style={{
+        width: 48,
+        height: 48,
+        borderRadius: 8,
+        backgroundColor: '#f8fafc',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        overflow: 'hidden',
+      }}
+    >
+      {showImage ? (
+        <img
+          src={candidate.image_url}
+          alt={candidate.product_name}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={() => setFailed(true)}
+          loading="lazy"
+        />
+      ) : (
+        <Icon name={iconForProduct(candidate)} size={22} color="#94a3b8" />
+      )}
+    </div>
   );
 }

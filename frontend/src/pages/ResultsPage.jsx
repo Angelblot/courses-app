@@ -150,7 +150,7 @@ export function ResultsPage() {
                         </div>
                         {isCheapest && (
                           <Badge variant="success" className="comparator__badge">
-                            💰 Moins cher
+                            Moins cher
                           </Badge>
                         )}
                       </div>
@@ -178,7 +178,8 @@ export function ResultsPage() {
             {drives.map((d) => (
               <section key={d.name} className="stack">
                 <h2 className="results__section-title">
-                  🛒 {d.display_name || DRIVE_LABEL[d.name] || d.name}
+                  <Icon name="cart" size={18} />
+                  {d.display_name || DRIVE_LABEL[d.name] || d.name}
                 </h2>
 
                 <Card>
@@ -204,7 +205,8 @@ export function ResultsPage() {
                 {d.missing?.length > 0 && (
                   <Card className="missing-card">
                     <h3 className="missing-card__title">
-                      <span aria-hidden="true">⚠️</span> Produits non trouvés
+                      <Icon name="alert" size={16} />
+                      Produits non trouvés
                     </h3>
                     <ul className="missing-list">
                       {d.missing.map((m, i) => (
@@ -222,7 +224,7 @@ export function ResultsPage() {
                               rel="noreferrer"
                               className="btn btn--secondary btn--sm"
                             >
-                              🔎 Chercher
+                              Chercher
                             </a>
                           )}
                         </li>
@@ -237,10 +239,10 @@ export function ResultsPage() {
 
         <div className="results__actions">
           <Link to="/" className="btn btn--secondary">
-            🏠 Accueil
+            Accueil
           </Link>
           <Link to="/lists" className="btn">
-            📋 Mes listes
+            Mes listes
           </Link>
         </div>
       </div>

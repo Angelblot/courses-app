@@ -145,7 +145,7 @@ export function ProductForm({
             </Button>
           )}
           <Button type="submit" full disabled={submitting}>
-            {submitting ? '…' : isEditing ? '💾 Mettre à jour' : '✅ Enregistrer'}
+            {submitting ? 'Enregistrement…' : isEditing ? 'Mettre à jour' : 'Enregistrer'}
           </Button>
         </div>
       </form>

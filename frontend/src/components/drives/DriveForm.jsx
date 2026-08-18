@@ -69,7 +69,7 @@ export function DriveForm({ onSubmit, onCancel }) {
           aria-label="Magasin par défaut"
         />
         <Button type="submit" full disabled={submitting}>
-          {submitting ? '…' : '✅ Enregistrer'}
+          {submitting ? 'Enregistrement…' : 'Enregistrer'}
         </Button>
       </form>
     </Card>

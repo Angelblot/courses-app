@@ -1,3 +1,4 @@
+import { Icon } from '../ui/Icon.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Select } from '../ui/Input.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
@@ -25,7 +26,8 @@ export function ListDetail({
       <div className="section-header">
         <h2>{list.name}</h2>
         <Button variant="secondary" size="sm" onClick={onGenerateFromFavorites}>
-          ⭐ Favoris
+          <Icon name="star" size={14} />
+          Favoris
         </Button>
       </div>
 
@@ -65,7 +67,7 @@ export function ListDetail({
                   onClick={() => onRemoveItem(item.id)}
                   aria-label="Retirer"
                 >
-                  🗑️
+                  <Icon name="trash" size={16} />
                 </Button>
               </div>
             </article>
