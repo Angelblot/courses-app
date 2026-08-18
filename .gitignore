@@ -30,6 +30,7 @@ build/
 
 # SQLite databases
 *.db
+*.db.bak
 *.db.bak.*
 *.sqlite
 *.sqlite3
