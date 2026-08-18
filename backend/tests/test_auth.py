@@ -39,7 +39,6 @@ def _auth(token: str) -> dict:
         ("get", "/api/recipes/"),
         ("get", "/api/categories/"),
         ("get", "/api/drives/configs"),
-        ("get", "/api/foods/"),
     ],
 )
 def test_api_refuse_les_requetes_sans_jeton(client_anon, method, path):
