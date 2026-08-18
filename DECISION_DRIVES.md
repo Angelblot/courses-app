@@ -1,6 +1,6 @@
 # Décision — génération automatique des paniers drive
 
-**Statut :** en attente d'arbitrage
+**Statut :** tranché le 18/08/2026 — **option D** (validée par Angelo)
 **Date :** 18 août 2026
 **Contexte :** audit du projet, point 4
 
@@ -276,7 +276,7 @@ n'existe pas.
 
 ## 8. Ce qu'il reste à décider
 
-- [ ] Option retenue : A, B ou C
+- [x] Option retenue : **D** — automatisation exécutée sur le Mac de la maison
 - [ ] Si A : acceptes-tu le passage à une instance Render à 25 $/mois et le
       stockage des identifiants drive côté serveur ?
 - [ ] Si B ou C : valide-t-on que le parcours cible est « une liste par rayon,

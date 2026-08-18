@@ -1307,3 +1307,21 @@ h1, h2, h3, h4 { line-height: 1.2; letter-spacing: -0.01em; font-weight: 700; }
   opacity: 0.55;
 }
 .product-sw__hero { background: var(--color-surface-warm); }
+
+/* ---- Connexion ---- */
+.login { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: var(--space-5); background: var(--color-bg); }
+.login__card { width: 100%; max-width: 380px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-7) var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); }
+.login__brand { width: 56px; height: 56px; border-radius: var(--radius-lg); background: var(--color-accent-soft); color: var(--color-accent); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+.login__title { font-size: var(--font-size-2xl); font-weight: 800; letter-spacing: -0.02em; text-align: center; }
+.login__subtitle { color: var(--color-text-muted); text-align: center; font-size: var(--font-size-sm); margin-top: calc(-1 * var(--space-3)); }
+.login__tabs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1); background: var(--color-bg); border-radius: var(--radius-md); padding: var(--space-1); }
+.login__tab { border: 0; background: transparent; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-weight: 600; font-size: var(--font-size-sm); color: var(--color-text-muted); cursor: pointer; font-family: inherit; }
+.login__tab--active { background: var(--color-surface); color: var(--color-text); box-shadow: var(--shadow-sm); }
+.login__form { display: flex; flex-direction: column; gap: var(--space-4); }
+.login__field { display: flex; flex-direction: column; gap: var(--space-1); }
+.login__label { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-muted); }
+.login__error { display: flex; align-items: center; gap: var(--space-2); color: var(--color-danger); font-size: var(--font-size-sm); }
+.login__confirm { display: flex; align-items: flex-start; gap: var(--space-3); background: var(--color-success-soft, #EAF6EC); color: var(--color-text); border-radius: var(--radius-md); padding: var(--space-4); font-size: var(--font-size-sm); }
+.login__confirm svg { color: var(--color-success, #2E7D43); flex-shrink: 0; margin-top: 2px; }
+.more-sheet__separator { height: 1px; background: var(--color-border); margin: var(--space-2) var(--space-4); }
+.more-sheet__item--muted { color: var(--color-text-muted); width: 100%; }

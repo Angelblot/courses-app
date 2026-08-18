@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore.js';
 
 const HomeIcon = (p) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}>
@@ -33,6 +34,14 @@ const CarIcon = (p) => (
   </svg>
 );
 
+const LogoutIcon = (p) => (
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4" />
+    <path d="M10 17l5-5-5-5" />
+    <path d="M15 12H3" />
+  </svg>
+);
+
 const ITEMS = [
   { to: '/', label: 'Accueil', Icon: HomeIcon },
   { to: '/lists', label: 'Listes', Icon: ListIcon },
@@ -42,6 +51,7 @@ const ITEMS = [
 
 export function MoreMenuSheet({ open, onClose }) {
   const navigate = useNavigate();
+  const signOut = useAuthStore((s) => s.signOut);
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(false);
   const touchStartY = useRef(null);
@@ -138,6 +148,20 @@ export function MoreMenuSheet({ open, onClose }) {
             </li>
           ))}
         </ul>
+        <div className="more-sheet__separator" aria-hidden="true" />
+        <button
+          type="button"
+          className="more-sheet__item more-sheet__item--muted"
+          onClick={() => {
+            onClose();
+            signOut();
+          }}
+        >
+          <span className="more-sheet__item-icon" aria-hidden="true">
+            <LogoutIcon />
+          </span>
+          <span className="more-sheet__item-label">Se déconnecter</span>
+        </button>
       </div>
     </div>
   );

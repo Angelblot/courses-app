@@ -1,10 +1,19 @@
+import { getAccessToken } from './stores/authStore.js';
+
 const API_URL = import.meta.env.PROD
   ? 'https://courses-app-backend-3gwn.onrender.com'
   : ''; // Dev: Vite proxy vers localhost:8000
 
+async function authHeaders() {
+  const token = await getAccessToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
 async function api(path, options = {}) {
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(),
     ...options,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
@@ -37,8 +46,11 @@ export const CategoriesAPI = {
   list: () => api('/api/categories/'),
   create: (data) => api('/api/categories/', { method: 'POST', body: data }),
   update: (key, data) => api(`/api/categories/${encodeURIComponent(key)}`, { method: 'PUT', body: data }),
-  delete: (key) =>
-    fetch(`${API_URL}/api/categories/${encodeURIComponent(key)}`, { method: 'DELETE' }).then(async (res) => {
+  delete: async (key) =>
+    fetch(`${API_URL}/api/categories/${encodeURIComponent(key)}`, {
+      method: 'DELETE',
+      headers: await authHeaders(),
+    }).then(async (res) => {
       if (!res.ok) {
         const err = await res.text();
         throw new Error(err);
