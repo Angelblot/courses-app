@@ -51,13 +51,19 @@ export const SITES = {
     ],
     price: ['[data-testid="product-price"]', '[class*="price"]', '.product-price'],
     // Bouton d'ajout au panier, à l'intérieur d'une carte.
-    // .add-to-cart d'abord : une occurrence par carte sur les deux pages
-    // observées (15/15 puis 30/30).
+    // Le libellé réel du bouton est « Acheter », pas « Ajouter ».
+    // .add-to-cart passe en dernier : il compte une occurrence par carte, mais
+    // un clic dessus reste sans effet — c'est le conteneur, pas le bouton.
+    // On vise donc d'abord un vrai <button>, par son texte ou son aria-label.
     addButton: [
-      '.add-to-cart',
+      "button:has-text('Acheter')",
+      'button[aria-label*="cheter"]',
       'button[aria-label*="jouter"]',
+      '.add-to-cart button',
+      'button.add-to-cart',
       '[data-testid="add-to-cart"]',
       "button:has-text('Ajouter')",
+      '.add-to-cart',
     ],
     // Indices d'un challenge anti-bot ou d'une déconnexion.
     challengeHints: ['un instant', 'formalité', 'vous êtes un humain', 'captcha'],

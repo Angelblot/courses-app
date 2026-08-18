@@ -28,6 +28,15 @@ export function pageAgent(cfg, item, mode) {
    */
   const textOf = (el) => ((el?.innerText || '').trim() || (el?.textContent || '').trim());
 
+  const isVisible = (el) => {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
+  };
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+
   function queryAll(root, selector) {
     const m = selector.match(HAS_TEXT);
     if (!m) {
@@ -56,6 +65,50 @@ export function pageAgent(cfg, item, mode) {
     return null;
   }
 
+  /**
+   * Premier élément réellement actionnable parmi les candidats.
+   *
+   * Un sélecteur peut désigner le conteneur de la carte plutôt que son bouton :
+   * le clic part alors dans le vide et l'ajout échoue en silence. On exige donc
+   * un <button> (ou role=button) visible et non désactivé.
+   */
+  function queryFirstClickable(root, selectors) {
+    for (const sel of selectors) {
+      for (const el of queryAll(root, sel)) {
+        const isButton = el.tagName === 'BUTTON' || el.getAttribute('role') === 'button';
+        if (isButton && isVisible(el) && !el.disabled) return el;
+      }
+    }
+    // Aucun vrai bouton : on retombe sur le premier élément visible, faute de mieux.
+    for (const sel of selectors) {
+      const el = queryAll(root, sel).find(isVisible);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  /**
+   * Empreinte d'une carte, pour détecter qu'un clic a produit un effet.
+   * Après un ajout réussi, le bouton laisse place à un sélecteur de quantité :
+   * le texte et le nombre de champs changent.
+   */
+  function fingerprint(card) {
+    return [
+      textOf(card).replace(/\s+/g, ' '),
+      card.querySelectorAll('input').length,
+      card.querySelectorAll('button').length,
+    ].join('|');
+  }
+
+  /** Compteur d'articles du panier, s'il est exposé dans l'en-tête. */
+  function cartCount() {
+    const el = document.querySelector(
+      '[data-testid="cart-count"], [class*="cart"] [class*="count"], [class*="basket"] [class*="count"]'
+    );
+    const n = parseInt(textOf(el).replace(/\D/g, ''), 10);
+    return Number.isFinite(n) ? n : null;
+  }
+
   function queryFirstList(root, selectors) {
     for (const sel of selectors) {
       const found = queryAll(root, sel);
@@ -63,14 +116,6 @@ export function pageAgent(cfg, item, mode) {
     }
     return { selector: null, elements: [] };
   }
-
-  const isVisible = (el) => {
-    if (!el) return false;
-    const r = el.getBoundingClientRect();
-    return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
-  };
-
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // --- Normalisation et score de correspondance ---
 
@@ -169,8 +214,18 @@ export function pageAgent(cfg, item, mode) {
         const t = textOf(el);
         if (t) titles[sel] = t.slice(0, 70);
       }
+      // Nature réelle des candidats : un conteneur non cliquable se repère ici.
       const buttons = {};
-      for (const sel of cfg.addButton) buttons[sel] = queryAll(card, sel).length;
+      for (const sel of cfg.addButton) {
+        const els = queryAll(card, sel);
+        if (els.length) {
+          buttons[sel] = els.map((e) => ({
+            tag: e.tagName.toLowerCase(),
+            texte: textOf(e).slice(0, 25),
+            aria: e.getAttribute('aria-label')?.slice(0, 30) ?? null,
+          }));
+        }
+      }
       return {
         cardText: textOf(card).replace(/\s+/g, ' ').slice(0, 120),
         titles,
@@ -228,7 +283,7 @@ export function pageAgent(cfg, item, mode) {
       };
     }
 
-    const addBtn = queryFirst(best.card, cfg.addButton);
+    const addBtn = queryFirstClickable(best.card, cfg.addButton);
     if (!addBtn || !isVisible(addBtn)) {
       return {
         ok: false,
@@ -240,8 +295,35 @@ export function pageAgent(cfg, item, mode) {
 
     addBtn.scrollIntoView({ block: 'center' });
     await sleep(300);
+
+    // Empreinte avant clic : sans cette vérification, un clic sans effet était
+    // rapporté comme un ajout réussi et le panier restait vide.
+    const before = fingerprint(best.card);
+    const cartBefore = cartCount();
+
     addBtn.click();
-    await sleep(1500);
+
+    // L'interface met un instant à réagir ; on laisse jusqu'à 5 s.
+    let changed = false;
+    for (let waited = 0; waited < 5000; waited += 500) {
+      await sleep(500);
+      const cartAfter = cartCount();
+      if (fingerprint(best.card) !== before) { changed = true; break; }
+      if (cartBefore !== null && cartAfter !== null && cartAfter > cartBefore) {
+        changed = true;
+        break;
+      }
+    }
+
+    if (!changed) {
+      return {
+        ok: false,
+        reason: 'click_no_effect',
+        message: `Clic sans effet sur « ${best.label} » — le panier n'a pas bougé`,
+        button: addBtn.tagName.toLowerCase(),
+        buttonLabel: textOf(addBtn).slice(0, 40) || addBtn.getAttribute('aria-label') || null,
+      };
+    }
 
     // Quantité > 1 : cliquer le "+" autant que nécessaire.
     const wanted = Math.max(1, Math.round(Number(item.quantity) || 1));
