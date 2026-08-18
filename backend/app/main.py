@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -9,12 +8,10 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core import database as db_module
 from app.core.auth import require_user, validate_auth_settings
+from app.core.bootstrap import bootstrap
 from app.core.config import Settings, get_settings
 from app.core.database import init_db
 from app.routes import api_router
-from app.routes.seed import seed_database
-from app.services.categories import seed_categories, seed_category_aliases
-from app.services.recipes_seed import seed_recipes
 
 
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
@@ -41,52 +38,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     @app.on_event("startup")
     def _startup() -> None:
         init_db()
-        # Auto-seed si la DB est vide (utile sur Render free sans disque persistant)
         db = db_module.SessionLocal()
         try:
-            if os.getenv("SKIP_PRODUCT_SEED") != "1":
-                result = seed_database(db)
-                if result.get("seeded"):
-                    print(f"[AUTO-SEED] {result['seeded']}")
-            inserted_cat = seed_categories(db)
-            if inserted_cat:
-                print(f"[AUTO-SEED] categories: {inserted_cat}")
-            inserted = seed_category_aliases(db)
-            if inserted:
-                print(f"[AUTO-SEED] category_aliases: {inserted}")
-            if os.getenv("SKIP_PRODUCT_SEED") != "1":
-                inserted_recipes = seed_recipes(db)
-                if inserted_recipes:
-                    print(f"[AUTO-SEED] recipes: {inserted_recipes}")
-        except Exception as e:
-            print(f"[AUTO-SEED] Erreur: {e}")
-
-        # Seed product_type pour les produits qui n'en ont pas
-        try:
-            from app.services.product_typology import normalize_product_type
-            from app.models.product import Product
-            products_no_type = db.query(Product).filter(Product.product_type.is_(None)).all()
-            for p in products_no_type:
-                p.product_type = normalize_product_type(p.name)
-            db.commit()
-            if products_no_type:
-                print(f"[AUTO-SEED] product_types: {len(products_no_type)}")
-
-            # Charcuterie wrongly categorized as P.L.S. — fix idempotent
-            charcut_types = {"lardon", "jambon", "chorizo", "saucisse", "saucisson"}
-            wrong_charcut = (
-                db.query(Product)
-                .filter(Product.category == "P.L.S.")
-                .filter(Product.product_type.in_(charcut_types))
-                .all()
-            )
-            for p in wrong_charcut:
-                p.category = "CHARCUT.TRAITEUR"
-            if wrong_charcut:
-                db.commit()
-                print(f"[AUTO-SEED] category fixes: {len(wrong_charcut)}")
-        except Exception as e:
-            print(f"[AUTO-SEED] product_types error: {e}")
+            bootstrap(db)
         finally:
             db.close()
 
