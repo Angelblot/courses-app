@@ -69,6 +69,11 @@ export const SITES = {
     // ambiguïté. La recherche par code-barres, elle, ne donne rien — Carrefour
     // n'indexe pas les EAN (vérifié le 18/08/2026, 0 résultat).
     productUrlPattern: /\/p\/[^/?#]*?-(\d{13})(?:[/?#]|$)/,
+    // Le segment de l'URL est décoratif : seul l'EAN identifie la fiche
+    // (vérifié le 18/08/2026, /p/x-<ean> ouvre bien le bon produit). On peut
+    // donc atteindre n'importe quel produit du catalogue sans passer par la
+    // recherche, dès lors qu'on connaît son code-barres.
+    productUrlTemplate: 'https://www.carrefour.fr/p/x-{ean}',
     productPage: {
       addButton: [
         "button:has-text('Ajouter au panier')",

@@ -75,6 +75,51 @@ async function runAgent(tabId, cfg, item, mode) {
   }
 }
 
+/** Motifs d'échec d'un accès direct qui justifient un repli sur la recherche. */
+const RETRYABLE_VIA_SEARCH = new Set([
+  'product_unavailable',
+  'no_add_button',
+  'click_no_effect',
+  'wrong_product',
+]);
+
+/**
+ * Traite une ligne : accès direct à la fiche si possible, repli sur la
+ * recherche sinon.
+ *
+ * L'URL d'une fiche Carrefour n'a besoin que de l'EAN — son segment textuel est
+ * décoratif. Connaissant le code-barres, on atteint donc le bon produit sans
+ * recherche ni ambiguïté. Le repli couvre les produits absents de ce drive.
+ *
+ * @param {number} tabId Onglet piloté.
+ * @param {object} cfg Configuration de l'enseigne.
+ * @param {object} item Ligne de courses.
+ * @returns {Promise<object>} Compte rendu, enrichi de la voie empruntée.
+ */
+async function attempt(tabId, cfg, item) {
+  const searchUrl = cfg.searchUrl.replace('{q}', encodeURIComponent(item.name));
+
+  const directUrl =
+    item.url ||
+    (item.ean && cfg.productUrlTemplate
+      ? cfg.productUrlTemplate.replace('{ean}', item.ean)
+      : null);
+
+  if (directUrl) {
+    await chrome.tabs.update(tabId, { url: directUrl });
+    await waitForTab(tabId);
+    const direct = await runAgent(tabId, cfg, item, 'run');
+    if (direct.ok) return { ...direct, via: direct.via ?? 'direct_url' };
+    if (!RETRYABLE_VIA_SEARCH.has(direct.reason)) return direct;
+    // Sinon : le produit n'est pas accessible par sa fiche, on tente le nom.
+  }
+
+  await chrome.tabs.update(tabId, { url: searchUrl });
+  await waitForTab(tabId);
+  const found = await runAgent(tabId, cfg, item, 'run');
+  return directUrl && !found.ok ? { ...found, triedDirect: true } : found;
+}
+
 /** Boucle principale : déroule la liste jusqu'au bout, une pause, ou un arrêt. */
 async function processJob() {
   let state = await getState();
@@ -100,14 +145,7 @@ async function processJob() {
     }
 
     const item = state.items[index];
-    // Une URL de fiche connue court-circuite la recherche : c'est le seul moyen
-    // sûr de viser un produit précis parmi des libellés voisins.
-    const url = item.url || cfg.searchUrl.replace('{q}', encodeURIComponent(item.name));
-
-    await chrome.tabs.update(tabId, { url });
-    await waitForTab(tabId);
-
-    const result = await runAgent(tabId, cfg, item, 'run');
+    let result = await attempt(tabId, cfg, item);
     const entry = { item: item.name, quantity: item.quantity, ...result };
 
     // Un challenge n'est pas un échec de produit : c'est une main à rendre.

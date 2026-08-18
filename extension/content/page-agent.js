@@ -223,7 +223,22 @@ export function pageAgent(cfg, item, mode) {
 
     const btn = queryFirstClickable(document, pp.addButton || []);
     if (!btn) {
-      return { ok: false, reason: 'no_add_button', message: 'Bouton d\'ajout introuvable', label };
+      // Sans titre ni bouton, la fiche n'existe pas ou le produit n'est pas
+      // proposé par ce drive : l'orchestrateur retentera par la recherche.
+      const body = textOf(document.body).toLowerCase();
+      const absent =
+        !label ||
+        body.includes('page introuvable') ||
+        body.includes('indisponible') ||
+        body.includes("n'existe plus");
+      return {
+        ok: false,
+        reason: absent ? 'product_unavailable' : 'no_add_button',
+        message: absent
+          ? 'Fiche introuvable ou produit non proposé par ce drive'
+          : "Bouton d'ajout introuvable",
+        label,
+      };
     }
 
     btn.scrollIntoView({ block: 'center' });

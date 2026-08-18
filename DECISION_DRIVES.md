@@ -357,8 +357,14 @@ Mesures faites depuis le navigateur, l'extension en place :
   Un écart constaté lors d'un premier essai venait d'une comparaison entre deux
   produits différents, pas d'un défaut de données.
 
-Conséquence retenue : le code-barres ne sert pas à *trouver* un produit mais à
-*confirmer* qu'on tient le bon. L'extension compare l'EAN attendu à celui de
-l'URL du résultat ; une correspondance exacte l'emporte sur toute évaluation du
-libellé. Les 65 produits de la base ayant un EAN13, l'appariement est certain
-pour l'ensemble du catalogue.
+- **Le segment textuel de l'URL est décoratif** : `/p/x-3443660013046` ouvre le
+  bon produit. Seul l'EAN identifie la fiche.
+
+Conséquence retenue, et elle est forte : l'extension **construit** l'adresse de
+la fiche à partir du code-barres et s'y rend directement. Plus de recherche,
+plus de libellé à interpréter, plus d'ambiguïté — et ce pour la totalité du
+catalogue, les 65 produits ayant un EAN13.
+
+La recherche par nom, avec son score et sa détection d'ambiguïté, ne sert plus
+que de repli : produit absent du drive, ou ligne libre saisie dans le wizard
+sans référence catalogue.

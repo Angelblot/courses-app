@@ -73,16 +73,22 @@ de « Lardons fumés BIO » ni de « Lardons fumés allégés ». Trois garde-fo
 3. **URL de fiche** — la seule méthode sûre. Colle l'adresse du produit dans la
    liste : l'extension y va directement, sans passer par la recherche.
 
-**Le code EAN prime sur tout le reste.** Quand la ligne porte un préfixe
-`[3760040427577]` — ce que l'application ajoute automatiquement, les 65 produits
-en base ayant un EAN13 — l'extension compare ce code à celui contenu dans l'URL
-de chaque résultat. Une correspondance exacte l'emporte immédiatement, sans
-aucun calcul sur le libellé : c'est le même produit, quel que soit son nom
-affiché.
+**Avec un code EAN, il n'y a plus de recherche du tout.** Le segment textuel
+d'une URL de fiche Carrefour est décoratif : `/p/x-3443660013046` ouvre le bon
+produit. L'extension construit donc l'adresse à partir du code-barres et s'y
+rend directement — aucune recherche, aucun libellé à interpréter, aucune
+ambiguïté possible.
+
+L'application préfixe automatiquement chaque ligne d'un `[3760040427577]`, les
+65 produits en base ayant un EAN13. Le journal signale ces ajouts par la
+mention « par code-barres » : ce sont les seuls qui soient certains.
+
+Si la fiche n'existe pas ou si le produit n'est pas proposé par ton drive,
+l'extension retombe automatiquement sur la recherche par nom, avec son score et
+sa détection d'ambiguïté.
 
 À noter : *rechercher* un code-barres ne donne rien (0 résultat, Carrefour
-n'indexe pas les EAN). Ils ne servent qu'à confirmer un résultat, pas à le
-trouver.
+n'indexe pas les EAN). C'est bien l'URL, et elle seule, qui les exploite.
 
 ## Sécurité et limites
 

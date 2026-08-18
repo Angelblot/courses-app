@@ -56,6 +56,7 @@ const REASON_LABEL = {
   ambiguous: 'plusieurs produits possibles — à choisir toi-même',
   click_no_effect: 'clic sans effet, rien ajouté',
   wrong_product: 'la fiche ouverte ne correspond pas',
+  product_unavailable: 'produit non proposé par ce drive',
   challenge: 'vérification demandée',
   inject_failed: 'injection impossible',
   no_result: 'page muette',
@@ -94,8 +95,9 @@ function render(state) {
   for (const r of (state.results ?? []).slice(-30).reverse()) {
     const li = document.createElement('li');
     li.className = r.ok ? 'log__item log__item--ok' : 'log__item log__item--ko';
+    const certain = r.ok && (r.via === 'direct_url' || r.via === 'ean_match');
     const detail = r.ok ? r.label || '' : REASON_LABEL[r.reason] || r.reason || '';
-    li.textContent = `${r.item} — ${detail}`;
+    li.textContent = `${r.item} — ${detail}${certain ? ' (par code-barres)' : ''}`;
     $('log').appendChild(li);
   }
 }
