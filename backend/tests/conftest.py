@@ -8,6 +8,13 @@ sys.path.insert(0, str(BACKEND_ROOT))
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("ENCRYPTION_KEY", "test-key-insecure-for-tests-only-0123456789")
 os.environ.setdefault("SKIP_PRODUCT_SEED", "1")
+# L'auth reste ACTIVE en test : les routes doivent être réellement protégées.
+# Les tests métier court-circuitent la vérification via dependency_overrides,
+# tests/test_auth.py exerce le vrai décodage avec ce secret.
+os.environ.setdefault("AUTH_ENABLED", "true")
+TEST_JWT_SECRET = "test-jwt-secret-hs256-not-for-production"
+os.environ.setdefault("SUPABASE_JWT_SECRET", TEST_JWT_SECRET)
+os.environ.setdefault("SUPABASE_URL", "https://test-project.supabase.co")
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,6 +23,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core import database as db_module
+from app.core.auth import AuthUser, require_user
 from app.core.database import Base, get_db
 from app.main import create_app
 
@@ -73,6 +81,23 @@ def app(engine, session_factory, monkeypatch):
 
 
 @pytest.fixture
+def app_anon(app):
+    """L'application sans utilisateur injecté — pour tester le rejet 401."""
+    return app
+
+
+@pytest.fixture
 def client(app):
+    """Client authentifié : la vérification du JWT est court-circuitée."""
+    app.dependency_overrides[require_user] = lambda: AuthUser(
+        id="00000000-0000-0000-0000-000000000001", email="test@example.com"
+    )
     with TestClient(app) as client:
+        yield client
+
+
+@pytest.fixture
+def client_anon(app_anon):
+    """Client anonyme : aucun jeton, la vraie dépendance d'auth s'applique."""
+    with TestClient(app_anon) as client:
         yield client

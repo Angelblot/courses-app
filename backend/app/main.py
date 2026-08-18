@@ -2,12 +2,13 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core import database as db_module
+from app.core.auth import require_user, validate_auth_settings
 from app.core.config import Settings, get_settings
 from app.core.database import init_db
 from app.routes import api_router
@@ -26,10 +27,13 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         debug=settings.debug,
     )
 
+    # Échoue au démarrage plutôt que de servir une API ouverte par mégarde.
+    validate_auth_settings(settings)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_credentials=settings.cors_allow_credentials,
+        allow_credentials=settings.effective_cors_allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -86,7 +90,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         finally:
             db.close()
 
-    app.include_router(api_router)
+    # Toute l'API métier exige un JWT Supabase valide. /health reste ouvert
+    # pour les sondes de disponibilité.
+    app.include_router(api_router, dependencies=[Depends(require_user)])
 
     @app.get("/health")
     def health():

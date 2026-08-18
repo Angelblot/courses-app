@@ -104,6 +104,7 @@ jobs:
         run: |
           docker run -d --name courses-app-ci \
             -e ENCRYPTION_KEY=ci-smoke-test-key-not-for-production-xxxxxxxxx \
+            -e SUPABASE_JWT_SECRET=ci-smoke-test-jwt-secret-not-for-production \
             -p 8000:8000 courses-app:ci
           for i in {1..30}; do
             if curl -fsS http://127.0.0.1:8000/health; then
