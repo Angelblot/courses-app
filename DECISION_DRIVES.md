@@ -175,23 +175,77 @@ coin.
 
 ---
 
+## 5 bis. Option D — automatisation complète, exécutée à la maison
+
+Variante de l'option A qui en supprime les deux coûts principaux : le serveur
+et une bonne partie du risque anti-bot.
+
+**Principe.** Le scraping Playwright ne tourne pas dans le cloud mais sur le
+Mac de la maison (machine toujours allumée). Le cloud ne porte que la file de
+travaux :
+
+1. Depuis le canapé, le téléphone valide la liste → l'app écrit un « job
+   panier » dans une table Supabase.
+2. Un worker installé sur le Mac (service `launchd`) surveille cette file,
+   lance Playwright localement et remplit les paniers.
+3. Il écrit la progression et le résultat dans Supabase ; le téléphone les
+   affiche en temps réel (Supabase Realtime). L'utilisateur paie ensuite sur
+   le site du drive, comme prévu.
+
+**Pourquoi ça change l'équation anti-bot.** Le 403 mesuré vient d'un client
+non authentifié ; les protections ciblent d'abord les IP de datacenter. Depuis
+la maison : IP résidentielle, vrai profil Chrome persistant (cookies, session
+déjà connectée), horaires humains. C'est la configuration la plus difficile à
+distinguer d'un usage normal. Et si un captcha survient malgré tout, le
+navigateur est physiquement à la maison : on le résout à l'écran, le worker
+reprend.
+
+**Coûts.**
+
+| Poste | Option A cloud | Option D maison |
+|---|---|---|
+| Instance serveur avec Chromium | 25-50 $/mois | 0 |
+| File + base + auth + temps réel | — | incluse dans Supabase (~10 $/mois, déjà décidé) |
+| API backend | comprise dans l'instance | instance gratuite suffit (plus de Chromium à héberger) |
+
+Le surcoût drives passe de 25-50 $/mois à **zéro** : Supabase est payé de
+toute façon pour l'auth et la base.
+
+**Limites honnêtes.**
+- Le Mac doit être allumé au moment de la génération (acceptable : machine
+  toujours en service, et la file absorbe un différé).
+- L'exposition CGU demeure : cela reste de l'accès automatisé.
+- Les identifiants drive restent nécessaires — mais ils restent à la maison,
+  sur le Mac, pas sur un serveur public. C'est un profil de risque nettement
+  meilleur que l'option A.
+- Un composant de plus à maintenir (le worker), mais simple : une boucle de
+  polling et le code Playwright qu'il aurait fallu écrire de toute façon.
+
+---
+
 ## 6. Comparatif
 
-| Critère | A — automatisation | B — deep links | C — hybride |
-|---|---|---|---|
-| Hébergement | 25-50 $/mois | 0-7 $/mois | 0-7 $/mois |
-| Effort initial | 2-4 jours | 1-2 jours | 2-3 jours |
-| Maintenance | Récurrente, non planifiable | Quasi nulle | Quasi nulle |
-| Fiabilité le jour J | Faible, casse silencieuse | Élevée | Élevée |
-| Mot de passe drive stocké | Oui | Non | Non |
-| Exposition CGU | Réelle | Nulle | Nulle |
-| Tient la promesse produit | Oui, quand ça marche | Partiellement | Partiellement, évolutif |
+| Critère | A — auto cloud | B — deep links | C — hybride | D — auto maison |
+|---|---|---|---|---|
+| Surcoût hébergement | 25-50 $/mois | 0 | 0 | 0 |
+| Effort initial | 2-4 jours | 1-2 jours | 2-3 jours | 3-4 jours |
+| Maintenance | Récurrente, imprévisible | Quasi nulle | Quasi nulle | Modérée (sélecteurs) |
+| Résistance anti-bot | Faible (IP datacenter) | Sans objet | Sans objet | Bien meilleure (IP résidentielle, vrai profil) |
+| Captcha | Bloquant | Sans objet | Sans objet | Résoluble à l'écran, à la maison |
+| Identifiants drive | Sur serveur public | Nulle part | Nulle part | Sur le Mac de la maison |
+| Exposition CGU | Réelle | Nulle | Nulle | Réelle |
+| Tient la promesse produit | Oui, quand ça marche | Non (exclu par Angelo) | Partiellement | Oui |
 
 ---
 
 ## 7. Recommandation
 
-**Option C.**
+**Option D** (mise à jour du 18/08 : l'option B seule est exclue — le
+parcours « un tap par produit » ne tient pas la promesse produit ; et le
+surcoût serveur de l'option A est éliminé en exécutant le scraping à la
+maison).
+
+~~Option C.~~ Raisonnement initial conservé ci-dessous pour mémoire :
 
 Le raisonnement tient en trois points :
 
