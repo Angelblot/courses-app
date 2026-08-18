@@ -28,6 +28,16 @@ check('plusieurs lignes',
   ]),
   'Spaghetti x2\nLardons');
 
+check("l'EAN est préfixé quand il est connu",
+  toExtensionList([{ name: 'Viognier', quantity: 1, unit: 'piece', ean13: '3760040427577' }]),
+  '[3760040427577] Viognier');
+check('EAN et quantité se combinent',
+  toExtensionList([{ name: 'Viognier', quantity: 2, unit: 'piece', ean13: '3760040427577' }]),
+  '[3760040427577] Viognier x2');
+check("sans EAN, la ligne est inchangée",
+  toExtensionList([{ name: 'Pain', quantity: 1, unit: 'piece' }]),
+  'Pain');
+
 console.log(`\n${pass} vérification(s), ${fails.length} échec(s)\n`);
 fails.forEach((f) => console.log('  ÉCHEC : ' + f + '\n'));
 process.exit(fails.length ? 1 : 0);

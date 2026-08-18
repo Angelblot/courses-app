@@ -23,20 +23,28 @@ function parseItems(raw) {
     .filter(Boolean)
     .map((line) => {
       const m = line.match(/^(.*?)\s*[x×]\s*(\d+)$/i);
-      const body = m ? m[1].trim() : line;
+      let body = m ? m[1].trim() : line;
       const quantity = m ? Number(m[2]) : 1;
+
+      // Préfixe [EAN13] posé par l'application : identifiant certain du produit.
+      let ean = null;
+      const tagged = body.match(/^\[(\d{13})\]\s*(.*)$/);
+      if (tagged) {
+        ean = tagged[1];
+        body = tagged[2].trim();
+      }
 
       if (/^https?:\/\//i.test(body)) {
         // Le nom lisible est déduit du segment d'URL, l'EAN de son suffixe.
         const slug = body.split('/').filter(Boolean).pop() ?? body;
-        const ean = slug.match(/(\d{13})/)?.[1] ?? null;
+        const eanFromSlug = slug.match(/(\d{13})/)?.[1] ?? null;
         const name = slug
           .replace(/-?\d{13}.*$/, '')
           .replace(/-/g, ' ')
           .trim();
-        return { name: name || body, quantity, url: body, ean };
+        return { name: name || body, quantity, url: body, ean: ean ?? eanFromSlug };
       }
-      return { name: body, quantity };
+      return ean ? { name: body, quantity, ean } : { name: body, quantity };
     });
 }
 

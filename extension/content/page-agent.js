@@ -337,6 +337,83 @@ export function pageAgent(cfg, item, mode) {
     return report;
   }
 
+  /**
+   * Ajoute au panier depuis une carte de résultats, en vérifiant l'effet.
+   *
+   * @param {{card: Element, label: string, href: string, ean: ?string, score: number}} choice
+   */
+  async function addToCart(choice) {
+    const addBtn = queryFirstClickable(choice.card, cfg.addButton);
+    if (!addBtn) {
+      return {
+        ok: false,
+        reason: 'no_add_button',
+        message: `Bouton d'ajout introuvable pour « ${choice.label} »`,
+      };
+    }
+
+    addBtn.scrollIntoView({ block: 'center' });
+    await sleep(300);
+
+    // Empreinte avant clic : sans cette vérification, un clic sans effet était
+    // rapporté comme un ajout réussi et le panier restait vide.
+    const before = fingerprint(choice.card);
+    const cartBefore = cartCount();
+    addBtn.click();
+
+    let changed = false;
+    for (let waited = 0; waited < 5000; waited += 500) {
+      await sleep(500);
+      const cartAfter = cartCount();
+      if (fingerprint(choice.card) !== before) { changed = true; break; }
+      if (cartBefore !== null && cartAfter !== null && cartAfter > cartBefore) {
+        changed = true;
+        break;
+      }
+    }
+
+    if (!changed) {
+      return {
+        ok: false,
+        reason: 'click_no_effect',
+        message: `Clic sans effet sur « ${choice.label} » — le panier n'a pas bougé`,
+        button: addBtn.tagName.toLowerCase(),
+        buttonLabel: textOf(addBtn).slice(0, 40) || addBtn.getAttribute('aria-label') || null,
+      };
+    }
+
+    // Quantité > 1 : cliquer le « + » autant que nécessaire.
+    const wanted = Math.max(1, Math.round(Number(item.quantity) || 1));
+    let added = 1;
+    if (wanted > 1) {
+      const plus = queryFirst(choice.card, [
+        '[data-testid="quantity-plus"]',
+        'button[aria-label*="ugmenter"]',
+        '.quantity-plus',
+        "button:has-text('+')",
+      ]);
+      for (let i = 1; i < wanted && plus && isVisible(plus); i++) {
+        plus.click();
+        added += 1;
+        await sleep(500);
+      }
+    }
+
+    return {
+      ok: true,
+      reason: 'added',
+      label: choice.label,
+      // Renvoyés pour alimenter la table des correspondances : la prochaine
+      // fois, on ira droit à cette fiche au lieu de rechercher.
+      ean: choice.ean ?? null,
+      url: choice.href ? new URL(choice.href, location.origin).href : null,
+      score: Number((choice.score ?? 1).toFixed(2)),
+      quantityAdded: added,
+      quantityWanted: wanted,
+      price: textOf(queryFirst(choice.card, cfg.price)).slice(0, 30) || null,
+    };
+  }
+
   // --- Programme principal ---
 
   return (async () => {
@@ -379,6 +456,16 @@ export function pageAgent(cfg, item, mode) {
       })
     );
 
+    // Un EAN connu tranche sans discussion : c'est le même produit, quel que
+    // soit le libellé affiché. On court-circuite alors tout le scoring textuel.
+    if (item.ean) {
+      const exact = ranked.find((c) => c.ean && c.ean === item.ean);
+      if (exact) {
+        const added = await addToCart(exact);
+        return added.ok ? { ...added, via: 'ean_match', certain: true } : added;
+      }
+    }
+
     const best = ranked[0];
     if (!best || best.score < MATCH_THRESHOLD) {
       return {
@@ -410,78 +497,6 @@ export function pageAgent(cfg, item, mode) {
       };
     }
 
-    const addBtn = queryFirstClickable(best.card, cfg.addButton);
-    if (!addBtn || !isVisible(addBtn)) {
-      return {
-        ok: false,
-        reason: 'no_add_button',
-        message: `Bouton d'ajout introuvable pour « ${best.label} »`,
-        cardSelector,
-      };
-    }
-
-    addBtn.scrollIntoView({ block: 'center' });
-    await sleep(300);
-
-    // Empreinte avant clic : sans cette vérification, un clic sans effet était
-    // rapporté comme un ajout réussi et le panier restait vide.
-    const before = fingerprint(best.card);
-    const cartBefore = cartCount();
-
-    addBtn.click();
-
-    // L'interface met un instant à réagir ; on laisse jusqu'à 5 s.
-    let changed = false;
-    for (let waited = 0; waited < 5000; waited += 500) {
-      await sleep(500);
-      const cartAfter = cartCount();
-      if (fingerprint(best.card) !== before) { changed = true; break; }
-      if (cartBefore !== null && cartAfter !== null && cartAfter > cartBefore) {
-        changed = true;
-        break;
-      }
-    }
-
-    if (!changed) {
-      return {
-        ok: false,
-        reason: 'click_no_effect',
-        message: `Clic sans effet sur « ${best.label} » — le panier n'a pas bougé`,
-        button: addBtn.tagName.toLowerCase(),
-        buttonLabel: textOf(addBtn).slice(0, 40) || addBtn.getAttribute('aria-label') || null,
-      };
-    }
-
-    // Quantité > 1 : cliquer le "+" autant que nécessaire.
-    const wanted = Math.max(1, Math.round(Number(item.quantity) || 1));
-    let added = 1;
-    if (wanted > 1) {
-      const plus = queryFirst(best.card, [
-        '[data-testid="quantity-plus"]',
-        'button[aria-label*="ugmenter"]',
-        '.quantity-plus',
-        "button:has-text('+')",
-      ]);
-      for (let i = 1; i < wanted && plus && isVisible(plus); i++) {
-        plus.click();
-        added += 1;
-        await sleep(500);
-      }
-    }
-
-    const priceEl = queryFirst(best.card, cfg.price);
-    return {
-      ok: true,
-      reason: 'added',
-      label: best.label,
-      // Renvoyés pour alimenter la table des correspondances : la prochaine
-      // fois, on ira droit à cette fiche au lieu de rechercher.
-      ean: best.ean ?? null,
-      url: best.href ? new URL(best.href, location.origin).href : null,
-      score: Number(best.score.toFixed(2)),
-      quantityAdded: added,
-      quantityWanted: wanted,
-      price: (priceEl?.innerText || '').trim().slice(0, 30) || null,
-    };
+    return addToCart(best);
   })();
 }

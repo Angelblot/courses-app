@@ -73,11 +73,16 @@ de « Lardons fumés BIO » ni de « Lardons fumés allégés ». Trois garde-fo
 3. **URL de fiche** — la seule méthode sûre. Colle l'adresse du produit dans la
    liste : l'extension y va directement, sans passer par la recherche.
 
-La recherche par code-barres, elle, ne fonctionne pas : Carrefour n'indexe pas
-les EAN (0 résultat, vérifié le 18/08/2026). En revanche il les expose dans
-l'URL des fiches (`/p/…-3443660013046`), et l'extension les remonte dans ses
-résultats — de quoi constituer une table de correspondances et n'avoir à
-choisir qu'une seule fois par produit.
+**Le code EAN prime sur tout le reste.** Quand la ligne porte un préfixe
+`[3760040427577]` — ce que l'application ajoute automatiquement, les 65 produits
+en base ayant un EAN13 — l'extension compare ce code à celui contenu dans l'URL
+de chaque résultat. Une correspondance exacte l'emporte immédiatement, sans
+aucun calcul sur le libellé : c'est le même produit, quel que soit son nom
+affiché.
+
+À noter : *rechercher* un code-barres ne donne rien (0 résultat, Carrefour
+n'indexe pas les EAN). Ils ne servent qu'à confirmer un résultat, pas à le
+trouver.
 
 ## Sécurité et limites
 

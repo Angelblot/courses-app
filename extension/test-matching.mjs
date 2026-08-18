@@ -16,16 +16,20 @@ function parseItems(raw) {
     .filter(Boolean)
     .map((line) => {
       const m = line.match(/^(.*?)\s*[x×]\s*(\d+)$/i);
-      const body = m ? m[1].trim() : line;
+      let body = m ? m[1].trim() : line;
       const quantity = m ? Number(m[2]) : 1;
+
+      let ean = null;
+      const tagged = body.match(/^\[(\d{13})\]\s*(.*)$/);
+      if (tagged) { ean = tagged[1]; body = tagged[2].trim(); }
 
       if (/^https?:\/\//i.test(body)) {
         const slug = body.split('/').filter(Boolean).pop() ?? body;
-        const ean = slug.match(/(\d{13})/)?.[1] ?? null;
+        const eanFromSlug = slug.match(/(\d{13})/)?.[1] ?? null;
         const name = slug.replace(/-?\d{13}.*$/, '').replace(/-/g, ' ').trim();
-        return { name: name || body, quantity, url: body, ean };
+        return { name: name || body, quantity, url: body, ean: ean ?? eanFromSlug };
       }
-      return { name: body, quantity };
+      return ean ? { name: body, quantity, ean } : { name: body, quantity };
     });
 }
 
@@ -163,6 +167,13 @@ checkTrue(
   'le motif d\'URL Carrefour extrait bien l\'EAN',
   /\/p\/[^/?#]*?-(\d{13})(?:[/?#]|$)/.exec(URL_VIN)?.[1] === '3443660013046'
 );
+
+check("le préfixe [EAN] de l'application est reconnu",
+  parseItems('[3760040427577] Vin Blanc Viognier x2'),
+  [{ name: 'Vin Blanc Viognier', quantity: 2, ean: '3760040427577' }]);
+check('un nombre à 13 chiffres dans le nom ne devient pas un EAN',
+  parseItems('Lot 1234567890123 pièces')[0].ean,
+  undefined);
 
 // --- Départage des quasi-homonymes ---
 

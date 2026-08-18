@@ -342,3 +342,23 @@ n'existe pas.
 - Tests HTTP effectués le 18 août 2026 depuis un client classique, User-Agent Chrome 120
 - Code audité : `backend/app/services/drives/`, `backend/app/routes/wizard.py`,
   `frontend/src/components/wizard/LaunchGeneration.jsx`
+
+
+---
+
+## Annexe — appariement des produits (18/08/2026)
+
+Mesures faites depuis le navigateur, l'extension en place :
+
+- **Chercher un EAN ne donne rien.** `carrefour.fr/s?q=3760040427577` → 0
+  résultat. Le moteur n'indexe pas les codes-barres.
+- **Les fiches exposent leur EAN dans l'URL** : `/p/<slug>-<ean13>`.
+- **Les EAN d'Open Food Facts correspondent bien aux références Carrefour.**
+  Un écart constaté lors d'un premier essai venait d'une comparaison entre deux
+  produits différents, pas d'un défaut de données.
+
+Conséquence retenue : le code-barres ne sert pas à *trouver* un produit mais à
+*confirmer* qu'on tient le bon. L'extension compare l'EAN attendu à celui de
+l'URL du résultat ; une correspondance exacte l'emporte sur toute évaluation du
+libellé. Les 65 produits de la base ayant un EAN13, l'appariement est certain
+pour l'ensemble du catalogue.
