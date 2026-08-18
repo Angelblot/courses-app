@@ -1,6 +1,8 @@
 # Décision — génération automatique des paniers drive
 
-**Statut :** tranché le 18/08/2026 — **option D** (validée par Angelo)
+**Statut :** option D **invalidée par la mesure** le 18/08/2026 — voir § 5 ter.
+Arbitrage à reprendre : extension navigateur (seule voie sans contournement) ou
+abandon de l'automatisation des drives.
 **Date :** 18 août 2026
 **Contexte :** audit du projet, point 4
 
@@ -220,6 +222,55 @@ toute façon pour l'auth et la base.
   meilleur que l'option A.
 - Un composant de plus à maintenir (le worker), mais simple : une boucle de
   polling et le code Playwright qu'il aurait fallu écrire de toute façon.
+
+---
+
+## 5 ter. Mesures du 18/08/2026 — l'option D est invalidée
+
+L'option D reposait sur une hypothèse : depuis une IP résidentielle avec un
+vrai profil de navigateur, les protections anti-bot laisseraient passer. **Cette
+hypothèse a été testée et elle est fausse.**
+
+Sondes Playwright exécutées depuis le Mac de la maison (IP résidentielle,
+Chromium avec profil persistant, locale fr-FR, fenêtre visible, temporisations
+longues) :
+
+| Cible | Résultat |
+|---|---|
+| `carrefour.fr` (accueil et recherche) | **403** — page « Un instant… », challenge *« C'est une formalité… si vous êtes un humain ! »* |
+| `carrefour.fr/sitemap.xml`, `/p/...` | **403** — le blocage porte sur tout le domaine, pas sur des chemins |
+| `robots.txt` Carrefour | Aucun sitemap déclaré : aucune surface publiée pour les machines |
+| `leclercdrive.fr`, `fd10-courses.leclercdrive.fr` | **403** |
+| `www.e.leclerc` | 200, mais c'est la **marketplace généraliste** — une recherche « spaghetti » y renvoie un CD, un roman et une boîte en métal. Sans objet pour les courses. |
+
+Recherche d'une voie officielle, même date :
+- Le portail développeur Carrefour (`developer.fr.carrefour.io`) **ne résout plus**
+  (NXDOMAIN) : l'API Store est hors service.
+- L'affiliation « Carrefour Online » est explicitement **hors alimentaire**.
+- L'API Mirakl s'adresse aux vendeurs marketplace, pas à la lecture du catalogue drive.
+- Leclerc n'expose aucune API publique ; les « API Leclerc » commerciales sont
+  du scraping sous-traité, avec le même problème de CGU en payant en plus.
+
+**Conclusion.** Les deux drives opposent un challenge anti-bot à tout accès
+programmatique. Les franchir supposerait de masquer le caractère automatisé du
+navigateur (empreinte, `navigator.webdriver`, résolution de captcha) : c'est
+précisément ce que ces protections existent pour empêcher, et ce ne sera pas
+construit ici.
+
+**Il n'existe pas de worker autonome possible, ni pour Carrefour ni pour
+Leclerc.** L'option D est morte, comme l'option A.
+
+### Ce qui reste techniquement possible
+
+Une seule voie ne franchit aucune protection : **le navigateur réel de
+l'utilisateur**, où le contrôle humain a déjà été passé normalement et où la
+session est déjà authentifiée. Une extension ou un userscript y déroule la
+liste — une recherche, un ajout, au suivant — sur un seul clic de départ. Si un
+challenge apparaît, l'humain le résout et le script reprend.
+
+Du point de vue de l'usage, c'est bien « un clic pour 40 produits ». Ce n'est
+pas un worker sans surveillance, et ça suppose d'installer un navigateur
+extensible (seul Safari est présent sur le Mac aujourd'hui).
 
 ---
 
