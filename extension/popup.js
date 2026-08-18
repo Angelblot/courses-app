@@ -7,10 +7,14 @@ const send = (msg) =>
 
 /**
  * Analyse la liste saisie à la main.
- * Format : un produit par ligne, quantité optionnelle en suffixe « x2 ».
+ *
+ * Une ligne peut être :
+ *   - un nom de produit, quantité optionnelle en suffixe « x2 » ;
+ *   - une URL de fiche produit, qui court-circuite la recherche et donc toute
+ *     ambiguïté entre produits aux noms voisins.
  *
  * @param {string} raw Texte brut du champ.
- * @returns {Array<{name: string, quantity: number}>}
+ * @returns {Array<{name: string, quantity: number, url?: string, ean?: string}>}
  */
 function parseItems(raw) {
   return raw
@@ -19,8 +23,20 @@ function parseItems(raw) {
     .filter(Boolean)
     .map((line) => {
       const m = line.match(/^(.*?)\s*[x×]\s*(\d+)$/i);
-      if (m) return { name: m[1].trim(), quantity: Number(m[2]) };
-      return { name: line, quantity: 1 };
+      const body = m ? m[1].trim() : line;
+      const quantity = m ? Number(m[2]) : 1;
+
+      if (/^https?:\/\//i.test(body)) {
+        // Le nom lisible est déduit du segment d'URL, l'EAN de son suffixe.
+        const slug = body.split('/').filter(Boolean).pop() ?? body;
+        const ean = slug.match(/(\d{13})/)?.[1] ?? null;
+        const name = slug
+          .replace(/-?\d{13}.*$/, '')
+          .replace(/-/g, ' ')
+          .trim();
+        return { name: name || body, quantity, url: body, ean };
+      }
+      return { name: body, quantity };
     });
 }
 
@@ -31,6 +47,7 @@ const REASON_LABEL = {
   no_add_button: "bouton d'ajout introuvable",
   ambiguous: 'plusieurs produits possibles — à choisir toi-même',
   click_no_effect: 'clic sans effet, rien ajouté',
+  wrong_product: 'la fiche ouverte ne correspond pas',
   challenge: 'vérification demandée',
   inject_failed: 'injection impossible',
   no_result: 'page muette',

@@ -16,8 +16,16 @@ function parseItems(raw) {
     .filter(Boolean)
     .map((line) => {
       const m = line.match(/^(.*?)\s*[x×]\s*(\d+)$/i);
-      if (m) return { name: m[1].trim(), quantity: Number(m[2]) };
-      return { name: line, quantity: 1 };
+      const body = m ? m[1].trim() : line;
+      const quantity = m ? Number(m[2]) : 1;
+
+      if (/^https?:\/\//i.test(body)) {
+        const slug = body.split('/').filter(Boolean).pop() ?? body;
+        const ean = slug.match(/(\d{13})/)?.[1] ?? null;
+        const name = slug.replace(/-?\d{13}.*$/, '').replace(/-/g, ' ').trim();
+        return { name: name || body, quantity, url: body, ean };
+      }
+      return { name: body, quantity };
     });
 }
 
@@ -119,6 +127,41 @@ checkTrue(
 checkTrue(
   'les mots outils ne comptent pas dans le score',
   score('Sauce de tomate', 'Sauce tomate 400g') === 1
+);
+
+// --- Lignes contenant une URL de fiche produit ---
+// Carrefour n'indexe pas les EAN dans sa recherche (0 résultat, vérifié le
+// 18/08/2026) mais les expose dans l'URL : l'accès direct est donc le seul
+// moyen sûr de viser un produit précis.
+
+const URL_VIN = 'https://www.carrefour.fr/p/vin-blanc-igp-pays-d-oc-viognier-cibadies-3443660013046';
+
+check(
+  'une URL de fiche est reconnue, avec son EAN',
+  parseItems(URL_VIN),
+  [{
+    name: 'vin blanc igp pays d oc viognier cibadies',
+    quantity: 1,
+    url: URL_VIN,
+    ean: '3443660013046',
+  }]
+);
+
+check(
+  'une URL accepte aussi une quantité',
+  parseItems(`${URL_VIN} x2`)[0].quantity,
+  2
+);
+
+check(
+  'un nom ordinaire ne produit ni url ni ean',
+  parseItems('Lardons fumés')[0],
+  { name: 'Lardons fumés', quantity: 1 }
+);
+
+checkTrue(
+  'le motif d\'URL Carrefour extrait bien l\'EAN',
+  /\/p\/[^/?#]*?-(\d{13})(?:[/?#]|$)/.exec(URL_VIN)?.[1] === '3443660013046'
 );
 
 // --- Départage des quasi-homonymes ---

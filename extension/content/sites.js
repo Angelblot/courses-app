@@ -65,6 +65,20 @@ export const SITES = {
       "button:has-text('Ajouter')",
       '.add-to-cart',
     ],
+    // Fiche produit : l'accès direct évite toute recherche, donc toute
+    // ambiguïté. La recherche par code-barres, elle, ne donne rien — Carrefour
+    // n'indexe pas les EAN (vérifié le 18/08/2026, 0 résultat).
+    productUrlPattern: /\/p\/[^/?#]*?-(\d{13})(?:[/?#]|$)/,
+    productPage: {
+      addButton: [
+        "button:has-text('Ajouter au panier')",
+        'button[aria-label*="jouter au panier"]',
+        "button:has-text('Ajouter')",
+        '[data-testid="add-to-cart"]',
+      ],
+      title: ['h1'],
+      price: ['[data-testid="product-price"]', '[class*="price"]'],
+    },
     // Indices d'un challenge anti-bot ou d'une déconnexion.
     challengeHints: ['un instant', 'formalité', 'vous êtes un humain', 'captcha'],
     loginHints: ['se connecter', 'connexion', 'identifiez-vous'],
@@ -95,6 +109,12 @@ export const SITES = {
       'button[aria-label*="jouter"]',
       '.btn-add',
     ],
+    productUrlPattern: /-(\d{13})(?:[/?#]|$)/,
+    productPage: {
+      addButton: ["button:has-text('Ajouter')", '[data-testid="add-to-cart"]'],
+      title: ['h1'],
+      price: ['[class*="price"]', '[class*="prix"]'],
+    },
     challengeHints: ['un instant', 'formalité', 'vous êtes un humain', 'captcha'],
     loginHints: ['se connecter', 'connexion', 'identifiez-vous'],
   },

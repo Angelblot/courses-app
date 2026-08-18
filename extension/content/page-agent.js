@@ -194,6 +194,67 @@ export function pageAgent(cfg, item, mode) {
       );
   }
 
+  /**
+   * Code EAN13 contenu dans une URL de fiche produit.
+   * Carrefour n'indexe pas les EAN dans sa recherche, mais les expose dans
+   * l'adresse : c'est ce qui permet de vérifier une correspondance, et surtout
+   * de revenir directement au bon produit la fois suivante.
+   */
+  function eanFromUrl(url) {
+    const m = (url || '').match(cfg.productUrlPattern);
+    return m ? m[1] : null;
+  }
+
+  /** Ajoute au panier depuis une fiche produit (pas une liste de résultats). */
+  async function addFromProductPage() {
+    const pp = cfg.productPage || {};
+    const label = textOf(queryFirst(document, pp.title || ['h1']));
+    const ean = eanFromUrl(location.href);
+
+    // Si l'on attendait un produit précis, on refuse tout écart.
+    if (item.ean && ean && item.ean !== ean) {
+      return {
+        ok: false,
+        reason: 'wrong_product',
+        message: `La fiche ouverte ne correspond pas (${ean} au lieu de ${item.ean})`,
+        label,
+      };
+    }
+
+    const btn = queryFirstClickable(document, pp.addButton || []);
+    if (!btn) {
+      return { ok: false, reason: 'no_add_button', message: 'Bouton d\'ajout introuvable', label };
+    }
+
+    btn.scrollIntoView({ block: 'center' });
+    await sleep(300);
+    const before = fingerprint(document.body);
+    const cartBefore = cartCount();
+    btn.click();
+
+    let changed = false;
+    for (let waited = 0; waited < 5000; waited += 500) {
+      await sleep(500);
+      const cartAfter = cartCount();
+      if (fingerprint(document.body) !== before) { changed = true; break; }
+      if (cartBefore !== null && cartAfter !== null && cartAfter > cartBefore) { changed = true; break; }
+    }
+
+    if (!changed) {
+      return { ok: false, reason: 'click_no_effect', message: `Clic sans effet sur « ${label} »`, label };
+    }
+
+    return {
+      ok: true,
+      reason: 'added',
+      label,
+      ean,
+      url: location.href,
+      via: 'product_page',
+      price: textOf(queryFirst(document, pp.price || [])).slice(0, 30) || null,
+    };
+  }
+
   // --- Détection d'état de page ---
 
   function pageState() {
@@ -290,6 +351,11 @@ export function pageAgent(cfg, item, mode) {
 
     if (mode === 'diagnose') return { ok: true, reason: 'diagnose', report: diagnose() };
 
+    // Accès direct à une fiche : aucune recherche, donc aucune ambiguïté.
+    if (cfg.productUrlPattern && cfg.productUrlPattern.test(location.href)) {
+      return addFromProductPage();
+    }
+
     const { selector: cardSelector, elements: cards } = await waitForCards();
     if (!cards.length) {
       return {
@@ -302,10 +368,15 @@ export function pageAgent(cfg, item, mode) {
 
     const ranked = rank(
       item.name,
-      cards.slice(0, 12).map((card) => ({
-        card,
-        label: textOf(queryFirst(card, cfg.title)) || textOf(card),
-      }))
+      cards.slice(0, 12).map((card) => {
+        const href = card.querySelector('a[href]')?.getAttribute('href') ?? '';
+        return {
+          card,
+          label: textOf(queryFirst(card, cfg.title)) || textOf(card),
+          href,
+          ean: eanFromUrl(href),
+        };
+      })
     );
 
     const best = ranked[0];
@@ -403,6 +474,10 @@ export function pageAgent(cfg, item, mode) {
       ok: true,
       reason: 'added',
       label: best.label,
+      // Renvoyés pour alimenter la table des correspondances : la prochaine
+      // fois, on ira droit à cette fiche au lieu de rechercher.
+      ean: best.ean ?? null,
+      url: best.href ? new URL(best.href, location.origin).href : null,
       score: Number(best.score.toFixed(2)),
       quantityAdded: added,
       quantityWanted: wanted,

@@ -100,7 +100,9 @@ async function processJob() {
     }
 
     const item = state.items[index];
-    const url = cfg.searchUrl.replace('{q}', encodeURIComponent(item.name));
+    // Une URL de fiche connue court-circuite la recherche : c'est le seul moyen
+    // sûr de viser un produit précis parmi des libellés voisins.
+    const url = item.url || cfg.searchUrl.replace('{q}', encodeURIComponent(item.name));
 
     await chrome.tabs.update(tabId, { url });
     await waitForTab(tabId);

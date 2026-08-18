@@ -29,8 +29,9 @@ Concrètement : un clic pour quarante produits, au lieu de quarante allers-retou
 1. Connecte-toi normalement au site du drive et choisis ton magasin — une fois,
    à la main.
 2. Clique l'icône de l'extension.
-3. Choisis l'enseigne, colle ta liste (un produit par ligne, quantité en suffixe
-   `x2`), puis **Remplir le panier**.
+3. Choisis l'enseigne, colle ta liste, puis **Remplir le panier**. Chaque ligne
+   est soit un nom de produit, soit une **URL de fiche produit** — quantité
+   optionnelle en suffixe `x2` dans les deux cas.
 4. Laisse l'onglet travailler. Le popup affiche la progression et ce qui n'a pas
    été trouvé.
 5. Vérifie le panier et paie **toi-même** sur le site : l'extension ne valide
@@ -59,6 +60,24 @@ Lance-le sur une page qui affiche vraiment des produits.
 
 Attends-toi à devoir refaire ce réglage après une refonte du site : beaucoup de
 classes CSS y sont générées à la compilation et changent à chaque déploiement.
+
+## Viser un produit précis
+
+La recherche par nom reste approximative : « Lardons fumés » ne se distingue pas
+de « Lardons fumés BIO » ni de « Lardons fumés allégés ». Trois garde-fous :
+
+1. **Départage automatique** — à score égal, le produit ayant le moins de mots
+   superflus l'emporte. Demander « lardons fumés bio » sélectionne bien le bio.
+2. **Aveu d'ambiguïté** — deux candidats indiscernables ne sont pas départagés
+   au hasard : la ligne est signalée, à toi de trancher.
+3. **URL de fiche** — la seule méthode sûre. Colle l'adresse du produit dans la
+   liste : l'extension y va directement, sans passer par la recherche.
+
+La recherche par code-barres, elle, ne fonctionne pas : Carrefour n'indexe pas
+les EAN (0 résultat, vérifié le 18/08/2026). En revanche il les expose dans
+l'URL des fiches (`/p/…-3443660013046`), et l'extension les remonte dans ses
+résultats — de quoi constituer une table de correspondances et n'avoir à
+choisir qu'une seule fois par produit.
 
 ## Sécurité et limites
 
