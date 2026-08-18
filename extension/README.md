@@ -38,8 +38,11 @@ Concrètement : un clic pour quarante produits, au lieu de quarante allers-retou
 
 ## Première utilisation : calibrer les sélecteurs
 
-Les sélecteurs CSS de `content/sites.js` n'ont **pas pu être validés
-automatiquement**, puisque les deux sites refusent l'accès programmatique. Ils
+**Carrefour est calibré** (18/08/2026, sur deux pages réelles). **Leclerc ne
+l'est pas** : ses sélecteurs restent des hypothèses.
+
+Les sélecteurs de `content/sites.js` ne peuvent pas être validés
+automatiquement, puisque les deux sites refusent l'accès programmatique. Ils
 sont donnés en listes de candidats et se calibrent en une passe :
 
 1. Va sur une page de résultats de recherche du drive, connecté.
@@ -48,6 +51,11 @@ sont donnés en listes de candidats et se calibrent en une passe :
    trouve, et un échantillon de titres lus.
 4. Reporte les sélecteurs qui renvoient un nombre cohérent (≈ le nombre de
    produits affichés) en tête des listes de `content/sites.js`.
+
+Attention au piège rencontré : `innerText` renvoie une chaîne vide pour un
+élément non rendu (carrousel hors écran). Un diagnostic lancé sur la page
+d'accueil affiche donc des titres vides alors que les sélecteurs sont bons.
+Lance-le sur une page qui affiche vraiment des produits.
 
 Attends-toi à devoir refaire ce réglage après une refonte du site : beaucoup de
 classes CSS y sont générées à la compilation et changent à chaque déploiement.

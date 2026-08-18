@@ -18,6 +18,16 @@ export function pageAgent(cfg, item, mode) {
   // --- Sélecteurs étendus : gère le pseudo :has-text('...') absent du CSS natif ---
   const HAS_TEXT = /^(.*?):has-text\((['"])(.*?)\2\)$/;
 
+  /**
+   * Texte d'un élément, avec repli sur textContent.
+   *
+   * innerText renvoie une chaîne vide pour tout élément non rendu — carrousel
+   * hors écran, panneau replié, contenu chargé mais masqué. Sur la page
+   * d'accueil Carrefour, cela vidait tous les titres lus et faisait échouer la
+   * recherche de boutons par texte.
+   */
+  const textOf = (el) => ((el?.innerText || '').trim() || (el?.textContent || '').trim());
+
   function queryAll(root, selector) {
     const m = selector.match(HAS_TEXT);
     if (!m) {
@@ -35,7 +45,7 @@ export function pageAgent(cfg, item, mode) {
     } catch {
       return [];
     }
-    return candidates.filter((el) => (el.innerText || '').toLowerCase().includes(needle));
+    return candidates.filter((el) => textOf(el).toLowerCase().includes(needle));
   }
 
   function queryFirst(root, selectors) {
@@ -106,7 +116,7 @@ export function pageAgent(cfg, item, mode) {
   // --- Détection d'état de page ---
 
   function pageState() {
-    const text = (document.body?.innerText || '').toLowerCase();
+    const text = textOf(document.body).toLowerCase();
     if (cfg.challengeHints.some((h) => text.includes(h))) return 'challenge';
     return 'ok';
   }
@@ -143,18 +153,35 @@ export function pageAgent(cfg, item, mode) {
       state: pageState(),
       cardSelectors: {},
       addButtonSelectors: {},
-      sampleTitles: [],
     };
     for (const sel of cfg.cards) report.cardSelectors[sel] = queryAll(document, sel).length;
     for (const sel of cfg.addButton) report.addButtonSelectors[sel] = queryAll(document, sel).length;
 
-    const { elements } = queryFirstList(document, cfg.cards);
-    report.sampleTitles = elements.slice(0, 5).map((card) => {
-      const t = queryFirst(card, cfg.title);
-      return (t?.innerText || card.innerText || '').trim().slice(0, 90);
+    const { selector: cardSelector, elements } = queryFirstList(document, cfg.cards);
+    report.cardSelectorUsed = cardSelector;
+
+    // Pour chaque carte échantillon : quel sélecteur de titre donne du texte,
+    // et quel bouton d'ajout est présent. C'est ce qui permet de trancher.
+    report.samples = elements.slice(0, 4).map((card) => {
+      const titles = {};
+      for (const sel of cfg.title) {
+        const el = queryAll(card, sel)[0];
+        const t = textOf(el);
+        if (t) titles[sel] = t.slice(0, 70);
+      }
+      const buttons = {};
+      for (const sel of cfg.addButton) buttons[sel] = queryAll(card, sel).length;
+      return {
+        cardText: textOf(card).replace(/\s+/g, ' ').slice(0, 120),
+        titles,
+        buttons,
+        link: card.querySelector('a')?.getAttribute('href')?.slice(0, 80) ?? null,
+      };
     });
+
     // Repli utile quand aucun sélecteur de carte ne marche : les liens produit.
     report.productLinks = document.querySelectorAll('a[href*="/p/"], a[href*="fiche-produit"]').length;
+    report.isSearchPage = /[?&]q=/.test(location.search) || /recherche/.test(location.pathname);
     return report;
   }
 
@@ -186,7 +213,7 @@ export function pageAgent(cfg, item, mode) {
     let best = null;
     for (const card of cards.slice(0, 12)) {
       const titleEl = queryFirst(card, cfg.title);
-      const label = (titleEl?.innerText || card.innerText || '').trim();
+      const label = textOf(titleEl) || textOf(card);
       const s = score(item.name, label);
       if (!best || s > best.score) best = { card, label, score: s };
     }

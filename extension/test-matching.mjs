@@ -121,6 +121,46 @@ checkTrue(
   score('Sauce de tomate', 'Sauce tomate 400g') === 1
 );
 
+// --- Sélection sur des titres Carrefour réels ---
+// Relevés le 18/08/2026 par le mode diagnostic, retours à la ligne compris :
+// le titre affiché répète la marque avant et après le libellé.
+
+const CATALOGUE = [
+  'LUSTUCRU\n\nPâtes Fraîches Tortellini Jambon Cru LUSTUCRU',
+  'CARREFOUR EXTRA\n\nGorgonzola AOP CARREFOUR EXTRA',
+  'HERTA\n\nPoitrine Fumée HERTA',
+  'BRETS\n\nChips la craquante nature BRETS',
+  "KELLOGG'S\n\nCéréales Trésor Chocolat au Lait KELLOGG'S",
+];
+
+/** Reproduit le choix de l'agent : meilleur score, puis seuil. */
+function pick(query) {
+  let best = null;
+  for (const label of CATALOGUE) {
+    const s = score(query, label);
+    if (!best || s > best.s) best = { label, s };
+  }
+  return best.s >= MATCH_THRESHOLD ? best.label : null;
+}
+
+checkTrue(
+  'les sauts de ligne du titre ne cassent pas le score',
+  score('Poitrine fumée Herta', CATALOGUE[2]) === 1
+);
+check('marque + produit trouve la bonne ligne', pick('Poitrine fumée Herta'), CATALOGUE[2]);
+check('libellé simple trouve la bonne ligne', pick('Gorgonzola'), CATALOGUE[1]);
+check('tortellini', pick('Tortellini jambon cru Lustucru'), CATALOGUE[0]);
+check(
+  'un produit absent du catalogue ne renvoie rien plutôt qu\'un faux',
+  pick('Saumon fumé'),
+  null
+);
+check(
+  'une marque seule ne suffit pas à choisir un produit au hasard',
+  pick('Yaourt nature Carrefour'),
+  null
+);
+
 // --- Verdict ---
 
 console.log(`\n${passed} vérification(s) passée(s), ${failures.length} échec(s)\n`);

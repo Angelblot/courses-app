@@ -25,14 +25,23 @@ export const SITES = {
       '[data-testid="cookie-reject"]',
     ],
     // Conteneurs de résultats.
+    // Calibré le 18/08/2026 sur deux rapports de diagnostic réels.
+    // article[class*="product"] renvoie exactement le nombre de produits
+    // (30 sur « Mes achats fréquents »), là où li[class*="product-list"]
+    // en compte 31 — un conteneur parasite s'y glisse.
     cards: [
-      '[data-testid="product-card"]',
       'article[class*="product"]',
+      '[data-testid="product-card"]',
       'li[class*="product-list"]',
       '.product-card',
       '.ds-product-card',
     ],
     // Titre du produit, cherché à l'intérieur d'une carte.
+    // Ordre conservé : il produit de bons titres sur une vraie page produit
+    // (« LUSTUCRU / Pâtes Fraîches Tortellini Jambon Cru LUSTUCRU »).
+    // a[href*="/p/"] reste en dernier recours : une carte contient environ
+    // deux liens produit (image + titre), on risquerait de lire celui de
+    // l'image, sans texte.
     title: [
       '[data-testid="product-title"]',
       '.product-card__title',
@@ -42,11 +51,13 @@ export const SITES = {
     ],
     price: ['[data-testid="product-price"]', '[class*="price"]', '.product-price'],
     // Bouton d'ajout au panier, à l'intérieur d'une carte.
+    // .add-to-cart d'abord : une occurrence par carte sur les deux pages
+    // observées (15/15 puis 30/30).
     addButton: [
-      '[data-testid="add-to-cart"]',
-      'button[aria-label*="jouter"]',
-      "button:has-text('Ajouter')",
       '.add-to-cart',
+      'button[aria-label*="jouter"]',
+      '[data-testid="add-to-cart"]',
+      "button:has-text('Ajouter')",
     ],
     // Indices d'un challenge anti-bot ou d'une déconnexion.
     challengeHints: ['un instant', 'formalité', 'vous êtes un humain', 'captcha'],
