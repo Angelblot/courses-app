@@ -4,6 +4,7 @@ import { useResultsStore } from '../stores/resultsStore.js';
 import { Card } from '../components/ui/Card.jsx';
 import { Badge } from '../components/ui/Badge.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
+import { Icon } from '../components/ui/Icon.jsx';
 
 const DRIVE_LABEL = {
   carrefour: 'Carrefour Drive',
@@ -15,8 +16,10 @@ export function ResultsPage() {
   const navigate = useNavigate();
 
   const loading = useResultsStore((s) => s.loading);
+  const error = useResultsStore((s) => s.error);
   const results = useResultsStore((s) => s.results);
   const load = useResultsStore((s) => s.load);
+  const retry = useResultsStore((s) => s.retry);
 
   useEffect(() => {
     if (sessionId) load(sessionId);
@@ -27,10 +30,28 @@ export function ResultsPage() {
     return Object.values(results.drives);
   }, [results]);
 
+  // Un panier n'est exploitable que si le drive a réellement remonté des lignes.
+  // Tant que ce n'est pas le cas, afficher un total à 0 € laisserait croire à
+  // une génération réussie et gratuite.
+  const hasPricedItems = drives.some((d) => (d.items?.length || 0) > 0);
+
   const cheapest = useMemo(() => {
-    if (drives.length === 0) return null;
+    if (!hasPricedItems) return null;
     return drives.reduce((best, d) => (best == null || d.total < best.total ? d : best), null);
-  }, [drives]);
+  }, [drives, hasPricedItems]);
+
+  const pendingMissing = useMemo(() => {
+    if (hasPricedItems) return [];
+    const seen = new Set();
+    return drives
+      .flatMap((d) => d.missing || [])
+      .filter((m) => {
+        const key = `${m.name}|${m.unit}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }, [drives, hasPricedItems]);
 
   return (
     <div className="results">
@@ -41,7 +62,7 @@ export function ResultsPage() {
           onClick={() => navigate('/')}
           aria-label="Retour accueil"
         >
-          ←
+          <Icon name="arrowLeft" size={20} />
         </button>
         <div>
           <div className="step-header__eyebrow">Phase de courses terminée</div>
@@ -51,12 +72,68 @@ export function ResultsPage() {
 
       <div className="container">
         {loading && !results && (
-          <EmptyState icon="⏳" title="Génération en cours…">
-            Ça prend quelques secondes. On remplit les paniers en parallèle.
+          <EmptyState icon="clock" title="Chargement des résultats…">
+            On récupère l'état de la génération.
           </EmptyState>
         )}
 
-        {drives.length > 0 && (
+        {!loading && error && (
+          <Card className="results__error">
+            <EmptyState icon="alert" title="Résultats indisponibles">
+              Impossible de joindre le serveur. Aucun panier n'a pu être récupéré
+              pour cette session.
+            </EmptyState>
+            <p className="results__error-detail">{error}</p>
+            <button type="button" className="btn" onClick={retry}>
+              Réessayer
+            </button>
+          </Card>
+        )}
+
+        {!loading && !error && results && drives.length === 0 && (
+          <EmptyState icon="cart" title="Aucun drive sélectionné">
+            Cette session n'a pas encore été envoyée à un drive.
+          </EmptyState>
+        )}
+
+        {!error && drives.length > 0 && !hasPricedItems && (
+          <div className="stack stack--lg">
+            <Card className="results__pending">
+              <EmptyState icon="clock" title="Paniers non générés">
+                La connexion automatique aux drives n'est pas encore active :
+                aucun prix ni disponibilité n'a été remonté. Ta liste est
+                enregistrée, tu peux la retrouver dans Mes listes.
+              </EmptyState>
+            </Card>
+
+            {pendingMissing.length > 0 && (
+              <Card className="missing-card">
+                <h3 className="missing-card__title">
+                  <Icon name="alert" size={16} />
+                  Sans produit associé
+                </h3>
+                <p className="missing-card__hint">
+                  Ces lignes n'ont pas de produit du catalogue : elles seront à
+                  ajouter à la main.
+                </p>
+                <ul className="missing-list">
+                  {pendingMissing.map((m, i) => (
+                    <li key={i} className="missing-item">
+                      <div>
+                        <div className="result-item__name">{m.name}</div>
+                        <div className="result-item__meta">
+                          {m.quantity} {m.unit}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {!error && hasPricedItems && (
           <div className="stack stack--lg">
             <div className="comparator">
               {drives.map((d) => {
