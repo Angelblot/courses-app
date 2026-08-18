@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Courses — remplissage de panier",
+  "version": "1.0.0",
+  "description": "Remplit le panier drive à partir d'une liste de courses, dans ta propre session déjà connectée.",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://*.carrefour.fr/*",
+    "https://*.leclercdrive.fr/*",
+    "https://*.leclerc/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Courses",
+    "default_icon": {
+      "128": "icon-128.png"
+    }
+  },
+  "externally_connectable": {
+    "matches": [
+      "http://localhost:5173/*",
+      "http://localhost:5174/*",
+      "https://*.vercel.app/*"
+    ]
+  },
+  "icons": {
+    "128": "icon-128.png"
+  }
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="head">
+      <h1>Courses</h1>
+      <span id="site-label" class="site"></span>
+    </header>
+
+    <section id="idle" class="panel">
+      <p class="hint">
+        Colle ta liste de courses, ou envoie-la depuis l'application.
+      </p>
+      <label class="field">
+        <span>Enseigne</span>
+        <select id="site">
+          <option value="carrefour">Carrefour</option>
+          <option value="leclerc">E.Leclerc Drive</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Liste — un produit par ligne, quantité optionnelle après « x »</span>
+        <textarea id="items" rows="7" placeholder="Spaghetti 500g x2&#10;Lardons fumés&#10;Sauce tomate x3"></textarea>
+      </label>
+      <button id="start" class="btn">Remplir le panier</button>
+      <button id="diagnose" class="btn btn--ghost">Diagnostiquer cette page</button>
+    </section>
+
+    <section id="running" class="panel" hidden>
+      <div class="progress">
+        <div id="bar" class="progress__bar"></div>
+      </div>
+      <p id="progress-text" class="hint"></p>
+      <ul id="log" class="log"></ul>
+      <div class="row">
+        <button id="resume" class="btn" hidden>Reprendre</button>
+        <button id="stop" class="btn btn--ghost">Arrêter</button>
+      </div>
+    </section>
+
+    <pre id="diag" class="diag" hidden></pre>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

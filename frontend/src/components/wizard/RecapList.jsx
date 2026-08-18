@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useRecipesStore } from '../../stores/recipesStore.js';
 import { useProductsStore } from '../../stores/productsStore.js';
 import {
@@ -10,6 +10,7 @@ import { Card } from '../ui/Card.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { Icon } from '../ui/Icon.jsx';
+import { toExtensionList } from '../../lib/extensionList.js';
 
 function formatQty(qty, unit) {
   const n = Number(qty);
@@ -43,6 +44,13 @@ export function RecapList() {
   );
 
   const groups = useMemo(() => groupByRayon(items), [items]);
+  const [copied, setCopied] = useState(false);
+
+  const copyForExtension = async () => {
+    await navigator.clipboard.writeText(toExtensionList(items));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
 
   const recipeIds = Object.keys(selectedRecipes);
   const activeRecipes = recipes.filter((r) => recipeIds.includes(String(r.id)));
@@ -68,6 +76,20 @@ export function RecapList() {
               </div>
             </Card>
           )}
+
+          <Card className="extension-cta">
+            <div className="extension-cta__body">
+              <div className="extension-cta__title">Remplir le panier drive</div>
+              <p className="extension-cta__hint">
+                Copie la liste, puis colle-la dans l'extension Chrome pour
+                l'ajouter au panier de ton drive.
+              </p>
+            </div>
+            <button type="button" className="btn btn--secondary" onClick={copyForExtension}>
+              <Icon name={copied ? 'check' : 'list'} size={16} />
+              {copied ? 'Copié' : 'Copier la liste'}
+            </button>
+          </Card>
 
           <div className="stack stack--lg">
             {groups.map(({ rayon, entries }) => (

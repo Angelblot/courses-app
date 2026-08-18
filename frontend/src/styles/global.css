@@ -1325,3 +1325,9 @@ h1, h2, h3, h4 { line-height: 1.2; letter-spacing: -0.01em; font-weight: 700; }
 .login__confirm svg { color: var(--color-success, #2E7D43); flex-shrink: 0; margin-top: 2px; }
 .more-sheet__separator { height: 1px; background: var(--color-border); margin: var(--space-2) var(--space-4); }
 .more-sheet__item--muted { color: var(--color-text-muted); width: 100%; }
+
+/* ---- Passerelle vers l'extension navigateur ---- */
+.extension-cta { display: flex; align-items: center; gap: var(--space-4); justify-content: space-between; flex-wrap: wrap; }
+.extension-cta__title { font-weight: 700; }
+.extension-cta__hint { font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: var(--space-1); max-width: 42ch; }
+.extension-cta .btn { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
