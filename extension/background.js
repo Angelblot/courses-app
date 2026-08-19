@@ -96,8 +96,13 @@ const RETRYABLE_VIA_SEARCH = new Set([
  * @param {object} item Ligne de courses.
  * @returns {Promise<object>} Compte rendu, enrichi de la voie empruntée.
  */
-async function attempt(tabId, cfg, item) {
-  const searchUrl = cfg.searchUrl.replace('{q}', encodeURIComponent(item.name));
+async function attempt(tabId, cfg, item, baseOrigin) {
+  // Un chemin relatif prime quand on connaît l'origine réelle : les drives
+  // Leclerc vivent chacun sur le sous-domaine de leur magasin.
+  const searchUrl =
+    cfg.searchPath && baseOrigin
+      ? baseOrigin + cfg.searchPath.replace('{q}', encodeURIComponent(item.name))
+      : cfg.searchUrl.replace('{q}', encodeURIComponent(item.name));
 
   const directUrl =
     item.url ||
@@ -145,7 +150,7 @@ async function processJob() {
     }
 
     const item = state.items[index];
-    let result = await attempt(tabId, cfg, item);
+    let result = await attempt(tabId, cfg, item, state.baseOrigin);
     const entry = { item: item.name, quantity: item.quantity, ...result };
 
     // Un challenge n'est pas un échec de produit : c'est une main à rendre.
@@ -172,13 +177,36 @@ async function startJob({ site, items }) {
   if (!cfg) throw new Error(`Enseigne inconnue : ${site}`);
   if (!Array.isArray(items) || !items.length) throw new Error('Liste vide');
 
-  const tab = await chrome.tabs.create({ url: cfg.origin, active: true });
-  await waitForTab(tab.id);
+  // Réutiliser l'onglet courant s'il est déjà sur le site de l'enseigne :
+  // c'est le seul moyen de connaître le sous-domaine du magasin, et cela évite
+  // de perdre la sélection de drive faite à la main.
+  const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+  let tab = active;
+  let onSite = false;
+  try {
+    onSite = Boolean(active?.url) && cfg.hostPattern.test(new URL(active.url).hostname);
+  } catch {
+    onSite = false;
+  }
+  if (!onSite) {
+    tab = await chrome.tabs.create({ url: cfg.origin, active: true });
+    await waitForTab(tab.id);
+    // Juste après création, tab.url n'est pas encore l'adresse chargée.
+    tab = await chrome.tabs.get(tab.id);
+  }
+
+  let baseOrigin = null;
+  try {
+    baseOrigin = new URL(tab.url).origin;
+  } catch {
+    baseOrigin = null;
+  }
 
   await setState({
     site,
     items,
     tabId: tab.id,
+    baseOrigin,
     cursor: 0,
     results: [],
     status: 'running',

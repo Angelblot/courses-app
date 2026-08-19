@@ -15,6 +15,7 @@ export const SITES = {
   carrefour: {
     label: 'Carrefour',
     origin: 'https://www.carrefour.fr',
+    hostPattern: /(^|\.)carrefour\.fr$/,
     // Recherche produit. {q} est remplacé par la requête encodée.
     searchUrl: 'https://www.carrefour.fr/s?q={q}',
     // Bannière cookies — on refuse (choix le plus protecteur).
@@ -92,7 +93,11 @@ export const SITES = {
   leclerc: {
     label: 'E.Leclerc Drive',
     origin: 'https://www.leclercdrive.fr',
+    // Chaque magasin a son sous-domaine (fd10-courses.leclercdrive.fr…), donc
+    // aucune origine ne peut être codée en dur : on part de l'onglet courant.
+    hostPattern: /(^|\.)leclercdrive\.fr$|(^|\.)leclerc$/,
     searchUrl: 'https://www.leclercdrive.fr/recherche.aspx?TexteRecherche={q}',
+    searchPath: '/recherche.aspx?TexteRecherche={q}',
     cookieReject: [
       "button:has-text('Continuer sans accepter')",
       "button:has-text('Tout refuser')",
