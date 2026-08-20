@@ -53,6 +53,21 @@ test('un même code-barres ne s\'accumule pas', async () => {
   assert.equal(await file.taille(), 1);
 });
 
+test('remplacer réécrit la file en une seule fois', async () => {
+  await file.enfiler(fiche('1'));
+  await file.enfiler(fiche('2'));
+  await file.remplacer([fiche('2'), fiche('3')]);
+  const sorties = await file.defiler();
+  assert.deepEqual(sorties.map((f) => f.ean13), ['2', '3']);
+});
+
+test('remplacer par une liste vide vide la file', async () => {
+  await file.enfiler(fiche('1'));
+  await file.remplacer([]);
+  assert.equal(await file.taille(), 0);
+  assert.deepEqual(await file.defiler(), []);
+});
+
 test('un stockage corrompu est traité comme une file vide', async () => {
   const s = stockageMemoire();
   await s.setItem('courses.file_scan', 'ceci n\'est pas du json');

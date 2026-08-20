@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -34,6 +35,15 @@ export default function Scan() {
   // Une ref est mise à jour immédiatement, avant tout `await`, donc la
   // deuxième lecture la voit déjà posée.
   const verrouille = useRef(false);
+  // Empêche deux passages de reprise de tourner en même temps. Même risque
+  // et même remède que `verrouille` ci-dessus : `enfiler` et `remplacer`
+  // sont une lecture-modification-écriture non atomique sur AsyncStorage, et
+  // le mode strict de React 18 monte puis démonte puis remonte chaque effet
+  // en développement — `useFocusEffect` serait donc invoqué deux fois de
+  // suite au premier focus. Deux boucles concurrentes liraient alors la même
+  // file et pourraient y remettre deux fois les mêmes fiches. Ref plutôt que
+  // state : lue et écrite de façon synchrone, sans attendre un rendu.
+  const repriseEnCours = useRef(false);
 
   const reprendre = useCallback(() => {
     verrouille.current = false;
@@ -72,36 +82,64 @@ export default function Scan() {
         setTimeout(reprendre, 1200);
       } else if (r.doublon) {
         setMessage({ texte: `Déjà dans ton catalogue : ${r.doublon.name}`, erreur: true });
-      } else {
-        // Échec probablement réseau : on met de côté plutôt que de perdre
-        // le scan, au lieu d'afficher l'erreur générique de `ajouterProduit`.
+      } else if (r.reseau) {
+        // Échec probablement réseau (voir `estErreurReseau` dans
+        // `stores/products.ts`) : on met de côté plutôt que de perdre le
+        // scan, dans l'espoir d'une reprise une fois le réseau revenu.
         await file.enfiler(aEnregistrer);
         setMessage({ texte: 'Hors connexion — ajouté dès le retour du réseau', erreur: false });
+        setTimeout(reprendre, 1600);
+      } else {
+        // Échec confirmé côté serveur (RLS, contrainte…) : rejouer la même
+        // fiche donnerait la même erreur indéfiniment, donc on ne la met pas
+        // en file — on informe l'utilisateur tout de suite.
+        setMessage({ texte: r.erreur ?? "Impossible d'ajouter ce produit.", erreur: true });
         setTimeout(reprendre, 1600);
       }
     },
     [reprendre],
   );
 
-  // Vide la file au retour sur l'écran : les scans mis de côté rejoignent
-  // le catalogue sans que l'utilisateur ait à y penser. Ne se relance pas à
-  // chaque scan (tableau de dépendances vide) : seul le montage de l'écran
-  // — donc un retour dessus depuis un autre onglet — déclenche la reprise.
-  useEffect(() => {
+  const reprendreFileEnAttente = useCallback(() => {
+    if (repriseEnCours.current) return;
+    repriseEnCours.current = true;
     (async () => {
-      const enAttente = await file.defiler();
-      if (!enAttente.length) return;
-      const restants: FicheProduit[] = [];
-      for (const f of enAttente) {
-        const r = await ajouterProduit(f);
-        if (!r.ok && !r.doublon) restants.push(f);
+      try {
+        const enAttente = await file.defiler();
+        if (!enAttente.length) return;
+        const restants: FicheProduit[] = [];
+        for (const f of enAttente) {
+          const r = await ajouterProduit(f);
+          // Succès, doublon (déjà en base) ou échec confirmé non réseau : la
+          // fiche ne revient pas en file — voir `ajouterProduit` pour la
+          // distinction réseau / non réseau et pourquoi un échec non réseau
+          // n'est pas retenté indéfiniment. Seul un échec probablement
+          // réseau y reste, dans l'espoir d'une prochaine reprise.
+          if (!r.ok && r.reseau) restants.push(f);
+        }
+        // Remplacement atomique en une seule écriture (voir `remplacer` dans
+        // `lib/queue.ts`) : contrairement à un `viderFile` suivi de
+        // plusieurs `enfiler`, il n'y a jamais d'état intermédiaire où la
+        // file serait vide alors que des fiches jamais envoyées avec succès
+        // restent à réinsérer — si l'application est tuée entre les deux
+        // écritures, rien n'est perdu.
+        if (restants.length !== enAttente.length) await file.remplacer(restants);
+      } finally {
+        repriseEnCours.current = false;
       }
-      // On vide puis on ré-enfile seulement les échecs : les succès (et les
-      // doublons, déjà présents en base) ne doivent pas revenir dans la file.
-      await file.viderFile();
-      for (const f of restants) await file.enfiler(f);
     })();
   }, []);
+
+  // Reprend la file à chaque prise de focus de l'écran. `app/(tabs)/_layout.tsx`
+  // utilise `<Tabs>` d'expo-router sans `unmountOnBlur` : un écran déjà
+  // visité reste monté quand on change d'onglet, il n'est pas remonté au
+  // retour dessus. Un `useEffect` à tableau de dépendances vide ne
+  // s'exécuterait donc qu'une seule fois, au tout premier passage sur
+  // l'onglet Scan, pour toute la durée de vie de l'application — revenir
+  // sur l'onglet après une coupure réseau ne relancerait jamais la reprise.
+  // `useFocusEffect` (réexporté par expo-router) se déclenche à chaque
+  // focus, mais exige un callback stable, d'où le `useCallback` ci-dessus.
+  useFocusEffect(reprendreFileEnAttente);
 
   const ajouter = useCallback(() => {
     if (resultat?.etat === 'trouve') enregistrer(resultat.fiche);

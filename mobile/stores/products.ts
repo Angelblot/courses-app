@@ -60,6 +60,23 @@ export function useProducts() {
 }
 
 /**
+ * Une erreur postgrest-js sans `code` vient d'un `fetch` qui a levé une
+ * exception avant qu'une réponse HTTP n'arrive — coupure réseau, DNS,
+ * timeout (voir `node_modules/@supabase/postgrest-js/dist/index.cjs`, le
+ * bloc `res.catch((fetchError) => ...)` dans `PostgrestBuilder.prototype.then` :
+ * il construit toujours `code: ''`, y compris pour un abandon ou un
+ * dépassement d'en-têtes). Une erreur qui a atteint PostgREST — violation
+ * RLS, contrainte, colonne manquante — porte au contraire un code
+ * Postgres/PostgREST non vide (ex. '23505', '42501', 'PGRST116'), posé par
+ * `processResponse` en parsant le corps JSON renvoyé par le serveur. Un
+ * code vide est donc un signal fiable — et propre à cette version de la
+ * librairie — d'échec réseau plutôt que d'échec métier.
+ */
+function estErreurReseau(error: { code?: string }): boolean {
+  return !error.code;
+}
+
+/**
  * Ajoute un produit scanné au catalogue.
  *
  * Un code-barres déjà présent n'est pas réinséré : la contrainte
@@ -68,7 +85,7 @@ export function useProducts() {
  */
 export async function ajouterProduit(
   fiche: FicheProduit,
-): Promise<{ ok: boolean; doublon?: Product; erreur?: string }> {
+): Promise<{ ok: boolean; doublon?: Product; reseau?: boolean; erreur?: string }> {
   const { data: existant } = await supabase
     .from('products')
     .select(CHAMPS)
@@ -115,7 +132,21 @@ export async function ajouterProduit(
     return { ok: false, erreur: 'Ce produit est déjà dans ton catalogue.' };
   }
 
-  // Toute autre cause (règle RLS, réseau, autre contrainte…) : un message
-  // humain à l'écran, jamais le texte brut renvoyé par Postgres.
-  return { ok: false, erreur: "Impossible d'ajouter ce produit pour le moment. Réessaie dans un instant." };
+  // Coupure réseau probable (voir `estErreurReseau`) : on laisse l'appelant
+  // mettre la fiche de côté pour la rejouer plus tard, elle a de bonnes
+  // chances de passer une fois le réseau revenu.
+  if (estErreurReseau(error)) {
+    return { ok: false, reseau: true };
+  }
+
+  // Échec confirmé côté serveur (règle RLS, contrainte, colonne…) : rejouer
+  // la même fiche produirait exactement la même erreur, indéfiniment. Plutôt
+  // qu'un compteur de tentatives, on abandonne dès ce premier échec non
+  // réseau et on informe tout de suite l'utilisateur — la fiche n'est pas
+  // mise en file, elle ne bloquera donc jamais les scans suivants.
+  return {
+    ok: false,
+    reseau: false,
+    erreur: "Impossible d'ajouter ce produit pour le moment. Réessaie dans un instant.",
+  };
 }

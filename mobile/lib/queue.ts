@@ -39,6 +39,20 @@ export function creerFile(stockage: Stockage) {
     async viderFile() {
       await stockage.removeItem(CLE);
     },
+    /**
+     * Remplace tout le contenu de la file par `fiches`, en une seule
+     * écriture. À utiliser à la place de `viderFile` suivi de plusieurs
+     * `enfiler` pour retirer les fiches envoyées avec succès : cette
+     * dernière séquence vide la file en mémoire persistée, y compris les
+     * fiches pas encore renvoyées, avant de les réinsérer une par une —
+     * si l'application est tuée entre les deux, tout ce qui n'a pas encore
+     * été ré-enfilé est perdu, alors que ces fiches n'ont jamais été
+     * envoyées avec succès. `remplacer` n'a qu'un seul `setItem` : il n'y a
+     * pas d'état intermédiaire où la file serait vide.
+     */
+    async remplacer(fiches: FicheProduit[]) {
+      await stockage.setItem(CLE, JSON.stringify(fiches));
+    },
     async taille() {
       return (await lire()).length;
     },
