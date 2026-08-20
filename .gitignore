@@ -63,3 +63,6 @@ htmlcov/
 # Local data
 data.db
 claude-brief-*.md
+
+# Suivi d'exécution des plans (scratch)
+.superpowers/
