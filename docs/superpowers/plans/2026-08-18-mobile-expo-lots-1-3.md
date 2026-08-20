@@ -237,163 +237,160 @@ possible et l'équivalence doit être mémorisée par son libellé."
 ### Task 2: Migration des données SQLite vers Supabase
 
 **Files:**
-- Create: `scripts/migrate_to_supabase.mjs`
+- Create: `scripts/generer_migration_donnees.mjs`
+- Create: `supabase/migrations/0004_donnees_initiales.sql` (produit par le script)
 - Create: `scripts/README.md`
 
 **Interfaces:**
 - Consomme : les tables créées en Task 1.
 - Produit : un catalogue peuplé — 65 produits, 10 catégories, 10 alias, 5 recettes, 26 ingrédients, 65 lignes d'achat.
 
-- [ ] **Step 1: Écrire le script de migration**
+**Note d'exécution :** le plan prévoyait initialement un script Node écrivant
+directement dans Supabase avec la clé `service_role`. Cette clé n'est
+accessible nulle part dans l'environnement, et la faire transiter serait
+contraire au principe « aucun secret stocké » du projet. L'approche retenue
+génère à la place un fichier SQL, appliqué par `apply_migration` : aucun
+secret, un artefact versionné et relisible, et les identifiants UUID fixés à
+la génération plutôt que tirés à l'exécution — ce qui rend la migration
+rejouable à l'identique.
 
-Créer `scripts/migrate_to_supabase.mjs` :
+- [ ] **Step 1: Écrire le générateur**
+
+Créer `scripts/generer_migration_donnees.mjs` :
 
 ```js
 /**
- * Migration unique de SQLite vers Supabase.
+ * Génère la migration SQL de reprise des données depuis SQLite.
  *
- * Lit backend/app.db et écrit dans Postgres. Idempotent par construction :
- * les identifiants SQLite (entiers) sont remplacés par des UUID générés, et
- * une table déjà peuplée fait échouer le script plutôt que de créer des
- * doublons silencieux.
+ * N'écrit rien en base : produit un fichier SQL, appliqué ensuite par
+ * apply_migration. Les UUID sont fixés ici, à la génération, de sorte que le
+ * fichier soit rejouable à l'identique et que les liens entre produits,
+ * recettes et ingrédients soient lisibles dans le SQL lui-même.
  *
- * Usage :
- *   SUPABASE_SERVICE_KEY=... node scripts/migrate_to_supabase.mjs <user_id>
+ * Usage : node scripts/generer_migration_donnees.mjs <user_id> > fichier.sql
  */
-import { createClient } from '@supabase/supabase-js';
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 
-const SUPABASE_URL = 'https://qmymwicsgilhoihtfdjm.supabase.co';
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const USER_ID = process.argv[2];
+if (!/^[0-9a-f-]{36}$/i.test(USER_ID ?? '')) {
+  throw new Error('Usage : node scripts/generer_migration_donnees.mjs <user_id>');
+}
 
-if (!SERVICE_KEY) throw new Error('SUPABASE_SERVICE_KEY manquante');
-if (!USER_ID) throw new Error('Usage : node scripts/migrate_to_supabase.mjs <user_id>');
-
-// La clé service contourne RLS : c'est voulu pour une migration, et c'est la
-// raison pour laquelle ce script ne doit jamais être exposé côté client.
 const db = new DatabaseSync('backend/app.db', { readOnly: true });
-const supa = createClient(SUPABASE_URL, SERVICE_KEY, {
-  auth: { persistSession: false },
-});
-
-/** Refuse de tourner sur une base déjà peuplée. */
-async function assertVide(table) {
-  const { count, error } = await supa.from(table).select('*', { count: 'exact', head: true });
-  if (error) throw new Error(`${table} : ${error.message}`);
-  if (count > 0) throw new Error(`${table} contient déjà ${count} ligne(s) — migration annulée`);
-}
-
-async function insere(table, rows) {
-  if (!rows.length) return 0;
-  const { error } = await supa.from(table).insert(rows);
-  if (error) throw new Error(`${table} : ${error.message}`);
-  return rows.length;
-}
-
 const lire = (sql) => db.prepare(sql).all();
 
-for (const t of ['products', 'categories', 'category_aliases', 'recipes',
-                 'recipe_ingredients', 'purchase_lines']) {
-  await assertVide(t);
+/** Échappe une valeur pour l'insérer littéralement dans du SQL. */
+function q(v) {
+  if (v === null || v === undefined || v === '') return 'null';
+  if (typeof v === 'number') return String(v);
+  if (typeof v === 'boolean') return v ? 'true' : 'false';
+  return `'${String(v).replace(/'/g, "''")}'`;
 }
 
-// --- Catégories et alias ---
-const categories = lire('select * from categories').map((c) => ({
-  user_id: USER_ID,
-  key: c.key,
-  label: c.label,
-  icon: c.icon ?? '',
-  display_order: c.display_order ?? 0,
-}));
+const lignes = [];
+const ecrire = (s) => lignes.push(s);
 
-const alias = lire('select * from category_aliases').map((a) => ({
-  user_id: USER_ID,
-  label_raw: a.label_raw,
-  key_canonical: a.key_canonical,
-}));
+ecrire('-- Reprise des données depuis SQLite (backend/app.db).');
+ecrire('-- Généré par scripts/generer_migration_donnees.mjs — ne pas éditer à la main.');
+ecrire(`-- Propriétaire : ${USER_ID}`);
+ecrire('');
 
-// --- Produits : l'id entier devient un UUID, la correspondance est conservée
-// pour rattacher ingrédients et lignes d'achat. ---
+// --- Catégories ---
+const categories = lire('select * from categories');
+for (const c of categories) {
+  ecrire(
+    `insert into public.categories (user_id, key, label, icon, display_order) values ` +
+    `(${q(USER_ID)}, ${q(c.key)}, ${q(c.label)}, ${q(c.icon ?? '')}, ${c.display_order ?? 0});`,
+  );
+}
+
+// --- Alias de catégories ---
+for (const a of lire('select * from category_aliases')) {
+  ecrire(
+    `insert into public.category_aliases (user_id, label_raw, key_canonical) values ` +
+    `(${q(USER_ID)}, ${q(a.label_raw)}, ${q(a.key_canonical)});`,
+  );
+}
+
+// --- Produits : l'id entier devient un UUID fixé ici ---
 const idProduit = new Map();
-const produits = lire('select * from products').map((p) => {
+for (const p of lire('select * from products')) {
   const id = randomUUID();
   idProduit.set(p.id, id);
-  return {
-    id,
-    user_id: USER_ID,
-    ean13: p.ean13 || null,
-    name: p.name,
-    brand: p.brand || null,
-    category: p.category || null,
-    default_quantity: p.default_quantity ?? 1,
-    unit: p.unit || 'piece',
-    favorite: Boolean(p.favorite),
-    notes: p.notes || null,
-    price_ttc: p.price_ttc ?? null,
-    image_url: p.image_url || null,
-    brand_type: p.brand_type || 'common',
-    store_brand_affinity: p.store_brand_affinity || null,
-    grammage_g: p.grammage_g ?? null,
-    volume_ml: p.volume_ml ?? null,
-    product_type: p.product_type || null,
-  };
-});
+  ecrire(
+    `insert into public.products (id, user_id, ean13, name, brand, category, ` +
+    `default_quantity, unit, favorite, notes, price_ttc, image_url, brand_type, ` +
+    `store_brand_affinity, grammage_g, volume_ml, product_type) values (` +
+    [
+      q(id), q(USER_ID), q(p.ean13), q(p.name), q(p.brand), q(p.category),
+      p.default_quantity ?? 1, q(p.unit || 'piece'), q(Boolean(p.favorite)),
+      q(p.notes), q(p.price_ttc), q(p.image_url), q(p.brand_type || 'common'),
+      q(p.store_brand_affinity), q(p.grammage_g), q(p.volume_ml), q(p.product_type),
+    ].join(', ') + ');',
+  );
+}
 
-// --- Recettes et ingrédients ---
+// --- Recettes ---
 const idRecette = new Map();
-const recettes = lire('select * from recipes').map((r) => {
+for (const r of lire('select * from recipes')) {
   const id = randomUUID();
   idRecette.set(r.id, id);
-  return {
-    id,
-    user_id: USER_ID,
-    name: r.name,
-    description: r.description || null,
-    servings_default: r.servings_default ?? 4,
-    category: r.category || null,
-    image_url: r.image_url || null,
-  };
-});
+  ecrire(
+    `insert into public.recipes (id, user_id, name, description, servings_default, ` +
+    `category, image_url) values (` +
+    [
+      q(id), q(USER_ID), q(r.name), q(r.description),
+      r.servings_default ?? 4, q(r.category), q(r.image_url),
+    ].join(', ') + ');',
+  );
+}
 
-const ingredients = lire('select * from recipe_ingredients').map((i) => ({
-  user_id: USER_ID,
-  recipe_id: idRecette.get(i.recipe_id),
-  product_id: i.product_id ? idProduit.get(i.product_id) ?? null : null,
-  name: i.name,
-  quantity_per_serving: i.quantity_per_serving ?? 0,
-  unit: i.unit || 'unité',
-  rayon: i.rayon || null,
-  category: i.category || null,
-  category_hint: i.category_hint || null,
-}));
+// --- Ingrédients : rattachés par les UUID générés ci-dessus ---
+let ingredientsIgnores = 0;
+for (const i of lire('select * from recipe_ingredients')) {
+  const recipeId = idRecette.get(i.recipe_id);
+  if (!recipeId) { ingredientsIgnores += 1; continue; }
+  ecrire(
+    `insert into public.recipe_ingredients (user_id, recipe_id, product_id, name, ` +
+    `quantity_per_serving, unit, rayon, category, category_hint) values (` +
+    [
+      q(USER_ID), q(recipeId),
+      q(i.product_id ? idProduit.get(i.product_id) ?? null : null),
+      q(i.name), i.quantity_per_serving ?? 0, q(i.unit || 'unité'),
+      q(i.rayon), q(i.category), q(i.category_hint),
+    ].join(', ') + ');',
+  );
+}
 
 // --- Lignes d'achat : drive_config_id devient le nom de l'enseigne ---
 const drives = new Map(lire('select id, name from drive_configs').map((d) => [d.id, d.name]));
-const achats = lire('select * from purchase_lines').map((l) => ({
-  user_id: USER_ID,
-  product_id: idProduit.get(l.product_id),
-  drive: drives.get(l.drive_config_id) ?? 'carrefour',
-  quantity_ordered: l.quantity_ordered ?? 0,
-  quantity_delivered: l.quantity_delivered ?? 0,
-  unit_price_ttc: l.unit_price_ttc ?? null,
-  total_ttc: l.total_ttc ?? null,
-  purchase_date: l.purchase_date || null,
-}));
-
-// L'ordre compte : les produits et recettes avant ce qui les référence.
-const bilan = {
-  categories: await insere('categories', categories),
-  category_aliases: await insere('category_aliases', alias),
-  products: await insere('products', produits),
-  recipes: await insere('recipes', recettes),
-  recipe_ingredients: await insere('recipe_ingredients', ingredients.filter((i) => i.recipe_id)),
-  purchase_lines: await insere('purchase_lines', achats.filter((l) => l.product_id)),
-};
+let achatsIgnores = 0;
+for (const l of lire('select * from purchase_lines')) {
+  const productId = idProduit.get(l.product_id);
+  if (!productId) { achatsIgnores += 1; continue; }
+  ecrire(
+    `insert into public.purchase_lines (user_id, product_id, drive, quantity_ordered, ` +
+    `quantity_delivered, unit_price_ttc, total_ttc, purchase_date) values (` +
+    [
+      q(USER_ID), q(productId), q(drives.get(l.drive_config_id) ?? 'carrefour'),
+      l.quantity_ordered ?? 0, l.quantity_delivered ?? 0,
+      q(l.unit_price_ttc), q(l.total_ttc), q(l.purchase_date),
+    ].join(', ') + ');',
+  );
+}
 
 db.close();
-console.table(bilan);
+
+// Les lignes orphelines partent sur stderr : elles ne doivent pas polluer le
+// SQL, mais elles ne doivent pas non plus disparaître en silence.
+if (ingredientsIgnores || achatsIgnores) {
+  console.error(
+    `Ignorés — ingrédients sans recette : ${ingredientsIgnores}, ` +
+    `lignes d'achat sans produit : ${achatsIgnores}`,
+  );
+}
+console.log(lignes.join('\n'));
 ```
 
 - [ ] **Step 2: Documenter le script**
@@ -403,35 +400,29 @@ Créer `scripts/README.md` :
 ```markdown
 # Scripts
 
-## migrate_to_supabase.mjs
+## generer_migration_donnees.mjs
 
-Migration unique de `backend/app.db` (SQLite) vers Supabase. À n'exécuter
-qu'une fois : le script refuse de tourner si une table cible contient déjà des
-lignes, pour éviter des doublons silencieux.
-
-```bash
-SUPABASE_SERVICE_KEY=<clé service_role> node scripts/migrate_to_supabase.mjs <user_id>
-```
-
-La clé `service_role` se trouve dans le tableau de bord Supabase, section
-API Keys. Elle contourne RLS — c'est ce qu'on veut pour une migration, et c'est
-pourquoi elle ne doit jamais être versionnée ni embarquée dans l'application.
-
-Le `user_id` est l'UUID du compte propriétaire des données, lisible dans
-Authentication > Users.
-```
-
-- [ ] **Step 3: Installer la dépendance**
+Génère la migration SQL de reprise des données depuis `backend/app.db`
+(SQLite). N'écrit rien en base : produit un fichier appliqué ensuite par
+`apply_migration`.
 
 ```bash
-npm install --no-save @supabase/supabase-js
+node scripts/generer_migration_donnees.mjs <user_id> \
+  > supabase/migrations/0004_donnees_initiales.sql
 ```
 
-Attendu : installation sans erreur. `node:sqlite` est natif depuis Node 22, aucune dépendance supplémentaire.
+Le `user_id` est l'UUID du compte propriétaire, lisible dans le tableau de
+bord Supabase, section Authentication > Users.
 
-- [ ] **Step 4: Récupérer l'identifiant du compte**
+Les UUID des produits et recettes sont fixés à la génération : le fichier est
+donc rejouable à l'identique, et les liens entre tables restent lisibles dans
+le SQL. Le regénérer produirait de nouveaux identifiants — ce qui créerait des
+doublons si la première migration a déjà été appliquée.
+```
 
-Via `execute_sql` :
+- [ ] **Step 3: Récupérer l'identifiant du compte**
+
+Via l'outil MCP `execute_sql` :
 
 ```sql
 select id, email from auth.users order by created_at limit 5;
@@ -439,20 +430,34 @@ select id, email from auth.users order by created_at limit 5;
 
 Noter l'UUID de `angelo.blot@gmail.com`.
 
-- [ ] **Step 5: Exécuter la migration**
+- [ ] **Step 4: Générer la migration**
 
 ```bash
-SUPABASE_SERVICE_KEY=<clé> node scripts/migrate_to_supabase.mjs <uuid>
+node scripts/generer_migration_donnees.mjs <uuid> \
+  > supabase/migrations/0004_donnees_initiales.sql
+wc -l supabase/migrations/0004_donnees_initiales.sql
 ```
 
-Attendu, un tableau :
+Attendu : 185 lignes d'insertion environ (10 + 10 + 65 + 5 + 26 + 65 = 181, plus l'en-tête). Aucun message sur stderr — toute ligne ignorée serait signalée.
 
-```
-categories: 10 · category_aliases: 10 · products: 65
-recipes: 5 · recipe_ingredients: 26 · purchase_lines: 65
+- [ ] **Step 5: Contrôler le SQL généré avant de l'appliquer**
+
+```bash
+head -6 supabase/migrations/0004_donnees_initiales.sql
+grep -c "^insert into public.products" supabase/migrations/0004_donnees_initiales.sql
+grep -c "^insert into public.recipe_ingredients" supabase/migrations/0004_donnees_initiales.sql
+grep -n "''" supabase/migrations/0004_donnees_initiales.sql | head -3
 ```
 
-- [ ] **Step 6: Vérifier les décomptes en base**
+Attendu : 65 produits, 26 ingrédients. Les apostrophes doublées sont normales — elles signalent que l'échappement fonctionne sur des noms comme « Classic'ade ».
+
+- [ ] **Step 6: Appliquer la migration**
+
+Avec l'outil MCP `apply_migration`, `project_id: qmymwicsgilhoihtfdjm`, `name: donnees_initiales`, et le contenu du fichier généré.
+
+Attendu : `{"success": true}`
+
+- [ ] **Step 7: Vérifier les décomptes en base**
 
 Via `execute_sql` :
 
@@ -466,27 +471,36 @@ union all select 'purchase_lines', count(*) from purchase_lines
 order by t;
 ```
 
-Attendu : 10, 10, 26, 65, 5, 65. Vérifier aussi qu'aucun ingrédient n'a perdu sa recette :
+Attendu : `category_aliases 10`, `categories 10`, `products 65`, `purchase_lines 65`, `recipe_ingredients 26`, `recipes 5`.
+
+Vérifier ensuite l'intégrité des liens :
 
 ```sql
-select count(*) from recipe_ingredients where recipe_id is null;
+select
+  (select count(*) from recipe_ingredients where recipe_id is null) as ingredients_orphelins,
+  (select count(*) from purchase_lines where product_id is null) as achats_orphelins,
+  (select count(*) from products where ean13 is not null) as produits_avec_ean,
+  (select count(distinct user_id) from products) as proprietaires;
 ```
 
-Attendu : `0`.
+Attendu : `0`, `0`, `65`, `1`. Le troisième décompte confirme que tous les produits ont conservé leur code-barres — c'est ce qui rend l'accès direct au panier Carrefour possible.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add scripts/
-git commit -m "feat: migration des données SQLite vers Supabase
+git add scripts/ supabase/migrations/0004_donnees_initiales.sql
+git commit -m "feat: reprise des données SQLite dans Supabase
 
-Script à usage unique. Les identifiants entiers deviennent des UUID, la
-correspondance étant conservée le temps de rattacher ingrédients et lignes
-d'achat. Le script refuse de tourner sur une table déjà peuplée plutôt que de
-créer des doublons silencieux.
+Le générateur produit un fichier SQL plutôt que d'écrire en base : aucune
+clé service_role à faire transiter, un artefact versionné et relisible, et
+des UUID fixés à la génération qui rendent la migration rejouable et les
+liens entre tables lisibles dans le SQL.
 
 drive_config_id est résolu en nom d'enseigne : la table drive_configs, qui
-stockait les identifiants de drive, n'est pas migrée."
+stockait les identifiants de drive, n'est pas reprise.
+
+Les lignes orphelines seraient signalées sur stderr plutôt qu'ignorées en
+silence ; il n'y en a aucune."
 ```
 
 ---
