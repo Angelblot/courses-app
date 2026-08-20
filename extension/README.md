@@ -81,7 +81,11 @@ de « Lardons fumés BIO » ni de « Lardons fumés allégés ». Trois garde-fo
    la recherche reste couvert : chercher « saumon fumé » ne peut pas retomber
    sur des lardons.
 2. **Aveu d'ambiguïté** — deux candidats indiscernables ne sont pas départagés
-   au hasard : la ligne est signalée, à toi de trancher.
+   au hasard. La ligne est signalée et les trois meilleurs résultats sont
+   listés, chacun avec un bouton **Choisir** : un clic revient sur la page de
+   recherche et ajoute exactement ce produit. C'est le cas courant quand tu
+   demandes une marque que ton rayon ne propose pas — mieux vaut choisir
+   soi-même qu'obtenir une autre marque sans le savoir.
 3. **URL de fiche** — la seule méthode sûre. Colle l'adresse du produit dans la
    liste : l'extension y va directement, sans passer par la recherche.
 

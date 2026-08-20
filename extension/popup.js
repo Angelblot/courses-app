@@ -119,7 +119,10 @@ function render(state) {
   $('resume').hidden = state.status !== 'paused';
 
   $('log').innerHTML = '';
-  for (const r of (state.results ?? []).slice(-30).reverse()) {
+  // L'index d'origine doit être conservé : le journal est affiché à l'envers
+  // et tronqué, mais la reprise d'un candidat vise la ligne réelle.
+  const entries = (state.results ?? []).map((r, index) => ({ r, index }));
+  for (const { r, index } of entries.slice(-30).reverse()) {
     const li = document.createElement('li');
     li.className = r.ok ? 'log__item log__item--ok' : 'log__item log__item--ko';
     const certain = r.ok && (r.via === 'direct_url' || r.via === 'ean_match');
@@ -142,8 +145,31 @@ function render(state) {
       const ul = document.createElement('ul');
       ul.className = 'log__candidates';
       for (const c of r.candidates) {
+        const label = c.label ?? c;
         const item = document.createElement('li');
-        item.textContent = c.label ?? c;
+
+        const texte = document.createElement('span');
+        texte.textContent = label;
+        item.appendChild(texte);
+
+        const bouton = document.createElement('button');
+        bouton.type = 'button';
+        bouton.className = 'log__choose';
+        bouton.textContent = 'Choisir';
+        // Pendant un remplissage, l'onglet est déjà piloté : deux actions
+        // simultanées se disputeraient la même page.
+        bouton.disabled = state.status === 'running';
+        bouton.addEventListener('click', async () => {
+          bouton.disabled = true;
+          bouton.textContent = 'Ajout…';
+          const res = await send({ type: 'choose', index, label });
+          if (!res?.ok) {
+            bouton.textContent = 'Échec';
+            bouton.title = res?.error ?? '';
+          }
+        });
+        item.appendChild(bouton);
+
         ul.appendChild(item);
       }
       li.appendChild(ul);

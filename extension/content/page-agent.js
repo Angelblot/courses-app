@@ -561,6 +561,26 @@ export function pageAgent(cfg, item, mode) {
       };
     }
 
+    // Choix explicite de l'utilisateur après une ambiguïté : on cible le
+    // libellé retenu et on n'évalue plus rien — il n'y a plus rien à décider.
+    if (item.exactLabel) {
+      const flatten = (t) => t.replace(/\s+/g, ' ').trim();
+      const wanted = flatten(item.exactLabel);
+      const target = cards
+        .map((card) => ({ card, label: textOf(queryFirst(card, cfg.title)) || textOf(card) }))
+        .find((c) => flatten(c.label) === wanted);
+
+      if (!target) {
+        return {
+          ok: false,
+          reason: 'candidate_gone',
+          message: `« ${item.exactLabel} » n'est plus dans les résultats`,
+        };
+      }
+      const added = await addToCart(target);
+      return added.ok ? { ...added, via: 'chosen' } : added;
+    }
+
     const { ranked, ignored } = rank(
       item.name,
       cards.slice(0, MAX_CANDIDATES).map((card) => {

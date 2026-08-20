@@ -160,7 +160,10 @@ async function attempt(tabId, cfg, item, baseOrigin) {
   await chrome.tabs.update(tabId, { url: searchUrl });
   await waitForTab(tabId);
   const found = await runAgent(tabId, cfg, item, 'run');
-  return directUrl && !found.ok ? { ...found, triedDirect: true } : found;
+  // searchUrl est conservée pour pouvoir revenir sur cette page et y choisir
+  // un candidat après coup, sans relancer toute la liste.
+  const enriched = { ...found, searchUrl };
+  return directUrl && !found.ok ? { ...enriched, triedDirect: true } : enriched;
 }
 
 /** Boucle principale : déroule la liste jusqu'au bout, une pause, ou un arrêt. */
@@ -207,6 +210,37 @@ async function processJob() {
     await setState({ results, cursor: index + 1 });
     await sleep(DELAY_BETWEEN_ITEMS_MS);
   }
+}
+
+/**
+ * Ajoute un candidat désigné par l'utilisateur après une ambiguïté.
+ *
+ * On revient sur la page de recherche d'origine et on cible le produit par son
+ * libellé exact, sans repasser par le classement : c'est un choix humain, il
+ * n'y a plus rien à évaluer.
+ *
+ * @param {number} index Rang de la ligne dans les résultats.
+ * @param {string} label Libellé du candidat retenu.
+ */
+async function chooseCandidate(index, label) {
+  const state = await getState();
+  if (!state) throw new Error('Aucune liste en cours');
+  if (state.status === 'running') throw new Error('Remplissage en cours, patiente');
+
+  const entry = state.results?.[index];
+  if (!entry?.searchUrl) throw new Error('Page de recherche inconnue pour cette ligne');
+
+  const cfg = SITES[state.site];
+  await chrome.tabs.update(state.tabId, { url: entry.searchUrl });
+  await waitForTab(state.tabId);
+
+  const item = { name: entry.item, quantity: entry.quantity, exactLabel: label };
+  const result = await runAgent(state.tabId, cfg, item, 'run');
+
+  const results = [...state.results];
+  results[index] = { ...entry, ...result, chosen: true, candidates: null };
+  await setState({ results });
+  return result;
 }
 
 /** Démarre un travail de remplissage. */
@@ -290,6 +324,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     resume: resumeJob,
     stop: stopJob,
     getState,
+    choose: () => chooseCandidate(msg.index, msg.label),
     diagnose: () => diagnose(msg.site),
   };
   const handler = handlers[msg.type];
