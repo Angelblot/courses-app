@@ -1,15 +1,22 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FicheScannee } from '../../components/FicheScannee';
 import { lookupEan, type FicheProduit, type ResultatRecherche } from '../../lib/openfoodfacts.ts';
 import { normalizeProductType } from '../../lib/typology.ts';
+import { creerFile } from '../../lib/queue.ts';
 import { ajouterProduit } from '../../stores/products';
 import { colors, radius, spacing } from '../../lib/theme';
 
 type Message = { texte: string; erreur: boolean };
+
+// Instance unique pour l'écran : la file s'appuie sur AsyncStorage, donc son
+// contenu survit d'un montage à l'autre — c'est justement ce qui permet de
+// rejouer les scans en attente quand l'utilisateur revient sur cet onglet.
+const file = creerFile(AsyncStorage);
 
 export default function Scan() {
   const [permission, demanderPermission] = useCameraPermissions();
@@ -48,7 +55,15 @@ export default function Scan() {
     [],
   );
 
-  /** Enregistre une fiche, quelle que soit son origine. */
+  /**
+   * Enregistre une fiche, quelle que soit son origine : une fiche trouvée
+   * sur Open Food Facts (`ajouter`) ou une saisie manuelle après un résultat
+   * `inconnu` ou `hors_ligne` (`ajouterManuel`). Les deux parcours passent
+   * par cette même fonction, donc la mise en file en cas d'échec les couvre
+   * tous les deux sans code dédié à la saisie manuelle : que le réseau ait
+   * manqué avant la recherche Open Food Facts ou seulement au moment de
+   * l'écriture en base, la fiche est mise de côté de la même façon.
+   */
   const enregistrer = useCallback(
     async (aEnregistrer: FicheProduit) => {
       const r = await ajouterProduit(aEnregistrer);
@@ -58,11 +73,35 @@ export default function Scan() {
       } else if (r.doublon) {
         setMessage({ texte: `Déjà dans ton catalogue : ${r.doublon.name}`, erreur: true });
       } else {
-        setMessage({ texte: r.erreur ?? 'Ajout impossible', erreur: true });
+        // Échec probablement réseau : on met de côté plutôt que de perdre
+        // le scan, au lieu d'afficher l'erreur générique de `ajouterProduit`.
+        await file.enfiler(aEnregistrer);
+        setMessage({ texte: 'Hors connexion — ajouté dès le retour du réseau', erreur: false });
+        setTimeout(reprendre, 1600);
       }
     },
     [reprendre],
   );
+
+  // Vide la file au retour sur l'écran : les scans mis de côté rejoignent
+  // le catalogue sans que l'utilisateur ait à y penser. Ne se relance pas à
+  // chaque scan (tableau de dépendances vide) : seul le montage de l'écran
+  // — donc un retour dessus depuis un autre onglet — déclenche la reprise.
+  useEffect(() => {
+    (async () => {
+      const enAttente = await file.defiler();
+      if (!enAttente.length) return;
+      const restants: FicheProduit[] = [];
+      for (const f of enAttente) {
+        const r = await ajouterProduit(f);
+        if (!r.ok && !r.doublon) restants.push(f);
+      }
+      // On vide puis on ré-enfile seulement les échecs : les succès (et les
+      // doublons, déjà présents en base) ne doivent pas revenir dans la file.
+      await file.viderFile();
+      for (const f of restants) await file.enfiler(f);
+    })();
+  }, []);
 
   const ajouter = useCallback(() => {
     if (resultat?.etat === 'trouve') enregistrer(resultat.fiche);
