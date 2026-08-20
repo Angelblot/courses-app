@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { colors } from '../lib/theme';
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
@@ -27,7 +29,15 @@ export default function RootLayout() {
     if (session && surLogin) router.replace('/');
   }, [pret, session, segments, router]);
 
-  if (!pret) return null;
+  // Jamais d'écran muet : tant que la session stockée n'a pas été relue,
+  // on affiche un indicateur plutôt qu'un écran blanc sans explication.
+  if (!pret) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
+        <ActivityIndicator color={colors.accent} />
+      </View>
+    );
+  }
 
   return <Stack screenOptions={{ headerShown: false }} />;
 }

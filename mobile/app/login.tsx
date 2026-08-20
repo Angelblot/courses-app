@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator, KeyboardAvoidingView, Platform, Pressable,
   StyleSheet, Text, TextInput, View,
@@ -11,22 +11,44 @@ const MESSAGES: Record<string, string> = {
   'Email not confirmed': 'Confirme ton adresse via le lien reçu par e-mail.',
 };
 
+// Message générique pour toute erreur imprévue (réseau coupé, délai dépassé,
+// erreur non normalisée par supabase-js) : on ne montre jamais de trace
+// technique brute à l'utilisateur.
+const ERREUR_GENERIQUE = 'Connexion impossible pour le moment. Réessaie dans un instant.';
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [motDePasse, setMotDePasse] = useState('');
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  // Garde par ref plutôt que par le seul état `enCours` : deux appuis très
+  // rapprochés peuvent tous deux lire `enCours === false` avant le premier
+  // rendu, une ref est mise à jour de façon synchrone et évite ce cas.
+  const enCoursRef = useRef(false);
 
   const connecter = async () => {
-    if (enCours) return;
+    if (enCoursRef.current) return;
+    enCoursRef.current = true;
     setEnCours(true);
     setErreur(null);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: motDePasse,
-    });
-    if (error) setErreur(MESSAGES[error.message] ?? error.message);
-    setEnCours(false);
+    try {
+      // signInWithPassword est supposé toujours résoudre avec { error } sans
+      // jamais rejeter, mais ce n'est pas garanti (coupure réseau, délai
+      // dépassé, erreur non normalisée par supabase-js) : sans ce try/catch,
+      // une exception laisserait `enCours` bloqué à `true` indéfiniment,
+      // avec un bouton figé en chargement et aucun moyen de relancer avant
+      // remontage de l'écran.
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: motDePasse,
+      });
+      if (error) setErreur(MESSAGES[error.message] ?? error.message);
+    } catch {
+      setErreur(ERREUR_GENERIQUE);
+    } finally {
+      enCoursRef.current = false;
+      setEnCours(false);
+    }
   };
 
   return (
