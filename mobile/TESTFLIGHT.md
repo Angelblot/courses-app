@@ -1,5 +1,9 @@
 # Publier sur TestFlight
 
+Toutes les commandes de ce document partent du dossier `mobile/` du projet.
+Si tu ouvres un terminal neuf, il démarre dans ton dossier personnel : les
+chemins sont donc donnés en entier, pour pouvoir être copiés tels quels.
+
 Le projet est prêt : `expo-doctor` passe ses 21 contrôles, l'icône et
 l'identifiant de bundle sont en place, `eas.json` définit les profils.
 
@@ -10,7 +14,7 @@ n'a à les saisir.
 ## 1. Se connecter à Expo
 
 ```bash
-cd mobile && npx eas-cli login
+cd /Users/angel-assistant/app-saas/courses-app/mobile && npx eas-cli login
 ```
 
 Crée un compte sur expo.dev si tu n'en as pas. Le niveau gratuit suffit pour
@@ -20,7 +24,7 @@ peut durer un moment aux heures chargées.
 ## 2. Compiler et envoyer
 
 ```bash
-cd mobile && npx eas-cli build --platform ios --profile production
+cd /Users/angel-assistant/app-saas/courses-app/mobile && npx eas-cli build --platform ios --profile production
 ```
 
 EAS demande alors tes identifiants Apple et génère lui-même le certificat de
@@ -31,7 +35,7 @@ Expo, pas dans le dépôt.
 La compilation dure une quinzaine de minutes. Ensuite :
 
 ```bash
-npx eas-cli submit --platform ios --latest
+cd /Users/angel-assistant/app-saas/courses-app/mobile && npx eas-cli submit --platform ios --latest
 ```
 
 L'application apparaît dans App Store Connect au bout de quelques minutes de
@@ -59,10 +63,18 @@ difficile à modifier une fois l'application déposée.
 n'est pas versionné, donc la compilation dans le nuage ne le verra pas.
 Déclare-les avant la première compilation :
 
+Une commande par variable, après s'être connecté :
+
 ```bash
-npx eas-cli env:create --name EXPO_PUBLIC_SUPABASE_URL --value https://qmymwicsgilhoihtfdjm.supabase.co --environment production --visibility plaintext
-npx eas-cli env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value sb_publishable_PueJWmalqhZO0ctPu95GKQ_EaAgVulr --environment production --visibility plaintext
+cd /Users/angel-assistant/app-saas/courses-app/mobile && npx eas-cli env:create --name EXPO_PUBLIC_SUPABASE_URL --value https://qmymwicsgilhoihtfdjm.supabase.co --environment production --visibility plaintext
 ```
+
+```bash
+cd /Users/angel-assistant/app-saas/courses-app/mobile && npx eas-cli env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value sb_publishable_PueJWmalqhZO0ctPu95GKQ_EaAgVulr --environment production --visibility plaintext
+```
+
+Ces commandes exigent d'être déjà connecté (étape 1) : sans session, elles
+échouent sans rien créer.
 
 Ces deux valeurs sont publiques par conception — elles partent de toute façon
 dans le paquet iOS, et le cloisonnement repose sur RLS, pas sur leur secret.
