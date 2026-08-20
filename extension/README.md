@@ -74,6 +74,12 @@ de « Lardons fumés BIO » ni de « Lardons fumés allégés ». Trois garde-fo
 
 1. **Départage automatique** — à score égal, le produit ayant le moins de mots
    superflus l'emporte. Demander « lardons fumés bio » sélectionne bien le bio.
+   Les grammages sont normalisés : « 500g » et « 500 g » se rejoignent.
+   Un terme qu'aucun résultat ne porte — une marque que le rayon ne référence
+   pas — est écarté plutôt que de condamner la liste ; le journal l'indique
+   alors par « sans « herta » ». Cet écart n'est toléré que si l'essentiel de
+   la recherche reste couvert : chercher « saumon fumé » ne peut pas retomber
+   sur des lardons.
 2. **Aveu d'ambiguïté** — deux candidats indiscernables ne sont pas départagés
    au hasard : la ligne est signalée, à toi de trancher.
 3. **URL de fiche** — la seule méthode sûre. Colle l'adresse du produit dans la

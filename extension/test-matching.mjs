@@ -37,8 +37,10 @@ function normalize(s) {
   return (s || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/(\d)([a-z])/g, '$1 $2')
+    .replace(/([a-z])(\d)/g, '$1 $2')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -178,6 +180,7 @@ check('un nombre à 13 chiffres dans le nom ne devient pas un EAN',
 // --- Départage des quasi-homonymes ---
 
 const AMBIGUITY_MARGIN = 0.05;
+const MIN_USABLE_RATIO = 0.5;
 
 function extraTokens(wanted, candidate) {
   const w = new Set(normalize(wanted).split(' ').filter(Boolean));
@@ -187,17 +190,28 @@ function extraTokens(wanted, candidate) {
 }
 
 function rank(wanted, labels) {
-  return labels
-    .map((label) => ({ label, score: score(wanted, label), extra: extraTokens(wanted, label) }))
+  const tokens = normalize(wanted).split(' ').filter((t) => t && !STOP_WORDS.has(t));
+  const corpus = labels.map((l) => normalize(l)).join(' ');
+  const matched = tokens.filter((t) => corpus.includes(t));
+  const missing = tokens.filter((t) => !corpus.includes(t));
+  const weight = (list) => list.reduce((sum, t) => sum + t.length, 0);
+  const total = weight(tokens);
+  const keep = total > 0 && weight(matched) / total >= MIN_USABLE_RATIO;
+  const effective = keep && matched.length ? matched.join(' ') : wanted;
+  const ignored = keep ? missing : [];
+
+  const ranked = labels
+    .map((label) => ({ label, score: score(effective, label), extra: extraTokens(effective, label) }))
     .sort((a, b) => b.score - a.score || a.extra - b.extra || a.label.length - b.label.length);
+  return { ranked, ignored };
 }
 
 /** Reproduit la décision de l'agent : meilleur, seuil, puis test d'ambiguïté. */
 function decide(wanted, labels) {
-  const r = rank(wanted, labels);
-  const best = r[0];
+  const { ranked, ignored } = rank(wanted, labels);
+  const best = ranked[0];
   if (!best || best.score < MATCH_THRESHOLD) return { verdict: 'no_match' };
-  const second = r[1];
+  const second = ranked[1];
   if (
     second &&
     second.score >= MATCH_THRESHOLD &&
@@ -206,7 +220,9 @@ function decide(wanted, labels) {
   ) {
     return { verdict: 'ambiguous' };
   }
-  return { verdict: 'added', label: best.label };
+  return ignored.length
+    ? { verdict: 'added', label: best.label, ignored }
+    : { verdict: 'added', label: best.label };
 }
 
 const VARIANTES = [
@@ -360,6 +376,50 @@ checkTrue(
   !new RegExp(SITES.leclerc.productUrlPattern).test(
     'https://fd3-courses.leclercdrive.fr/magasin-093401-093401-Le-Cres-Montpellier/recherche.aspx?TexteRecherche=lardons'
   )
+);
+
+// --- Marque absente du rayon, et grammages ---
+// Cas réel signalé à l'usage : il fallait le nom exact. Une marque que le
+// drive ne référence pas condamnait toute la liste, alors que le moteur du
+// site avait déjà filtré.
+
+check(
+  "une marque absente du rayon est écartée, pas bloquante",
+  decide('Lardons fumés Herta', LARDONS),
+  { verdict: 'added', label: LARDONS[2], ignored: ['herta'] }
+);
+
+check(
+  'sans terme écarté, rien n\'est signalé',
+  decide('Lardons fumés', LARDONS),
+  { verdict: 'added', label: LARDONS[2] }
+);
+
+checkTrue(
+  '« 500g » et « 500 g » désignent le même grammage',
+  score('Spaghetti 500g', 'Spaghetti Barilla 500 g') === 1,
+  `score = ${score('Spaghetti 500g', 'Spaghetti Barilla 500 g').toFixed(2)}`
+);
+
+check(
+  'le grammage collé au chiffre reste discriminant',
+  decide('Lardons fumés 2x200g', LARDONS),
+  { verdict: 'added', label: LARDONS[3] }
+);
+
+checkTrue(
+  'une recherche sans rapport reste rejetée : on ne peut pas écarter le produit lui-même',
+  decide('Saumon fumé Labeyrie', LARDONS).verdict === 'no_match',
+  JSON.stringify(decide('Saumon fumé Labeyrie', LARDONS))
+);
+checkTrue(
+  'écarter un seul qualificatif reste permis',
+  decide('Lardons fumés Tradilège bio', LARDONS).verdict === 'added'
+);
+checkTrue(
+  'un produit absent du rayon ne se rabat pas sur un voisin',
+  decide('Jambon blanc Herta', LARDONS).verdict === 'no_match',
+  JSON.stringify(decide('Jambon blanc Herta', LARDONS))
 );
 
 // --- Verdict ---

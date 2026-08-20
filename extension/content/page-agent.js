@@ -135,6 +135,11 @@ export function pageAgent(cfg, item, mode) {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '') // accents
       .replace(/[^a-z0-9\s]/g, ' ')
+      // Sépare chiffres et lettres : « 500g » et « 500 g » désignent le même
+      // grammage, mais donnaient deux mots différents et faisaient échouer la
+      // correspondance sur un simple détail de typographie.
+      .replace(/(\d)([a-z])/g, '$1 $2')
+      .replace(/([a-z])(\d)/g, '$1 $2')
       .replace(/\s+/g, ' ')
       .trim();
   }
@@ -172,6 +177,13 @@ export function pageAgent(cfg, item, mode) {
   const AMBIGUITY_MARGIN = 0.05;
 
   /**
+   * Part minimale de la recherche devant se retrouver dans les résultats pour
+   * qu'on accepte d'en écarter le reste. En deçà, ce qu'on écarterait n'est
+   * plus un qualificatif mais le produit lui-même.
+   */
+  const MIN_USABLE_RATIO = 0.5;
+
+  /**
    * Mots du candidat absents de la recherche, hors bruit.
    *
    * « Lardons fumés » obtient 1,0 face à « Lardons fumés », « Lardons fumés
@@ -190,18 +202,46 @@ export function pageAgent(cfg, item, mode) {
   /**
    * Classe les candidats : score décroissant, puis le moins de mots superflus,
    * puis le libellé le plus court.
+   *
+   * Les termes qu'aucun résultat ne porte sont retirés de la recherche. Une
+   * marque absente du rayon — « Lardons fumés Herta » dans un drive qui ne
+   * vend que du Tradilège — condamnait sinon toute la liste, alors que le
+   * moteur du site avait déjà fait le tri. Ces termes écartés sont signalés :
+   * le produit retenu est alors approchant, et l'utilisateur doit le savoir.
+   *
+   * @returns {{ranked: Array, ignored: string[]}}
    */
   function rank(wanted, candidates) {
-    return candidates
+    const tokens = normalize(wanted)
+      .split(' ')
+      .filter((t) => t && !STOP_WORDS.has(t));
+    const corpus = candidates.map((c) => normalize(c.label)).join(' ');
+    const matched = tokens.filter((t) => corpus.includes(t));
+    const missing = tokens.filter((t) => !corpus.includes(t));
+
+    // Écarter des termes n'est légitime que s'il en reste l'essentiel.
+    // « Saumon fumé Labeyrie » face à des lardons ne laisserait que « fumé » :
+    // on retiendrait des lardons pour du saumon. La recherche est alors
+    // conservée intacte, le score reste bas et le seuil la rejette.
+    const weight = (list) => list.reduce((sum, t) => sum + t.length, 0);
+    const total = weight(tokens);
+    const keep = total > 0 && weight(matched) / total >= MIN_USABLE_RATIO;
+
+    const effective = keep && matched.length ? matched.join(' ') : wanted;
+    const ignored = keep ? missing : [];
+
+    const ranked = candidates
       .map((c) => ({
         ...c,
-        score: score(wanted, c.label),
-        extra: extraTokens(wanted, c.label),
+        score: score(effective, c.label),
+        extra: extraTokens(effective, c.label),
       }))
       .sort(
         (a, b) =>
           b.score - a.score || a.extra - b.extra || a.label.length - b.label.length
       );
+
+    return { ranked, ignored };
   }
 
   /**
@@ -519,7 +559,7 @@ export function pageAgent(cfg, item, mode) {
       };
     }
 
-    const ranked = rank(
+    const { ranked, ignored } = rank(
       item.name,
       cards.slice(0, 12).map((card) => {
         // Les ancres internes (« # », « #plus ») ne désignent aucun produit :
@@ -555,6 +595,7 @@ export function pageAgent(cfg, item, mode) {
         message: `Aucun résultat convaincant pour « ${item.name} »`,
         bestLabel: best?.label ?? null,
         bestScore: best?.score ?? 0,
+        ignored,
       };
     }
 
@@ -575,9 +616,13 @@ export function pageAgent(cfg, item, mode) {
         candidates: ranked
           .slice(0, 3)
           .map((c) => ({ label: c.label.slice(0, 70), score: Number(c.score.toFixed(2)) })),
+        ignored,
       };
     }
 
-    return addToCart(best);
+    const added = await addToCart(best);
+    // Des termes écartés signifient un produit approchant, pas exact : c'est à
+    // signaler, sans quoi l'utilisateur croirait avoir eu ce qu'il demandait.
+    return added.ok && ignored.length ? { ...added, ignored, approximate: true } : added;
   })();
 }

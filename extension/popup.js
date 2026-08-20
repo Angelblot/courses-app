@@ -126,7 +126,15 @@ function render(state) {
     const detail = r.ok
       ? r.label || ''
       : r.message || REASON_LABEL[r.reason] || r.reason || '';
-    li.textContent = `${r.item} — ${detail}${certain ? ' (par code-barres)' : ''}`;
+    // Un produit approchant doit se voir : sinon on croit avoir eu ce qu'on
+    // demandait alors qu'un terme a été écarté du rayon.
+    const nuance = certain
+      ? ' (par code-barres)'
+      : r.ignored?.length
+        ? ` (sans « ${r.ignored.join(' ')} »)`
+        : '';
+    li.textContent = `${r.item} — ${detail}${nuance}`;
+    if (r.approximate) li.classList.add('log__item--approx');
     $('log').appendChild(li);
   }
 }

@@ -78,3 +78,4 @@ select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-col
   word-break: break-word;
 }
 .hint--inline { display: block; margin-top: 2px; font-size: 11px; color: var(--accent); }
+.log__item--approx { border-left-color: #B8860B; }
