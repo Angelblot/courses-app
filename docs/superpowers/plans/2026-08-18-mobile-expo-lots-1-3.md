@@ -1554,7 +1554,13 @@ complète à la main."
 - Modify: `mobile/stores/products.ts`
 
 **Interfaces:**
-- Consomme : `lookupEan`, `FicheProduit` (Task 6), `useProducts` (Task 5).
+- Consomme : `lookupEan`, `FicheProduit`, `ResultatRecherche` (Task 6), `useProducts` (Task 5).
+- **Contrat de `lookupEan`, modifié en Task 6 :** il ne renvoie plus
+  `FicheProduit | null` mais une union discriminée
+  `{ etat: 'trouve'; fiche } | { etat: 'inconnu' } | { etat: 'hors_ligne' }`.
+  La relecture avait relevé qu'un `null` unique rendait indiscernables un
+  produit absent d'Open Food Facts et une panne réseau — or le premier appelle
+  un formulaire de saisie, le second une mise en file d'attente.
 - Produit : `ajouterProduit(fiche: FicheProduit): Promise<{ ok: boolean; doublon?: Product; erreur?: string }>`.
 
 - [ ] **Step 1: Installer les dépendances natives**
@@ -1583,7 +1589,7 @@ Le texte est visible par l'utilisateur au moment de la demande : il doit dire po
 Ajouter à la fin de `mobile/stores/products.ts` :
 
 ```ts
-import type { FicheProduit } from '../lib/openfoodfacts';
+import type { ResultatRecherche } from '../lib/openfoodfacts.ts';
 
 /**
  * Ajoute un produit scanné au catalogue.
@@ -1628,11 +1634,11 @@ import { useState } from 'react';
 import {
   ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import type { FicheProduit } from '../lib/openfoodfacts';
+import type { ResultatRecherche } from '../lib/openfoodfacts.ts';
 import { colors, radius, spacing } from '../lib/theme';
 
 type Props = {
-  fiche: FicheProduit | null;
+  resultat: ResultatRecherche | null;
   ean: string;
   chargement: boolean;
   message: string | null;
@@ -1643,10 +1649,16 @@ type Props = {
 };
 
 export function FicheScannee({
-  fiche, ean, chargement, message, onAjouter, onAjouterManuel, onIgnorer,
+  resultat, ean, chargement, message, onAjouter, onAjouterManuel, onIgnorer,
 }: Props) {
   const [nom, setNom] = useState('');
   const [marque, setMarque] = useState('');
+
+  // Trois issues distinctes, trois écrans distincts : une fiche trouvée, un
+  // produit qu'Open Food Facts ignore, et un réseau absent. Les confondre
+  // priverait l'utilisateur de la bonne action à faire.
+  const fiche = resultat?.etat === 'trouve' ? resultat.fiche : null;
+  const horsLigne = resultat?.etat === 'hors_ligne';
   const contenance = fiche?.grammageG
     ? `${fiche.grammageG} g`
     : fiche?.volumeMl
@@ -1687,10 +1699,17 @@ export function FicheScannee({
         </>
       ) : (
         <>
-          <Text style={s.nom}>Produit inconnu</Text>
+          {/* Produit inconnu et réseau absent appellent la même action — une
+              saisie manuelle — mais pas la même explication : dans un cas le
+              produit n'existe pas au catalogue Open Food Facts, dans l'autre
+              on n'a pas pu le lui demander. */}
+          <Text style={s.nom}>
+            {horsLigne ? 'Réseau indisponible' : 'Produit inconnu'}
+          </Text>
           <Text style={s.detail}>
-            Open Food Facts ne connaît pas le code {ean}. Ajoute-le à la main : il
-            entrera quand même dans ton catalogue.
+            {horsLigne
+              ? `Impossible de joindre Open Food Facts pour le code ${ean}. Ajoute le produit à la main, il entrera quand même dans ton catalogue.`
+              : `Open Food Facts ne connaît pas le code ${ean}. Ajoute-le à la main : il entrera quand même dans ton catalogue.`}
           </Text>
 
           <Text style={s.label}>Nom du produit</Text>
@@ -1773,21 +1792,21 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FicheScannee } from '../../components/FicheScannee';
-import { lookupEan, type FicheProduit } from '../../lib/openfoodfacts';
-import { normalizeProductType } from '../../lib/typology';
+import { lookupEan, type FicheProduit, type ResultatRecherche } from '../../lib/openfoodfacts.ts';
+import { normalizeProductType } from '../../lib/typology.ts';
 import { ajouterProduit } from '../../stores/products';
 import { colors, radius, spacing } from '../../lib/theme';
 
 export default function Scan() {
   const [permission, demanderPermission] = useCameraPermissions();
   const [ean, setEan] = useState<string | null>(null);
-  const [fiche, setFiche] = useState<FicheProduit | null>(null);
+  const [resultat, setResultat] = useState<ResultatRecherche | null>(null);
   const [chargement, setChargement] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const reprendre = useCallback(() => {
     setEan(null);
-    setFiche(null);
+    setResultat(null);
     setMessage(null);
   }, []);
 
@@ -1799,7 +1818,7 @@ export default function Scan() {
       setEan(data);
       setChargement(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setFiche(await lookupEan(data));
+      setResultat(await lookupEan(data));
       setChargement(false);
     },
     [ean, chargement],
@@ -1822,8 +1841,8 @@ export default function Scan() {
   );
 
   const ajouter = useCallback(() => {
-    if (fiche) enregistrer(fiche);
-  }, [fiche, enregistrer]);
+    if (resultat?.etat === 'trouve') enregistrer(resultat.fiche);
+  }, [resultat, enregistrer]);
 
   /** Produit absent d'Open Food Facts : on compose la fiche depuis la saisie. */
   const ajouterManuel = useCallback(
@@ -1872,7 +1891,7 @@ export default function Scan() {
 
       {ean && (
         <FicheScannee
-          fiche={fiche}
+          resultat={resultat}
           ean={ean}
           chargement={chargement}
           message={message}
