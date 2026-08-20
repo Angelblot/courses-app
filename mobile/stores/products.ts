@@ -86,8 +86,36 @@ export async function ajouterProduit(
     volume_ml: fiche.volumeMl,
     product_type: fiche.productType,
     favorite: true, // un produit qu'on scanne chez soi est un produit qu'on aime
-    unit: fiche.volumeMl ? 'l' : 'piece',
+    // Les 65 produits existants du catalogue utilisent tous unit = 'unité',
+    // y compris les liquides (vin 750 ml, bière 200 ml) : la contenance vit
+    // dans grammage_g / volume_ml, pas dans l'unité. Déduire 'l' de volumeMl
+    // casse cette convention et fausse le wizard : unitConverter.js normalise
+    // 'l' vers le même seau que 'ml', donc une brique de lait scannée
+    // (volume_ml: 1000, unit: 'l') pour une recette demandant 500 ml
+    // emprunterait le cas « même unité normalisée » et renverrait 500 comme
+    // quantité à acheter, au lieu de diviser par volume_ml pour trouver
+    // « 1 brique ».
+    unit: 'unité',
   });
 
-  return error ? { ok: false, erreur: error.message } : { ok: true };
+  if (!error) return { ok: true };
+
+  // Contrainte unique (user_id, ean13) : la vérification préalable n'est pas
+  // atomique, deux scans rapprochés du même code-barres peuvent tous deux la
+  // passer avant que l'un des deux insère. Le second échoue alors ici — c'est
+  // fonctionnellement le même doublon que celui détecté plus haut, pas une
+  // erreur à annoncer différemment.
+  if (error.code === '23505') {
+    const { data: doublon } = await supabase
+      .from('products')
+      .select(CHAMPS)
+      .eq('ean13', fiche.ean13)
+      .maybeSingle();
+    if (doublon) return { ok: false, doublon: doublon as Product };
+    return { ok: false, erreur: 'Ce produit est déjà dans ton catalogue.' };
+  }
+
+  // Toute autre cause (règle RLS, réseau, autre contrainte…) : un message
+  // humain à l'écran, jamais le texte brut renvoyé par Postgres.
+  return { ok: false, erreur: "Impossible d'ajouter ce produit pour le moment. Réessaie dans un instant." };
 }

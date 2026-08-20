@@ -9,6 +9,9 @@ export const colors = {
   accentSoft: '#E6EFE9',
   accentContrast: '#FFFFFF',
   danger: '#B3261E',
+  // Voile sombre posé sur l'image caméra pour garder un texte de consigne
+  // lisible, quelle que soit la scène filmée en dessous.
+  voileCamera: 'rgba(0,0,0,0.45)',
 } as const;
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;

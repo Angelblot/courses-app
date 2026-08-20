@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -9,14 +9,27 @@ import { normalizeProductType } from '../../lib/typology.ts';
 import { ajouterProduit } from '../../stores/products';
 import { colors, radius, spacing } from '../../lib/theme';
 
+type Message = { texte: string; erreur: boolean };
+
 export default function Scan() {
   const [permission, demanderPermission] = useCameraPermissions();
   const [ean, setEan] = useState<string | null>(null);
   const [resultat, setResultat] = useState<ResultatRecherche | null>(null);
   const [chargement, setChargement] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<Message | null>(null);
+  // Verrou lu et écrit de façon synchrone. `ean` et `chargement` ne suffisent
+  // pas : ils sont capturés dans la fermeture de `surLecture` au moment du
+  // rendu, et `onBarcodeScanned={ean ? undefined : surLecture}` ne coupe la
+  // caméra côté natif qu'après que l'état soit commité et propagé — un
+  // cycle plus tard. Entre le premier appel et ce cycle, plusieurs lectures
+  // peuvent arriver avec la même fermeture périmée, passer le garde d'état,
+  // et déclencher chacune leur requête Open Food Facts et leur vibration.
+  // Une ref est mise à jour immédiatement, avant tout `await`, donc la
+  // deuxième lecture la voit déjà posée.
+  const verrouille = useRef(false);
 
   const reprendre = useCallback(() => {
+    verrouille.current = false;
     setEan(null);
     setResultat(null);
     setMessage(null);
@@ -24,16 +37,15 @@ export default function Scan() {
 
   const surLecture = useCallback(
     async ({ data }: { data: string }) => {
-      // La caméra émet en continu : sans ce garde, un même code déclencherait
-      // des dizaines de requêtes pendant qu'on le tient devant l'objectif.
-      if (ean || chargement) return;
+      if (verrouille.current) return;
+      verrouille.current = true;
       setEan(data);
       setChargement(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setResultat(await lookupEan(data));
       setChargement(false);
     },
-    [ean, chargement],
+    [],
   );
 
   /** Enregistre une fiche, quelle que soit son origine. */
@@ -41,12 +53,12 @@ export default function Scan() {
     async (aEnregistrer: FicheProduit) => {
       const r = await ajouterProduit(aEnregistrer);
       if (r.ok) {
-        setMessage('Ajouté à tes favoris');
+        setMessage({ texte: 'Ajouté à tes favoris', erreur: false });
         setTimeout(reprendre, 1200);
       } else if (r.doublon) {
-        setMessage(`Déjà dans ton catalogue : ${r.doublon.name}`);
+        setMessage({ texte: `Déjà dans ton catalogue : ${r.doublon.name}`, erreur: true });
       } else {
-        setMessage(r.erreur ?? 'Ajout impossible');
+        setMessage({ texte: r.erreur ?? 'Ajout impossible', erreur: true });
       }
     },
     [reprendre],
@@ -129,7 +141,7 @@ const s = StyleSheet.create({
   consigne: { alignItems: 'center', paddingTop: spacing.xl },
   consigneTexte: {
     color: colors.accentContrast, fontSize: 15, fontWeight: '600',
-    backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: spacing.lg,
+    backgroundColor: colors.voileCamera, paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm, borderRadius: radius.pill, overflow: 'hidden',
   },
 });

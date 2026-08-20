@@ -5,11 +5,13 @@ import {
 import type { ResultatRecherche } from '../lib/openfoodfacts.ts';
 import { colors, radius, spacing } from '../lib/theme';
 
+type Message = { texte: string; erreur: boolean };
+
 type Props = {
   resultat: ResultatRecherche | null;
   ean: string;
   chargement: boolean;
-  message: string | null;
+  message: Message | null;
   onAjouter: () => void;
   /** Saisie manuelle, quand Open Food Facts ne connaît pas le code. */
   onAjouterManuel: (nom: string, marque: string) => void;
@@ -54,7 +56,11 @@ export function FicheScannee({
             </View>
           </View>
 
-          {message && <Text style={s.message}>{message}</Text>}
+          {message && (
+            <Text style={[s.message, message.erreur && s.messageErreur]}>
+              {message.texte}
+            </Text>
+          )}
 
           <View style={s.actions}>
             <Pressable style={[s.bouton, s.secondaire]} onPress={onIgnorer}>
@@ -99,7 +105,11 @@ export function FicheScannee({
             placeholderTextColor={colors.textMuted}
           />
 
-          {message && <Text style={s.message}>{message}</Text>}
+          {message && (
+            <Text style={[s.message, message.erreur && s.messageErreur]}>
+              {message.texte}
+            </Text>
+          )}
 
           <View style={s.actions}>
             <Pressable style={[s.bouton, s.secondaire]} onPress={onIgnorer}>
@@ -134,6 +144,9 @@ const s = StyleSheet.create({
   nom: { fontSize: 17, fontWeight: '700', color: colors.text },
   detail: { fontSize: 14, color: colors.textMuted },
   message: { fontSize: 13, color: colors.accent, fontWeight: '600' },
+  // Un doublon ou un échec d'ajout ne doit jamais se lire comme un succès :
+  // même style que `message`, mais dans le ton d'alerte du thème.
+  messageErreur: { color: colors.danger },
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   bouton: { flex: 1, padding: spacing.lg, borderRadius: radius.md, alignItems: 'center' },
   principal: { backgroundColor: colors.accent },
