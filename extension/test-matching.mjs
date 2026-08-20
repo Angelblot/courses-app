@@ -279,6 +279,38 @@ check(
   null
 );
 
+// --- Variantes réelles du drive Leclerc ---
+// Relevées le 18/08/2026 sur une recherche « lardons » : quatre déclinaisons
+// du même produit, qui ne diffèrent que par la variante et le format.
+
+const LARDONS = [
+  'Lardons supérieurs Tradilège\nNature - 2x100g',
+  'Lardons supérieurs Tradilège\nNature - 160g',
+  'Lardons supérieurs Tradilège\nFumés - 2x100g',
+  'Lardons supérieurs Tradilège\nFumés maxi format 2x200g',
+];
+
+check(
+  'la variante fumée est distinguée de la nature',
+  decide('Lardons fumés', LARDONS),
+  { verdict: 'added', label: LARDONS[2] }
+);
+check(
+  'le format maxi est sélectionné quand il est demandé',
+  decide('Lardons fumés maxi', LARDONS),
+  { verdict: 'added', label: LARDONS[3] }
+);
+check(
+  'le grammage départage deux variantes nature',
+  decide('Lardons nature 160g', LARDONS),
+  { verdict: 'added', label: LARDONS[1] }
+);
+check(
+  '« lardons » seul est trop vague pour trancher',
+  decide('Lardons', LARDONS),
+  { verdict: 'ambiguous' }
+);
+
 // --- Verdict ---
 
 console.log(`\n${passed} vérification(s) passée(s), ${failures.length} échec(s)\n`);

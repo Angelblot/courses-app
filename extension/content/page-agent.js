@@ -457,7 +457,7 @@ export function pageAgent(cfg, item, mode) {
     const wanted = Math.max(1, Math.round(Number(item.quantity) || 1));
     let added = 1;
     if (wanted > 1) {
-      const plus = queryFirst(choice.card, [
+      const plus = queryFirstClickable(choice.card, cfg.quantityPlus ?? [
         '[data-testid="quantity-plus"]',
         'button[aria-label*="ugmenter"]',
         '.quantity-plus',
@@ -517,7 +517,12 @@ export function pageAgent(cfg, item, mode) {
     const ranked = rank(
       item.name,
       cards.slice(0, 12).map((card) => {
-        const href = card.querySelector('a[href]')?.getAttribute('href') ?? '';
+        // Les ancres internes (« # », « #plus ») ne désignent aucun produit :
+        // chez Leclerc, les liens produit n'ont d'ailleurs pas de href du tout.
+        const href =
+          [...card.querySelectorAll('a[href]')]
+            .map((a) => a.getAttribute('href'))
+            .find((h) => h && !h.startsWith('#')) ?? '';
         return {
           card,
           label: textOf(queryFirst(card, cfg.title)) || textOf(card),

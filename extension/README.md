@@ -39,8 +39,14 @@ Concrètement : un clic pour quarante produits, au lieu de quarante allers-retou
 
 ## Première utilisation : calibrer les sélecteurs
 
-**Carrefour est calibré** (18/08/2026, sur deux pages réelles). **Leclerc ne
-l'est pas** : ses sélecteurs restent des hypothèses.
+**Carrefour et Leclerc sont tous deux calibrés** sur des rapports de diagnostic
+réels (18/08/2026).
+
+Une différence importante entre les deux : chez Carrefour, l'EAN figure dans
+l'URL des fiches, ce qui permet l'accès direct au produit. **Chez Leclerc, les
+liens produit n'ont pas de href** — la navigation est pilotée en JavaScript, et
+aucun code-barres n'est lisible dans l'adresse. La recherche par nom, avec son
+score et sa détection d'ambiguïté, y reste donc la seule voie.
 
 Les sélecteurs de `content/sites.js` ne peuvent pas être validés
 automatiquement, puisque les deux sites refusent l'accès programmatique. Ils

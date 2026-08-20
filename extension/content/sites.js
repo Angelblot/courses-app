@@ -126,23 +126,29 @@ export const SITES = {
       'h2',
     ],
     price: ['[class*="Prix"]', '[class*="price"]', '[class*="prix"]'],
-    // Seulement 14 boutons pour 22 produits : l'ajout ne passe donc pas par un
-    // <button>. On ratisse les liens et champs porteurs d'un libellé d'ajout.
+    // Le contrôle d'ajout est un <a href="#"> de classe aWCRS310_Add.
+    //
+    // La classe exacte est indispensable : aWCRS310_Add2List (« Ajouter à mes
+    // listes ») contient la même sous-chaîne, et [class*="Panier"] remonte
+    // 50 éléments dont un div conteneur — le piège déjà rencontré avec
+    // .add-to-cart chez Carrefour, où le clic partait dans le vide.
     addButton: [
-      '[class*="Ajouter"]',
-      '[class*="Panier"]',
-      'a[title*="jouter"]',
-      'input[value*="jouter"]',
-      "a:has-text('Ajouter')",
-      "button:has-text('Ajouter')",
+      'a.aWCRS310_Add',
+      "a:has-text('Ajouter au panier')",
+      'a[title*="jouter au panier"]',
       '[data-testid="add-to-cart"]',
-      'button[aria-label*="jouter"]',
     ],
+    // Incrément de quantité propre au site (href="#plus").
+    quantityPlus: ['a.aWCRS310_More', 'a[href="#plus"]'],
+    // Les liens produit de la liste de résultats n'ont pas de href : la
+    // navigation est pilotée en JavaScript. Aucun EAN n'est donc lisible dans
+    // l'adresse, contrairement à Carrefour — l'accès direct par code-barres
+    // n'est pas possible ici, et la recherche par nom reste la seule voie.
     productUrlPattern: /-(\d{13})(?:[/?#]|$)/,
     productPage: {
-      addButton: ["button:has-text('Ajouter')", '[data-testid="add-to-cart"]'],
+      addButton: ["a:has-text('Ajouter au panier')", "button:has-text('Ajouter')"],
       title: ['h1'],
-      price: ['[class*="price"]', '[class*="prix"]'],
+      price: ['[class*="Prix"]', '[class*="price"]'],
     },
     challengeHints: ['un instant', 'formalité', 'vous êtes un humain', 'captcha'],
     loginHints: ['se connecter', 'connexion', 'identifiez-vous'],
