@@ -68,15 +68,21 @@ export function pageAgent(cfg, item, mode) {
   /**
    * Premier élément réellement actionnable parmi les candidats.
    *
-   * Un sélecteur peut désigner le conteneur de la carte plutôt que son bouton :
-   * le clic part alors dans le vide et l'ajout échoue en silence. On exige donc
-   * un <button> (ou role=button) visible et non désactivé.
+   * Un sélecteur peut désigner le conteneur de la carte plutôt que son contrôle
+   * d'ajout : le clic part alors dans le vide et l'ajout échoue en silence.
+   * On exige donc un élément visible, actif, et de nature cliquable — <button>,
+   * mais aussi <a> ou <input>, car les sites anciens comme le drive Leclerc
+   * n'utilisent pas de <button> pour ajouter au panier.
    */
   function queryFirstClickable(root, selectors) {
+    const CLICKABLE_TAGS = new Set(['BUTTON', 'A', 'INPUT']);
     for (const sel of selectors) {
       for (const el of queryAll(root, sel)) {
-        const isButton = el.tagName === 'BUTTON' || el.getAttribute('role') === 'button';
-        if (isButton && isVisible(el) && !el.disabled) return el;
+        const clickable =
+          CLICKABLE_TAGS.has(el.tagName) ||
+          el.getAttribute('role') === 'button' ||
+          el.hasAttribute('onclick');
+        if (clickable && isVisible(el) && !el.disabled) return el;
       }
     }
     // Aucun vrai bouton : on retombe sur le premier élément visible, faute de mieux.
@@ -338,10 +344,23 @@ export function pageAgent(cfg, item, mode) {
           }));
         }
       }
+      // Tous les éléments actionnables de la carte, quel que soit leur type :
+      // sur les sites anciens, l'ajout au panier est souvent un <a>.
+      const cliquables = [...card.querySelectorAll('a, button, input, [onclick], [role="button"]')]
+        .slice(0, 10)
+        .map((e) => ({
+          tag: e.tagName.toLowerCase(),
+          cls: (e.className || '').toString().slice(0, 45),
+          txt: textOf(e).slice(0, 25),
+          title: e.getAttribute('title')?.slice(0, 30) ?? null,
+          href: e.getAttribute('href')?.slice(0, 45) ?? null,
+        }));
+
       return {
         cardText: textOf(card).replace(/\s+/g, ' ').slice(0, 120),
         titles,
         buttons,
+        cliquables,
         link: card.querySelector('a')?.getAttribute('href')?.slice(0, 80) ?? null,
       };
     });

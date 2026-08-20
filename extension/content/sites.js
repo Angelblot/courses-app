@@ -107,20 +107,36 @@ export const SITES = {
       '#popin_tc_privacy_button_2',
       "button:has-text('Refuser')",
     ],
+    // Calibré le 18/08/2026 sur fd3-courses.leclercdrive.fr.
+    // Site ASP.NET WebForms : les classes s'écrivent liWCRS310_Product, avec
+    // une majuscule. Les sélecteurs d'attribut CSS étant sensibles à la casse,
+    // [class*="product"] ne matchait rien — d'où les zéros du premier rapport.
     cards: [
+      'li[class*="WCRS310_Product"]',
+      'li[class*="_Product"]',
       '[data-testid="product"]',
-      'article[class*="product"]',
+      'article[class*="roduct"]',
       '.product-item',
-      '.prd-item',
-      'div[class*="product-card"]',
     ],
-    title: ['.product-title', '.prd-title', 'h3', 'h2', 'a[href*="-fiche-produit"]'],
-    price: ['[class*="price"]', '[class*="prix"]'],
+    title: [
+      'a[class*="WCRS310_Product"]',
+      'a[class*="_Product"]',
+      '.product-title',
+      'h3',
+      'h2',
+    ],
+    price: ['[class*="Prix"]', '[class*="price"]', '[class*="prix"]'],
+    // Seulement 14 boutons pour 22 produits : l'ajout ne passe donc pas par un
+    // <button>. On ratisse les liens et champs porteurs d'un libellé d'ajout.
     addButton: [
+      '[class*="Ajouter"]',
+      '[class*="Panier"]',
+      'a[title*="jouter"]',
+      'input[value*="jouter"]',
+      "a:has-text('Ajouter')",
       "button:has-text('Ajouter')",
       '[data-testid="add-to-cart"]',
       'button[aria-label*="jouter"]',
-      '.btn-add',
     ],
     productUrlPattern: /-(\d{13})(?:[/?#]|$)/,
     productPage: {
