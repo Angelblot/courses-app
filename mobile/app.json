@@ -8,8 +8,9 @@
     "scheme": "coursesapp",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.coursesapp.mobile"
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.coursesapp.mobile",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -39,7 +40,8 @@
         {
           "cameraPermission": "L'appareil photo sert à scanner le code-barres de tes produits."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
