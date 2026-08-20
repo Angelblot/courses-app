@@ -349,6 +349,40 @@ export function pageAgent(cfg, item, mode) {
     // Repli utile quand aucun sélecteur de carte ne marche : les liens produit.
     report.productLinks = document.querySelectorAll('a[href*="/p/"], a[href*="fiche-produit"]').length;
     report.isSearchPage = /[?&]q=/.test(location.search) || /recherche/.test(location.pathname);
+
+    // Quand rien ne correspond, décrire la page telle qu'elle est plutôt que de
+    // répéter des zéros : le contenu peut vivre dans une iframe, ou porter des
+    // classes qu'on n'a pas devinées.
+    if (!cardSelector) {
+      const classCount = {};
+      for (const el of document.querySelectorAll('[class]')) {
+        for (const c of el.classList) {
+          if (/prod|item|article|result|card|tuile|vignette/i.test(c)) {
+            classCount[c] = (classCount[c] || 0) + 1;
+          }
+        }
+      }
+      const topClasses = Object.entries(classCount)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 12)
+        .map(([c, n]) => `${c} (${n})`);
+
+      const hrefs = [...document.querySelectorAll('a[href]')]
+        .map((a) => a.getAttribute('href'))
+        .filter((h) => h && !h.startsWith('#') && !/^javascript:/i.test(h));
+
+      report.exploration = {
+        cadre: window === window.top ? 'principal' : 'iframe',
+        urlCadre: location.href.slice(0, 120),
+        iframes: document.querySelectorAll('iframe, frame').length,
+        elements: document.querySelectorAll('*').length,
+        liens: hrefs.length,
+        boutons: document.querySelectorAll('button, input[type="button"], input[type="submit"]').length,
+        images: document.querySelectorAll('img').length,
+        classesProbables: topClasses,
+        exemplesLiens: [...new Set(hrefs)].slice(0, 8).map((h) => h.slice(0, 90)),
+      };
+    }
     return report;
   }
 

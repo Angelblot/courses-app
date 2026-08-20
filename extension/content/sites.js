@@ -97,7 +97,10 @@ export const SITES = {
     // aucune origine ne peut être codée en dur : on part de l'onglet courant.
     hostPattern: /(^|\.)leclercdrive\.fr$|(^|\.)leclerc$/,
     searchUrl: 'https://www.leclercdrive.fr/recherche.aspx?TexteRecherche={q}',
+    // Chemin confirmé par un diagnostic réel le 18/08/2026, sur
+    // fd3-courses.leclercdrive.fr/magasin-093401-093401-Le-Cres-Montpellier/
     searchPath: '/recherche.aspx?TexteRecherche={q}',
+    storePathPattern: /^\/magasin-[^/]+/,
     cookieReject: [
       "button:has-text('Continuer sans accepter')",
       "button:has-text('Tout refuser')",

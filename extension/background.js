@@ -62,14 +62,39 @@ function waitForTab(tabId, timeoutMs = 30000) {
  */
 async function runAgent(tabId, cfg, item, mode) {
   try {
-    const [result] = await chrome.scripting.executeScript({
-      target: { tabId },
+    const frames = await chrome.scripting.executeScript({
+      // Tous les cadres : le drive Leclerc est un site ASP.NET dont les
+      // résultats vivent dans une iframe. Se limiter au cadre principal y
+      // donnait zéro élément pour absolument tous les sélecteurs.
+      target: { tabId, allFrames: true },
       func: pageAgent,
       args: [cfg, item, mode],
       // Monde isolé (défaut) : accès complet au DOM sans partager le contexte
       // JS de la page, donc aucun risque de collision avec son framework.
     });
-    return result?.result ?? { ok: false, reason: 'no_result', message: 'Aucune réponse de la page' };
+
+    const answers = frames
+      .map((f) => (f?.result ? { ...f.result, frameId: f.frameId } : null))
+      .filter(Boolean);
+
+    if (!answers.length) {
+      return { ok: false, reason: 'no_result', message: 'Aucune réponse de la page' };
+    }
+
+    if (mode === 'diagnose') {
+      // Le cadre intéressant est celui qui a reconnu des cartes ; à défaut, le
+      // plus fourni. On renvoie tout de même les autres, pour l'analyse.
+      const withCards = answers.filter((a) => a.report?.cardSelectorUsed);
+      const best =
+        withCards[0] ??
+        answers.reduce((a, b) =>
+          (b.report?.exploration?.elements ?? 0) > (a.report?.exploration?.elements ?? 0) ? b : a
+        );
+      return { ...best, frames: answers.length };
+    }
+
+    // En exécution : un cadre a agi, les autres n'ont rien trouvé.
+    return answers.find((a) => a.ok) ?? answers.find((a) => a.reason !== 'no_results') ?? answers[0];
   } catch (e) {
     return { ok: false, reason: 'inject_failed', message: String(e).slice(0, 200) };
   }
@@ -197,7 +222,14 @@ async function startJob({ site, items }) {
 
   let baseOrigin = null;
   try {
-    baseOrigin = new URL(tab.url).origin;
+    const u = new URL(tab.url);
+    // Le drive Leclerc préfixe ses chemins par le magasin
+    // (/magasin-093401-…-Le-Cres-Montpellier) : sans ce segment, la recherche
+    // ne pointe sur aucun magasin.
+    const storeSegment = cfg.storePathPattern
+      ? (u.pathname.match(cfg.storePathPattern)?.[0] ?? '')
+      : '';
+    baseOrigin = u.origin + storeSegment;
   } catch {
     baseOrigin = null;
   }
