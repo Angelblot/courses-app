@@ -34,10 +34,22 @@ const CATEGORIES_LIQUIDES = ['beverages', 'drinks', 'waters', 'juices', 'milks']
 const sansAccents = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
+// Échappe les métacaractères regex d'un mot-clé avant de l'insérer dans un
+// `new RegExp(...)`. `typology.ts` a la même fonction, non exportée : c'est
+// une utilitaire pure d'une ligne, sans état, et les deux modules raisonnent
+// sur des tables de mots-clés indépendantes (typologie des produits ici,
+// détection de liquide là-bas). Créer un couplage entre ces deux modules
+// pour partager une ligne de regex serait plus coûteux que de la dupliquer —
+// aucun des deux n'a de raison de dépendre de l'autre pour évoluer.
+// Exportée uniquement pour être testée directement : la liste MOTS_LIQUIDES
+// actuelle ne contient aucun métacaractère, donc estLiquide() seul ne peut
+// pas démontrer que l'échappement fonctionne.
+export const echappe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /** Un produit est liquide si son nom ou sa catégorie Open Food Facts le dit. */
 export function estLiquide(nom: string, categories: string[] = []): boolean {
   const n = sansAccents(nom);
-  if (MOTS_LIQUIDES.some((m) => new RegExp(`(^|\\s)${m}`).test(n))) return true;
+  if (MOTS_LIQUIDES.some((m) => new RegExp(`(^|\\s)${echappe(m)}`).test(n))) return true;
   return categories.some((c) => CATEGORIES_LIQUIDES.some((l) => c.includes(l)));
 }
 
@@ -58,8 +70,10 @@ export function mapOffProduct(ean: string, data: OffData): FicheProduit | null {
   return {
     ean13: ean,
     name,
-    // Open Food Facts liste parfois plusieurs marques séparées par des virgules.
-    brand: (data.brands ?? '').split(',')[0].trim() || null,
+    // Open Food Facts liste parfois plusieurs marques séparées par des
+    // virgules, parfois avec une virgule de tête vide (ex. ", Danone") :
+    // on retient la première valeur non vide plutôt que le premier élément.
+    brand: (data.brands ?? '').split(',').map((m) => m.trim()).find((m) => m) ?? null,
     imageUrl: data.image_url || null,
     grammageG: valide && !liquide ? Math.round(quantite) : null,
     volumeMl: valide && liquide ? Math.round(quantite) : null,
@@ -70,22 +84,59 @@ export function mapOffProduct(ean: string, data: OffData): FicheProduit | null {
 const URL_OFF = 'https://world.openfoodfacts.org/api/v2/product';
 const CHAMPS = 'product_name,brands,image_url,product_quantity,categories_tags';
 
+// Délai avant d'abandonner la requête. La source Python (enrich_ean.py) pose
+// 10 secondes, mais elle tourne côté serveur pour un traitement par lot :
+// ici l'utilisateur a le doigt sur le déclencheur de scan et regarde son
+// écran. 5 secondes est déjà long à vivre devant une caméra ; au-delà, mieux
+// vaut rendre la main (mode hors ligne) que de laisser l'écran figé.
+const DELAI_MS = 5000;
+
 /**
- * Interroge Open Food Facts pour un code-barres.
- *
- * @returns null si le produit est inconnu ou la réponse illisible. L'appelant
- *   bascule alors sur la saisie manuelle.
+ * Trois issues possibles pour une recherche de code-barres, et pas un simple
+ * booléen "trouvé / pas trouvé" : l'écran de scan doit réagir différemment
+ * selon la cause de l'échec.
+ * - `trouve`   : la fiche est exploitable, on l'ajoute au panier.
+ * - `inconnu`  : Open Food Facts a répondu, ce code-barres ne lui dit rien
+ *   (ou la fiche renvoyée est inexploitable, ex. sans nom). C'est un fait
+ *   stable : rejouer la requête ne changera rien tant que personne n'a
+ *   complété la base. La bonne réponse est la saisie manuelle immédiate.
+ * - `hors_ligne` : on n'a pas pu interroger Open Food Facts (panne réseau,
+ *   DNS, délai dépassé). Le produit existe peut-être très bien : c'est le
+ *   réseau qui a manqué, pas la base. La bonne réponse est de mettre le scan
+ *   en file d'attente et de réessayer au retour de la connexion — surtout
+ *   pas d'obliger l'utilisateur à ressaisir un produit que l'app connaît.
+ * Un booléen unique confondrait ces deux cas et forcerait l'un des deux
+ * parcours à s'appliquer à tort à l'autre situation.
  */
-export async function lookupEan(ean: string): Promise<FicheProduit | null> {
+export type ResultatRecherche =
+  | { etat: 'trouve'; fiche: FicheProduit }
+  | { etat: 'inconnu' }
+  | { etat: 'hors_ligne' };
+
+/** Interroge Open Food Facts pour un code-barres. Voir `ResultatRecherche`. */
+export async function lookupEan(ean: string): Promise<ResultatRecherche> {
+  const controleur = new AbortController();
+  const minuteur = setTimeout(() => controleur.abort(), DELAI_MS);
   try {
     const reponse = await fetch(`${URL_OFF}/${ean}.json?fields=${CHAMPS}`, {
       headers: { 'User-Agent': 'courses-app/1.0 (usage familial)' },
+      signal: controleur.signal,
     });
-    if (!reponse.ok) return null;
+    // Une réponse HTTP en erreur (5xx, proxy, etc.) est un problème de
+    // service, pas un verdict sur le produit : Open Food Facts signale un
+    // code-barres inconnu via `status` dans un corps 200, pas par un code
+    // HTTP d'erreur. On la traite donc comme `hors_ligne`.
+    if (!reponse.ok) return { etat: 'hors_ligne' };
     const json = await reponse.json();
-    if (json.status !== 1 || !json.product) return null;
-    return mapOffProduct(ean, json.product);
+    if (json.status !== 1 || !json.product) return { etat: 'inconnu' };
+    const fiche = mapOffProduct(ean, json.product);
+    return fiche ? { etat: 'trouve', fiche } : { etat: 'inconnu' };
   } catch {
-    return null;
+    // Fetch échoue de la même façon (TypeError) pour une coupure réseau que
+    // pour notre propre abandon sur délai dépassé : dans les deux cas, on
+    // n'a pas eu de réponse d'Open Food Facts, donc `hors_ligne`.
+    return { etat: 'hors_ligne' };
+  } finally {
+    clearTimeout(minuteur);
   }
 }

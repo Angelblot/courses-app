@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mapOffProduct, estLiquide } from './openfoodfacts.ts';
+import { mapOffProduct, estLiquide, echappe } from './openfoodfacts.ts';
 
 test('un solide reçoit un grammage', () => {
   const fiche = mapOffProduct('3760040427577', {
@@ -55,4 +55,26 @@ test('une fiche sans nom est refusée', () => {
 test('la marque prend la première quand Open Food Facts en liste plusieurs', () => {
   const fiche = mapOffProduct('123', { product_name: 'Yaourt', brands: 'Danone,Activia' });
   assert.equal(fiche.brand, 'Danone');
+});
+
+test('une virgule de tête ne doit pas donner une marque vide', () => {
+  // Open Food Facts renvoie parfois une liste avec une entrée vide en tête.
+  const fiche = mapOffProduct('123', { product_name: 'Yaourt', brands: ', Danone' });
+  assert.equal(fiche.brand, 'Danone');
+});
+
+test('une fiche sans nom donne un résultat inconnu, pas une fiche exploitable', () => {
+  // mapOffProduct renvoie null : c'est ce que lookupEan doit traduire en
+  // `{ etat: 'inconnu' }`, testé ici au niveau du mapping qui porte la règle.
+  assert.equal(mapOffProduct('123', { product_name: '   ' }), null);
+});
+
+test('un mot-clé de liquide contenant un métacaractère ne casse pas la détection', () => {
+  // Aucun des seize mots-clés actuels de MOTS_LIQUIDES n'a de métacaractère,
+  // donc estLiquide() seul ne peut pas démontrer la régression corrigée. On
+  // teste directement echappe() avec un mot-clé hypothétique contenant une
+  // parenthèse : sans échappement, `new RegExp` lèverait une SyntaxError.
+  const motCle = 'sauce(maison)';
+  assert.doesNotThrow(() => new RegExp(`(^|\\s)${echappe(motCle)}`));
+  assert.equal(new RegExp(`(^|\\s)${echappe(motCle)}`).test('la sauce(maison) du chef'), true);
 });
