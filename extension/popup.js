@@ -1,6 +1,33 @@
 /** Interface du popup : lancement, suivi, reprise après vérification. */
 
+import { SITES } from './content/sites.js';
+
 const $ = (id) => document.getElementById(id);
+
+/**
+ * Présélectionne l'enseigne d'après l'onglet actif.
+ *
+ * Sans cela, le menu reste sur Carrefour et un diagnostic lancé depuis une page
+ * Leclerc teste les sélecteurs de la mauvaise enseigne : le rapport ne renvoie
+ * que des zéros, sans que rien n'indique la cause.
+ */
+async function detectSite() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.url) return;
+    const host = new URL(tab.url).hostname;
+    for (const [key, cfg] of Object.entries(SITES)) {
+      if (cfg.hostPattern?.test(host)) {
+        $('site').value = key;
+        $('site-hint').textContent = `Page ${cfg.label} détectée`;
+        return;
+      }
+    }
+    $('site-hint').textContent = "Aucune page de drive détectée dans l'onglet actif";
+  } catch {
+    // URL illisible (page interne de Chrome) : on garde la sélection par défaut.
+  }
+}
 
 const send = (msg) =>
   new Promise((resolve) => chrome.runtime.sendMessage(msg, (r) => resolve(r)));
@@ -125,4 +152,5 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type === 'state') render(msg.state);
 });
 
+detectSite();
 send({ type: 'getState' }).then((r) => render(r?.data ?? null));

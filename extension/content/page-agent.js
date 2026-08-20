@@ -311,6 +311,9 @@ export function pageAgent(cfg, item, mode) {
 
   function diagnose() {
     const report = {
+      // Sans cette mention, un diagnostic lancé avec la mauvaise enseigne
+      // renvoie des zéros indiscernables d'une page non reconnue.
+      enseigne: cfg.label,
       url: location.href,
       title: document.title,
       state: pageState(),

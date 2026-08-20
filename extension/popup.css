@@ -77,3 +77,4 @@ select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-col
   white-space: pre-wrap;
   word-break: break-word;
 }
+.hint--inline { display: block; margin-top: 2px; font-size: 11px; color: var(--accent); }
