@@ -20,6 +20,12 @@
 - **Aucun identifiant de drive n'est stocké**, dans aucune table, à aucun moment.
 - **RLS obligatoire** sur chaque table créée, avec la clause `(select auth.uid()) = user_id`.
 - Les migrations Supabase passent par l'outil `apply_migration`, jamais par `execute_sql`.
+- **Les imports entre modules de `mobile/lib/` portent l'extension `.ts`**
+  (`from './typology.ts'`). Sans elle, `node --test` échoue en
+  `ERR_MODULE_NOT_FOUND`, et sans le drapeau ci-dessous il exécute **zéro test
+  en annonçant un succès** — un faux vert. Mesuré sous Node 22.22.
+- **Les tests des fonctions pures se lancent avec**
+  `node --experimental-strip-types --test <fichier>`.
 
 ---
 
@@ -524,7 +530,18 @@ mobile/android/
 mobile/.env
 ```
 
-- [ ] **Step 3: Écrire la configuration d'environnement**
+- [ ] **Step 3: Autoriser les extensions .ts dans les imports**
+
+Dans `mobile/tsconfig.json`, ajouter sous `compilerOptions` :
+
+```json
+"allowImportingTsExtensions": true
+```
+
+Sans cette option, TypeScript refuse `from './typology.ts'` — or cette
+extension est indispensable pour que `node --test` résolve les modules.
+
+- [ ] **Step 4: Écrire la configuration d'environnement**
 
 Créer `mobile/.env` :
 
@@ -535,7 +552,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_PueJWmalqhZO0ctPu95GKQ_EaAgVulr
 
 Créer `mobile/.env.example` avec les mêmes clés, valeurs vidées.
 
-- [ ] **Step 4: Écrire le client Supabase**
+- [ ] **Step 5: Écrire le client Supabase**
 
 Créer `mobile/lib/supabase.ts` :
 
@@ -567,7 +584,7 @@ export const supabase = createClient(url, key, {
 });
 ```
 
-- [ ] **Step 5: Écrire les jetons de thème**
+- [ ] **Step 6: Écrire les jetons de thème**
 
 Créer `mobile/lib/theme.ts` :
 
@@ -589,7 +606,7 @@ export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as cons
 export const radius = { sm: 6, md: 10, lg: 14, pill: 999 } as const;
 ```
 
-- [ ] **Step 6: Écrire la racine de navigation**
+- [ ] **Step 7: Écrire la racine de navigation**
 
 Remplacer `mobile/app/_layout.tsx` :
 
@@ -629,7 +646,7 @@ export default function RootLayout() {
 }
 ```
 
-- [ ] **Step 7: Écrire l'écran de connexion**
+- [ ] **Step 8: Écrire l'écran de connexion**
 
 Créer `mobile/app/login.tsx` :
 
@@ -729,7 +746,7 @@ const s = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 8: Lancer et vérifier sur l'iPhone**
+- [ ] **Step 9: Lancer et vérifier sur l'iPhone**
 
 ```bash
 cd mobile && npx expo start
@@ -745,7 +762,7 @@ Attendu :
 
 Le point 4 est le plus important : il valide qu'AsyncStorage est bien branché.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add mobile .gitignore
@@ -818,7 +835,7 @@ test('un nom vide ne produit rien', () => {
 - [ ] **Step 2: Lancer les tests pour les voir échouer**
 
 ```bash
-cd mobile && node --test lib/typology.test.mjs
+cd mobile && node --experimental-strip-types --test lib/typology.test.mjs
 ```
 
 Attendu : échec, `Cannot find module './typology.ts'`.
@@ -837,31 +854,95 @@ Créer `mobile/lib/typology.ts`. Les règles sont reprises **à l'identique** de
 
 /** (mots-clés, type associé). L'ordre compte : spécifique avant générique. */
 const TYPE_RULES: Array<[string[], string]> = [
+  // Charcuterie
   [['allumette', 'lardon', 'bacon', 'poitrine'], 'lardon'],
   [['chorizo', 'saucisson', 'saucisse', 'rosette'], 'charcuterie'],
   [['pancetta', 'coppa', 'prosciutto'], 'charcuterie'],
+  // Pates & riz
   [['spaghetti', 'tortellini', 'gnocchi', 'tagliatelle', 'penne', 'fusilli'], 'pate'],
   [['coude', 'macaroni', 'farfalle', 'conchiglie'], 'pate'],
   [['riz', 'risotto', 'arborio', 'basmati', 'jasmine', 'thai'], 'riz'],
+  // Produits laitiers (SAUF lait et beurre, trop generiques)
   [['creme liquide', 'creme fraiche'], 'creme liquide'],
   [['parmesan', 'parmigiano'], 'parmesan'],
   [['mozzarella', 'mozza', 'burrata'], 'mozzarella'],
   // Avant la règle « fromage » : « ravioles au fromage » sont des pâtes.
-  [['raviole', 'ravioles'], 'pate'],
+  [['raviole', 'ravioles'], 'pate'],  // avant fromage (contient "fromage")
   [['emmental', 'comte', 'gruyere'], 'fromage rape'],
   [['cheddar', 'gorgonzola', 'feta', 'fromage'], 'fromage'],
-  [['yaourt', 'skyr', 'fromage blanc', 'petit suisse'], 'yaourt'],
+  [['yaourt', 'yaourt grec', 'skyr', 'fromage blanc', 'petit suisse'], 'yaourt'],
+  // Oeufs
+  [['oeuf', 'oeufs'], 'oeuf'],
+  // Legumes
+  [['oignon', 'oignons', 'echalote', 'cebette'], 'oignon'],
+  [['carotte'], 'carotte'],
+  [['pomme de terre', 'pommes de terre', 'patate'], 'pomme de terre'],
+  [['tomate', 'tomates', 'tomate cerise', 'tomates cerises'], 'tomate'],
+  [['salade', 'laitue', 'mache', 'roquette', 'mesclun'], 'salade'],
+  [[' ail '], 'ail'],  // avec espaces pour eviter "volaille"
+  // Fruits
+  [['avocat'], 'avocat'],
+  [['banane'], 'banane'],
+  [['pomme'], 'pomme'],
+  // Viandes
+  [['filet de poulet', 'blanc de poulet', 'poulet', 'cuisse de poulet'], 'poulet'],
+  [['boeuf', 'entrecote', 'faux-filet', 'rumsteck'], 'boeuf'],
+  [['hache'], 'viande hachee'],
+  [['jambon blanc', 'jambon fume', 'jambon cru'], 'jambon'],
+  // Epicerie salee
+  [['farine'], 'farine'],
+  [['sucre'], 'sucre'],
+  [['sel'], 'sel'],
+  [['poivre noir', 'poivre blanc', 'poivre'], 'poivre'],
+  [['huile d'olive'], 'huile d'olive'],
+  [['huile'], 'huile'],
+  [['vinaigre'], 'vinaigre'],
+  [['moutarde'], 'moutarde'],
+  [['bouillon'], 'bouillon'],
+  [['sauce soja', 'soja'], 'sauce soja'],
+  [['ketchup', 'mayonnaise'], 'condiment'],
+  // Epicerie sucree (AVANT lait/beurre)
+  [['biscuit', 'cookie', 'granola', 'petit beurre'], 'biscuit'],
+  [['cereale', 'cereales', 'tresor', 'kellogg', 'chocapic'], 'cereale'],
+  [['cafe', 'capsule', 'dolce gusto', 'nescafe', 'nespresso'], 'cafe'],
+  [['pain de mie', 'pain', 'baguette', 'campagnard', 'schar'], 'pain'],
+  [['chips', 'cacahuete', 'cacahuetes', 'aperitif', 'twinuts'], 'aperitif'],
+  [['houmous', 'humous'], 'houmous'],
+  // Frais
+  [['muffin', 'muffins', 'pate feuillettee', 'pate a pizza', 'pate'], 'pate'],
+  [['raviole', 'ravioles'], 'pate'],
+  // Boissons
+  [[' biere ', ' ipa ', ' tourtel '], 'biere'],
+  [['vin blanc', 'vin rouge', 'rose', 'vin'], 'vin'],
+  [['jus'], 'jus'],
+  // Lait, beurre (EN DERNIER car trop generiques)
+  [['beurre'], 'beurre'],
+  [['lait'], 'lait'],
+  // Hygiene
+  [['gel douche', 'shampooing', 'shampoing', 'savon'], 'gel douche'],
+  [['dentifrice'], 'dentifrice'],
+  [['deodorant'], 'deodorant'],
+  [['brosse a dent'], 'brosse a dents'],
+  [[' brosse '], 'brosse a dents'],
+  // Papier
+  [['papier toilette', 'pq'], 'papier toilette'],
+  [['mouchoir', 'mouchoirs'], 'mouchoirs'],
+  [['essuie-tout', 'essuie tout', 'essuie main'], 'essuie-tout'],
+  // Droguerie
+  [['lingette', 'lingettes desinfectantes'], 'lingettes'],
+  [['briquet', 'briquets', 'bic'], 'briquet'],
+  [['recharge gaz', 'gaz'], 'recharge gaz'],
+  [['sac', 'sacs reutilisables', 'sacs consignes'], 'sac'],
 ];
 
 const STOPWORDS = new Set([
-  'carrefour', "classic'", 'classic', 'bio', 'extra', 'soft',
-  'sensation', 'eco', 'planet', 'essential', 'simpl',
-  'sans', 'avec', 'nature', 'lot', 'pack', 'maxi',
-  'format', 'economique', 'familial',
-  'frais', 'fumes', 'fume', 'fumee', 'fumees', 'fines',
-  'tranches', 'tranche', 'epais', 'epaise', 'legere',
-  'confit', 'confits', 'rape', 'fondant',
-  'jaune', 'blanc', 'rouge', 'noir', 'pur', 'hb', 'hac',
+  'avec', 'bio', 'blanc', 'carrefour', 'cl', 'classic', "classic'",
+  'confit', 'confits', 'eco', 'economique', 'epais', 'epaise', 'essential',
+  'extra', 'familial', 'fines', 'fondant', 'format', 'frais', 'fume',
+  'fumee', 'fumees', 'fumes', 'g', 'hac', 'hb', 'jaune', 'kg', 'l',
+  'legere', 'lot', 'maxi', 'ml', 'nature', 'noir', 'pack', 'planet', 'pur',
+  'rape', 'rouge', 'sans', 'sensation', 'simpl', 'soft', 'tranche',
+  'tranches', 'x'
 ]);
 
 const sansAccents = (s: string) =>
@@ -903,13 +984,11 @@ export function normalizeProductType(name: string | null | undefined): string | 
 - [ ] **Step 4: Lancer les tests**
 
 ```bash
-cd mobile && node --test lib/typology.test.mjs
+cd mobile && node --experimental-strip-types --test lib/typology.test.mjs
 ```
 
 Attendu : `pass 6`, `fail 0`.
 
-Si l'import d'un `.ts` échoue sous Node, ajouter `--experimental-strip-types` :
-`node --test --experimental-strip-types lib/typology.test.mjs` (natif depuis Node 22.6).
 
 - [ ] **Step 5: Commit**
 
@@ -1291,7 +1370,7 @@ test('la marque prend la première quand Open Food Facts en liste plusieurs', ()
 - [ ] **Step 2: Lancer les tests pour les voir échouer**
 
 ```bash
-cd mobile && node --test lib/openfoodfacts.test.mjs
+cd mobile && node --experimental-strip-types --test lib/openfoodfacts.test.mjs
 ```
 
 Attendu : échec, module introuvable.
@@ -1307,7 +1386,7 @@ Créer `mobile/lib/openfoodfacts.ts` :
  * Le mapping est porté de backend/app/services/enrich_ean.py : détection des
  * liquides et affectation de la quantité en grammes ou en millilitres.
  */
-import { normalizeProductType } from './typology';
+import { normalizeProductType } from './typology.ts';
 
 export type FicheProduit = {
   ean13: string;
@@ -1397,7 +1476,7 @@ export async function lookupEan(ean: string): Promise<FicheProduit | null> {
 - [ ] **Step 4: Lancer les tests**
 
 ```bash
-cd mobile && node --test lib/openfoodfacts.test.mjs
+cd mobile && node --experimental-strip-types --test lib/openfoodfacts.test.mjs
 ```
 
 Attendu : `pass 7`, `fail 0`.
@@ -1910,7 +1989,7 @@ test('un stockage corrompu est traité comme une file vide', async () => {
 - [ ] **Step 2: Lancer les tests pour les voir échouer**
 
 ```bash
-cd mobile && node --test lib/queue.test.mjs
+cd mobile && node --experimental-strip-types --test lib/queue.test.mjs
 ```
 
 Attendu : échec, module introuvable.
@@ -1971,7 +2050,7 @@ export function creerFile(stockage: Stockage) {
 - [ ] **Step 4: Lancer les tests**
 
 ```bash
-cd mobile && node --test lib/queue.test.mjs
+cd mobile && node --experimental-strip-types --test lib/queue.test.mjs
 ```
 
 Attendu : `pass 6`, `fail 0`.
@@ -2059,7 +2138,7 @@ le démarrage."
 - [ ] **Tous les tests passent**
 
 ```bash
-cd mobile && node --test lib/*.test.mjs
+cd mobile && node --experimental-strip-types --test lib/*.test.mjs
 ```
 
 Attendu : 19 tests au vert (6 typologie + 7 Open Food Facts + 6 file).
