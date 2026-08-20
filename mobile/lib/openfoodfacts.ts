@@ -31,8 +31,11 @@ const MOTS_LIQUIDES = [
 
 const CATEGORIES_LIQUIDES = ['beverages', 'drinks', 'waters', 'juices', 'milks'];
 
+// Plage Unicode "Combining Diacritical Marks" en points de code plutot
+// qu'en caracteres litteraux invisibles : voir la meme fonction dans
+// `typology.ts` pour la justification complete.
 const sansAccents = (s: string) =>
-  s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036F]/g, '');
 
 // Échappe les métacaractères regex d'un mot-clé avant de l'insérer dans un
 // `new RegExp(...)`. `typology.ts` a la même fonction, non exportée : c'est

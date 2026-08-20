@@ -63,7 +63,6 @@ const TYPE_RULES: Array<[string[], string]> = [
   [['houmous', 'humous'], 'houmous'],
   // Frais
   [['muffin', 'muffins', 'pate feuillettee', 'pate a pizza', 'pate'], 'pate'],
-  [['raviole', 'ravioles'], 'pate'],
   // Boissons
   [[' biere ', ' ipa ', ' tourtel '], 'biere'],
   [['vin blanc', 'vin rouge', 'rose', 'vin'], 'vin'],
@@ -103,8 +102,12 @@ const STOPWORDS = new Set([
 // délibérée : le Python rate ses propres règles dès qu'un nom porte un accent
 // (« Céréales Trésor » ne matche pas `cereale` et retombe sur `lait`, « Féta
 // cubes » ne matche pas `feta` et retombe sur `féta`). On assume cet écart.
+// Plage Unicode « Combining Diacritical Marks » écrite en points de code
+// (\u0300-\u036F) plutôt qu'en caractères littéraux invisibles : ces
+// derniers se relisent comme un intervalle vide dans un éditeur ou un outil
+// de reformatage, qui peut les altérer sans que rien ne se voie à l'écran.
 const sansAccents = (s: string) =>
-  s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036F]/g, '').trim();
 
 const echappe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 

@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { FicheProduit } from '../lib/openfoodfacts.ts';
+import { estErreurReseau } from '../lib/postgrest.ts';
+
+// Message affiché à l'utilisateur en cas d'échec de chargement : une phrase
+// française, jamais le `message` brut de postgrest-js (souvent en anglais
+// et technique). Le détail exact part au journal de développement via
+// `console.error`, jamais à l'écran — voir la convention harmonisée entre
+// ce module, `app/(tabs)/index.tsx` et `app/login.tsx`.
+const ERREUR_CHARGEMENT = 'Impossible de charger le catalogue. Vérifie ta connexion et réessaie.';
 
 export type Product = {
   id: string;
@@ -44,8 +52,11 @@ export function useProducts() {
     if (generationAppel !== generation.current) return;
     if (error) {
       // Pas de repli silencieux : un catalogue vide et une erreur réseau ne
-      // doivent pas se ressembler à l'écran.
-      setErreur(error.message);
+      // doivent pas se ressembler à l'écran. Le message affiché reste en
+      // français et générique — voir `ERREUR_CHARGEMENT` — le détail
+      // technique part au journal de développement.
+      console.error('[recharger]', error);
+      setErreur(ERREUR_CHARGEMENT);
       setProduits([]);
     } else {
       setErreur(null);
@@ -57,23 +68,6 @@ export function useProducts() {
   useEffect(() => { recharger(); }, [recharger]);
 
   return { produits, chargement, erreur, recharger };
-}
-
-/**
- * Une erreur postgrest-js sans `code` vient d'un `fetch` qui a levé une
- * exception avant qu'une réponse HTTP n'arrive — coupure réseau, DNS,
- * timeout (voir `node_modules/@supabase/postgrest-js/dist/index.cjs`, le
- * bloc `res.catch((fetchError) => ...)` dans `PostgrestBuilder.prototype.then` :
- * il construit toujours `code: ''`, y compris pour un abandon ou un
- * dépassement d'en-têtes). Une erreur qui a atteint PostgREST — violation
- * RLS, contrainte, colonne manquante — porte au contraire un code
- * Postgres/PostgREST non vide (ex. '23505', '42501', 'PGRST116'), posé par
- * `processResponse` en parsant le corps JSON renvoyé par le serveur. Un
- * code vide est donc un signal fiable — et propre à cette version de la
- * librairie — d'échec réseau plutôt que d'échec métier.
- */
-function estErreurReseau(error: { code?: string }): boolean {
-  return !error.code;
 }
 
 /**
@@ -143,7 +137,10 @@ export async function ajouterProduit(
   // la même fiche produirait exactement la même erreur, indéfiniment. Plutôt
   // qu'un compteur de tentatives, on abandonne dès ce premier échec non
   // réseau et on informe tout de suite l'utilisateur — la fiche n'est pas
-  // mise en file, elle ne bloquera donc jamais les scans suivants.
+  // mise en file, elle ne bloquera donc jamais les scans suivants. Le
+  // message reste français et générique, le détail technique part au
+  // journal de développement.
+  console.error('[ajouterProduit]', error);
   return {
     ok: false,
     reseau: false,

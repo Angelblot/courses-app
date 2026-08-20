@@ -1,5 +1,7 @@
+import { useCallback } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import { ProductRow } from '../../components/ProductRow';
 import { EtatVide } from '../../components/EtatVide';
 import { useProducts } from '../../stores/products';
@@ -7,6 +9,18 @@ import { colors, spacing } from '../../lib/theme';
 
 export default function Produits() {
   const { produits, chargement, erreur, recharger } = useProducts();
+
+  // Recharge le catalogue à chaque prise de focus de l'écran, pas seulement
+  // au montage : `app/(tabs)/_layout.tsx` utilise `<Tabs>` d'expo-router,
+  // qui garde les écrans montés d'un onglet à l'autre. Sans ceci, un produit
+  // ajouté depuis Scan n'apparaîtrait ici qu'après un tirer-pour-rafraîchir
+  // manuel. `recharger` a une identité stable (compteur de génération dans
+  // `useProducts`, voir `stores/products.ts`) : le rappel ci-dessous l'est
+  // donc aussi, et ne provoque pas de rechargement en boucle.
+  const rechargerAuFocus = useCallback(() => {
+    recharger();
+  }, [recharger]);
+  useFocusEffect(rechargerAuFocus);
 
   if (chargement && produits.length === 0) {
     return (
@@ -25,8 +39,10 @@ export default function Produits() {
 
       {erreur && (
         <View style={s.erreur}>
-          <Text style={s.erreurTexte}>Impossible de charger le catalogue.</Text>
-          <Text style={s.erreurDetail}>{erreur}</Text>
+          {/* `erreur` est déjà une phrase française destinée à l'utilisateur
+              (voir `stores/products.ts`) : le détail technique brut n'est
+              jamais affiché ici, seulement journalisé côté développeur. */}
+          <Text style={s.erreurTexte}>{erreur}</Text>
           <Pressable onPress={recharger}><Text style={s.reessayer}>Réessayer</Text></Pressable>
         </View>
       )}
@@ -66,6 +82,5 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: colors.danger, gap: spacing.xs,
   },
   erreurTexte: { color: colors.text, fontWeight: '600' },
-  erreurDetail: { color: colors.textMuted, fontSize: 12 },
   reessayer: { color: colors.accent, fontWeight: '700', marginTop: spacing.sm },
 });

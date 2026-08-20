@@ -42,8 +42,16 @@ export default function Login() {
         email: email.trim(),
         password: motDePasse,
       });
-      if (error) setErreur(MESSAGES[error.message] ?? error.message);
-    } catch {
+      if (error) {
+        // Message français toujours affiché, jamais `error.message` brut :
+        // les erreurs répertoriées ont leur phrase dédiée, les autres
+        // retombent sur le même message générique que le catch ci-dessous.
+        // Le détail technique part au journal de développement.
+        console.error('[connexion]', error.message);
+        setErreur(MESSAGES[error.message] ?? ERREUR_GENERIQUE);
+      }
+    } catch (err) {
+      console.error('[connexion]', err);
       setErreur(ERREUR_GENERIQUE);
     } finally {
       enCoursRef.current = false;

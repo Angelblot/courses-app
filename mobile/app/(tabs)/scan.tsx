@@ -3,21 +3,15 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FicheScannee } from '../../components/FicheScannee';
 import { lookupEan, type FicheProduit, type ResultatRecherche } from '../../lib/openfoodfacts.ts';
 import { normalizeProductType } from '../../lib/typology.ts';
-import { creerFile } from '../../lib/queue.ts';
+import { fileScan } from '../../stores/queue.ts';
 import { ajouterProduit } from '../../stores/products';
 import { colors, radius, spacing } from '../../lib/theme';
 
 type Message = { texte: string; erreur: boolean };
-
-// Instance unique pour l'écran : la file s'appuie sur AsyncStorage, donc son
-// contenu survit d'un montage à l'autre — c'est justement ce qui permet de
-// rejouer les scans en attente quand l'utilisateur revient sur cet onglet.
-const file = creerFile(AsyncStorage);
 
 export default function Scan() {
   const [permission, demanderPermission] = useCameraPermissions();
@@ -25,6 +19,12 @@ export default function Scan() {
   const [resultat, setResultat] = useState<ResultatRecherche | null>(null);
   const [chargement, setChargement] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
+  // Compteur de scans en attente et avis de reprise, affichés en permanence
+  // sous la consigne de visée (défaut 5) : sans ceci, la file d'attente est
+  // invisible pour l'utilisateur — il n'a aucun moyen de savoir combien de
+  // scans patientent, ni si une reprise vient de réussir ou d'échouer.
+  const [enAttenteCount, setEnAttenteCount] = useState(0);
+  const [avisFile, setAvisFile] = useState<Message | null>(null);
   // Verrou lu et écrit de façon synchrone. `ean` et `chargement` ne suffisent
   // pas : ils sont capturés dans la fermeture de `surLecture` au moment du
   // rendu, et `onBarcodeScanned={ean ? undefined : surLecture}` ne coupe la
@@ -65,6 +65,11 @@ export default function Scan() {
     [],
   );
 
+  /** Relit la taille de la file et met à jour le compteur affiché à l'écran. */
+  const rafraichirCompteur = useCallback(async () => {
+    setEnAttenteCount(await fileScan.taille());
+  }, []);
+
   /**
    * Enregistre une fiche, quelle que soit son origine : une fiche trouvée
    * sur Open Food Facts (`ajouter`) ou une saisie manuelle après un résultat
@@ -84,9 +89,10 @@ export default function Scan() {
         setMessage({ texte: `Déjà dans ton catalogue : ${r.doublon.name}`, erreur: true });
       } else if (r.reseau) {
         // Échec probablement réseau (voir `estErreurReseau` dans
-        // `stores/products.ts`) : on met de côté plutôt que de perdre le
+        // `lib/postgrest.ts`) : on met de côté plutôt que de perdre le
         // scan, dans l'espoir d'une reprise une fois le réseau revenu.
-        await file.enfiler(aEnregistrer);
+        await fileScan.enfiler(aEnregistrer);
+        await rafraichirCompteur();
         setMessage({ texte: 'Hors connexion — ajouté dès le retour du réseau', erreur: false });
         setTimeout(reprendre, 1600);
       } else {
@@ -97,25 +103,83 @@ export default function Scan() {
         setTimeout(reprendre, 1600);
       }
     },
-    [reprendre],
+    [reprendre, rafraichirCompteur],
   );
+
+  /**
+   * Met en attente un EAN scanné hors ligne, sans repasser par
+   * `lookupEan` qui vient déjà d'échouer (voir `ResultatRecherche.hors_ligne`
+   * dans `lib/openfoodfacts.ts`). C'est le chemin que la spécification
+   * promet par défaut sur cet état : « la fiche est mise en attente et
+   * l'ajout se fait au retour du réseau », sans obliger l'utilisateur à
+   * ressaisir un produit que le réseau, et non la base, a fait manquer.
+   *
+   * `lib/queue.ts` stocke des `FicheProduit` complètes, et un EAN hors ligne
+   * n'en a pas encore (pas de nom, pas d'image : Open Food Facts n'a jamais
+   * répondu). Plutôt que d'ajouter un second type ou une seconde file pour
+   * ce cas, on loge un espace réservé qui respecte déjà le type `FicheProduit`
+   * — `name` prend la valeur de l'EAN, tous les champs enrichis restent
+   * `null` — reconnaissable par `reprendreFileEnAttente` ci-dessous, qui
+   * retente `lookupEan` avant l'insertion pour restaurer l'enrichissement
+   * dès que le réseau revient. C'est le plus petit changement qui n'exige ni
+   * nouveau type, ni nouvelle file, ni changement du format déjà persisté
+   * sur les appareils qui ont une file existante.
+   */
+  const mettreEnAttente = useCallback(async () => {
+    if (!ean) return;
+    await fileScan.enfiler({
+      ean13: ean, name: ean, brand: null, imageUrl: null,
+      grammageG: null, volumeMl: null, productType: null,
+    });
+    await rafraichirCompteur();
+    setMessage({ texte: 'Mis en attente — ajouté dès le retour du réseau', erreur: false });
+    setTimeout(reprendre, 1600);
+  }, [ean, reprendre, rafraichirCompteur]);
 
   const reprendreFileEnAttente = useCallback(() => {
     if (repriseEnCours.current) return;
     repriseEnCours.current = true;
     (async () => {
       try {
-        const enAttente = await file.defiler();
-        if (!enAttente.length) return;
+        const enAttente = await fileScan.defiler();
+        if (!enAttente.length) {
+          await rafraichirCompteur();
+          return;
+        }
         const restants: FicheProduit[] = [];
+        let envoyes = 0;
+        let abandonnes = 0;
         for (const f of enAttente) {
-          const r = await ajouterProduit(f);
+          let aInserer = f;
+          // Espace réservé posé par `mettreEnAttente` (nom == EAN, voir sa
+          // documentation) : le réseau étant revenu, on retente la
+          // recherche Open Food Facts pour récupérer l'enrichissement
+          // avant l'insertion, plutôt que d'entrer définitivement l'EAN
+          // en guise de nom.
+          if (f.name === f.ean13) {
+            const trouve = await lookupEan(f.ean13);
+            if (trouve.etat === 'trouve') {
+              aInserer = trouve.fiche;
+            } else if (trouve.etat === 'hors_ligne') {
+              // Réseau encore instable : on retente au prochain focus,
+              // sans toucher à l'espace réservé.
+              restants.push(f);
+              continue;
+            }
+            // 'inconnu' : Open Food Facts ne connaît toujours pas ce code.
+            // On insère l'espace réservé tel quel plutôt que de bloquer la
+            // fiche indéfiniment — mieux vaut un nom provisoire (l'EAN)
+            // dans le catalogue qu'un scan perdu.
+          }
           // Succès, doublon (déjà en base) ou échec confirmé non réseau : la
           // fiche ne revient pas en file — voir `ajouterProduit` pour la
           // distinction réseau / non réseau et pourquoi un échec non réseau
           // n'est pas retenté indéfiniment. Seul un échec probablement
           // réseau y reste, dans l'espoir d'une prochaine reprise.
-          if (!r.ok && r.reseau) restants.push(f);
+          const r = await ajouterProduit(aInserer);
+          if (r.ok || r.doublon) envoyes += 1;
+          else if (r.reseau) restants.push(f);
+          else abandonnes += 1;
         }
         // Remplacement atomique en une seule écriture (voir `remplacer` dans
         // `lib/queue.ts`) : contrairement à un `viderFile` suivi de
@@ -123,12 +187,28 @@ export default function Scan() {
         // file serait vide alors que des fiches jamais envoyées avec succès
         // restent à réinsérer — si l'application est tuée entre les deux
         // écritures, rien n'est perdu.
-        if (restants.length !== enAttente.length) await file.remplacer(restants);
+        if (restants.length !== enAttente.length) await fileScan.remplacer(restants);
+        await rafraichirCompteur();
+        // Confirmation de reprise et signalement d'abandon définitif
+        // (défaut 5) : sans ceci, l'utilisateur n'a aucun moyen de savoir
+        // qu'une fiche mise en attente est bien partie, ou qu'elle a été
+        // abandonnée après un échec confirmé côté serveur.
+        if (envoyes > 0 || abandonnes > 0) {
+          const parties: string[] = [];
+          if (envoyes > 0) {
+            parties.push(`${envoyes} scan${envoyes > 1 ? 's' : ''} en attente ajouté${envoyes > 1 ? 's' : ''}`);
+          }
+          if (abandonnes > 0) {
+            parties.push(`${abandonnes} scan${abandonnes > 1 ? 's' : ''} abandonné${abandonnes > 1 ? 's' : ''}`);
+          }
+          setAvisFile({ texte: parties.join(' — '), erreur: abandonnes > 0 });
+          setTimeout(() => setAvisFile(null), 4000);
+        }
       } finally {
         repriseEnCours.current = false;
       }
     })();
-  }, []);
+  }, [rafraichirCompteur]);
 
   // Reprend la file à chaque prise de focus de l'écran. `app/(tabs)/_layout.tsx`
   // utilise `<Tabs>` d'expo-router sans `unmountOnBlur` : un écran déjà
@@ -188,6 +268,13 @@ export default function Scan() {
       />
       <SafeAreaView style={s.consigne} pointerEvents="none">
         <Text style={s.consigneTexte}>Vise le code-barres du produit</Text>
+        {(enAttenteCount > 0 || avisFile) && (
+          <Text style={[s.fileTexte, avisFile?.erreur && s.fileTexteAlerte]}>
+            {avisFile
+              ? avisFile.texte
+              : `${enAttenteCount} scan${enAttenteCount > 1 ? 's' : ''} en attente`}
+          </Text>
+        )}
       </SafeAreaView>
 
       {ean && (
@@ -198,6 +285,7 @@ export default function Scan() {
           message={message}
           onAjouter={ajouter}
           onAjouterManuel={ajouterManuel}
+          onMettreEnAttente={mettreEnAttente}
           onIgnorer={reprendre}
         />
       )}
@@ -215,10 +303,18 @@ const s = StyleSheet.create({
     paddingHorizontal: spacing.xl, paddingVertical: spacing.md, marginTop: spacing.sm,
   },
   boutonTexte: { color: colors.accentContrast, fontWeight: '700' },
-  consigne: { alignItems: 'center', paddingTop: spacing.xl },
+  consigne: { alignItems: 'center', paddingTop: spacing.xl, gap: spacing.sm },
   consigneTexte: {
     color: colors.accentContrast, fontSize: 15, fontWeight: '600',
     backgroundColor: colors.voileCamera, paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm, borderRadius: radius.pill, overflow: 'hidden',
   },
+  fileTexte: {
+    color: colors.accentContrast, fontSize: 13, fontWeight: '600',
+    backgroundColor: colors.voileCamera, paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs, borderRadius: radius.pill, overflow: 'hidden',
+  },
+  // Un abandon définitif ne doit pas se lire comme une simple information :
+  // même pastille que `fileTexte`, teinte d'alerte du thème.
+  fileTexteAlerte: { backgroundColor: colors.danger },
 });
