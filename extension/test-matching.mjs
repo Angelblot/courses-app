@@ -180,7 +180,7 @@ check('un nombre à 13 chiffres dans le nom ne devient pas un EAN',
 // --- Départage des quasi-homonymes ---
 
 const AMBIGUITY_MARGIN = 0.05;
-const MIN_USABLE_RATIO = 0.5;
+
 
 function extraTokens(wanted, candidate) {
   const w = new Set(normalize(wanted).split(' ').filter(Boolean));
@@ -194,9 +194,8 @@ function rank(wanted, labels) {
   const corpus = labels.map((l) => normalize(l)).join(' ');
   const matched = tokens.filter((t) => corpus.includes(t));
   const missing = tokens.filter((t) => !corpus.includes(t));
-  const weight = (list) => list.reduce((sum, t) => sum + t.length, 0);
-  const total = weight(tokens);
-  const keep = total > 0 && weight(matched) / total >= MIN_USABLE_RATIO;
+  const head = tokens[0];
+  const keep = Boolean(head) && corpus.includes(head);
   const effective = keep && matched.length ? matched.join(' ') : wanted;
   const ignored = keep ? missing : [];
 
@@ -218,7 +217,11 @@ function decide(wanted, labels) {
     best.score - second.score < AMBIGUITY_MARGIN &&
     best.extra === second.extra
   ) {
-    return { verdict: 'ambiguous' };
+    return {
+      verdict: 'ambiguous',
+      ignored,
+      candidates: ranked.slice(0, 3).map((c) => c.label),
+    };
   }
   return ignored.length
     ? { verdict: 'added', label: best.label, ignored }
@@ -243,10 +246,10 @@ check(
   { verdict: 'added', label: 'Lardons Fumés BIO HERTA' }
 );
 
-check(
-  'deux formats également plausibles : on ne devine pas',
-  decide('Lait demi-écrémé', ['Lait demi-écrémé Carrefour', 'Lait demi-écrémé Lactel']),
-  { verdict: 'ambiguous' }
+checkTrue(
+  'deux marques également plausibles : on ne devine pas',
+  decide('Lait demi-écrémé', ['Lait demi-écrémé Carrefour', 'Lait demi-écrémé Lactel'])
+    .verdict === 'ambiguous'
 );
 
 checkTrue(
@@ -321,10 +324,9 @@ check(
   decide('Lardons nature 160g', LARDONS),
   { verdict: 'added', label: LARDONS[1] }
 );
-check(
+checkTrue(
   '« lardons » seul est trop vague pour trancher',
-  decide('Lardons', LARDONS),
-  { verdict: 'ambiguous' }
+  decide('Lardons', LARDONS).verdict === 'ambiguous'
 );
 
 // --- Franchissement de la frontière executeScript ---
@@ -420,6 +422,49 @@ checkTrue(
   'un produit absent du rayon ne se rabat pas sur un voisin',
   decide('Jambon blanc Herta', LARDONS).verdict === 'no_match',
   JSON.stringify(decide('Jambon blanc Herta', LARDONS))
+);
+
+// --- Jambons réels du drive Leclerc ---
+// Relevés le 18/08/2026 : 70 résultats pour « Jambon blanc Herta », dont
+// aucun des premiers ne porte les mots « blanc » ni « Herta » — le site parle
+// de « jambon supérieur ». Refuser ces résultats était un faux négatif.
+
+const JAMBONS = [
+  'Jambon Supérieur Fleury Michon sans nitrite x4 - 140g',
+  'Jambon superieur 4 tranches Soutenons Nos Agriculteurs 140g',
+  'Jambon supérieur 6 tranches Soutenons Nos Agriculteurs 210g',
+  'Jambon supérieur 4T Tradilège Conservation sans nitrite-140g',
+];
+
+// Une marque introuvable au rayon rend les jambons restants indiscernables :
+// on le dit, plutôt que d'en livrer un au hasard à la place du Herta demandé.
+checkTrue(
+  'sans la marque demandée, les jambons restants sont déclarés indiscernables',
+  decide('Jambon blanc Herta', JAMBONS).verdict === 'ambiguous',
+  JSON.stringify(decide('Jambon blanc Herta', JAMBONS))
+);
+
+checkTrue(
+  "l'ambiguïté propose des candidats à choisir",
+  decide('Jambon blanc Herta', JAMBONS).candidates?.length === 3
+);
+
+checkTrue(
+  'les termes introuvables sont signalés',
+  decide('Jambon blanc Herta', JAMBONS).ignored?.includes('herta') === true
+);
+
+checkTrue(
+  "un saumon ne se rabat pas sur un jambon : le nom du produit est absent",
+  decide('Saumon fumé Labeyrie', JAMBONS).verdict === 'no_match'
+);
+
+// Quand la marque est bien au rayon, elle doit l'emporter.
+const JAMBONS_AVEC_HERTA = [...JAMBONS, 'Jambon Le Bon Paris HERTA 4 tranches 140g'];
+check(
+  'la marque demandée est retenue quand le rayon la propose',
+  decide('Jambon blanc Herta', JAMBONS_AVEC_HERTA),
+  { verdict: 'added', label: 'Jambon Le Bon Paris HERTA 4 tranches 140g', ignored: ['blanc'] }
 );
 
 // --- Verdict ---

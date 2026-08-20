@@ -177,11 +177,10 @@ export function pageAgent(cfg, item, mode) {
   const AMBIGUITY_MARGIN = 0.05;
 
   /**
-   * Part minimale de la recherche devant se retrouver dans les résultats pour
-   * qu'on accepte d'en écarter le reste. En deçà, ce qu'on écarterait n'est
-   * plus un qualificatif mais le produit lui-même.
+   * Nombre de résultats examinés. Large à dessein : quand une marque manque des
+   * premiers titres, elle se trouve souvent plus bas dans la liste.
    */
-  const MIN_USABLE_RATIO = 0.5;
+  const MAX_CANDIDATES = 30;
 
   /**
    * Mots du candidat absents de la recherche, hors bruit.
@@ -219,13 +218,16 @@ export function pageAgent(cfg, item, mode) {
     const matched = tokens.filter((t) => corpus.includes(t));
     const missing = tokens.filter((t) => !corpus.includes(t));
 
-    // Écarter des termes n'est légitime que s'il en reste l'essentiel.
-    // « Saumon fumé Labeyrie » face à des lardons ne laisserait que « fumé » :
-    // on retiendrait des lardons pour du saumon. La recherche est alors
-    // conservée intacte, le score reste bas et le seuil la rejette.
-    const weight = (list) => list.reduce((sum, t) => sum + t.length, 0);
-    const total = weight(tokens);
-    const keep = total > 0 && weight(matched) / total >= MIN_USABLE_RATIO;
+    // On ne peut écarter que des qualificatifs, jamais le produit lui-même.
+    // Le premier mot significatif d'une recherche de courses en est le nom :
+    // « Jambon blanc Herta » demande du jambon, « Saumon fumé Labeyrie » du
+    // saumon. S'il figure dans les résultats, écarter le reste est légitime —
+    // le rayon ne référence simplement pas cette marque ou cette précision.
+    // S'il en est absent, aucun repli n'est acceptable : sans cette règle,
+    // « Saumon fumé Labeyrie » ne gardait que « fumé » et faisait entrer des
+    // lardons dans le panier.
+    const head = tokens[0];
+    const keep = Boolean(head) && corpus.includes(head);
 
     const effective = keep && matched.length ? matched.join(' ') : wanted;
     const ignored = keep ? missing : [];
@@ -561,7 +563,7 @@ export function pageAgent(cfg, item, mode) {
 
     const { ranked, ignored } = rank(
       item.name,
-      cards.slice(0, 12).map((card) => {
+      cards.slice(0, MAX_CANDIDATES).map((card) => {
         // Les ancres internes (« # », « #plus ») ne désignent aucun produit :
         // chez Leclerc, les liens produit n'ont d'ailleurs pas de href du tout.
         const href =

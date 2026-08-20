@@ -135,6 +135,20 @@ function render(state) {
         : '';
     li.textContent = `${r.item} — ${detail}${nuance}`;
     if (r.approximate) li.classList.add('log__item--approx');
+
+    // Une ambiguïté sans propositions est un cul-de-sac : on liste les
+    // candidats pour que le choix soit possible d'un coup d'œil.
+    if (r.candidates?.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'log__candidates';
+      for (const c of r.candidates) {
+        const item = document.createElement('li');
+        item.textContent = c.label ?? c;
+        ul.appendChild(item);
+      }
+      li.appendChild(ul);
+    }
+
     $('log').appendChild(li);
   }
 }

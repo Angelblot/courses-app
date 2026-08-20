@@ -79,3 +79,5 @@ select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-col
 }
 .hint--inline { display: block; margin-top: 2px; font-size: 11px; color: var(--accent); }
 .log__item--approx { border-left-color: #B8860B; }
+.log__candidates { list-style: none; margin: 5px 0 0; padding: 0 0 0 8px; display: flex; flex-direction: column; gap: 2px; border-left: 2px solid var(--border); }
+.log__candidates li { font-size: 11px; color: var(--muted); }
