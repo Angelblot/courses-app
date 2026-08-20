@@ -12,16 +12,36 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 
 const USER_ID = process.argv[2];
-if (!/^[0-9a-f-]{36}$/i.test(USER_ID ?? '')) {
+// Format UUID réel (8-4-4-4-12), et non 36 caractères quelconques parmi
+// [0-9a-f-] — cette dernière forme laissait passer, par exemple, 36 'a'
+// consécutifs sans le moindre tiret.
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(USER_ID ?? '')) {
   throw new Error('Usage : node scripts/generer_migration_donnees.mjs <user_id>');
 }
 
 const db = new DatabaseSync('backend/app.db', { readOnly: true });
 const lire = (sql) => db.prepare(sql).all();
 
-/** Échappe une valeur pour l'insérer littéralement dans du SQL. */
+/**
+ * Échappe une valeur pour l'insérer littéralement dans du SQL.
+ *
+ * Seuls `null`/`undefined` (valeur absente côté source) deviennent `NULL`.
+ * Une chaîne vide est une valeur à part entière et reste `''` : plusieurs
+ * colonnes cibles sont `not null` (categories.key/label/icon, products.name,
+ * recipe_ingredients.name...) et un `NULL` explicite les ferait échouer même
+ * quand la colonne a un `DEFAULT` — un `DEFAULT` ne s'applique que si la
+ * colonne est absente de l'INSERT, jamais quand une valeur `NULL` est
+ * fournie explicitement.
+ *
+ * Les colonnes nullables ne sont pas traitées différemment ici : vérifié sur
+ * backend/app.db, elles ne contiennent jamais de chaîne vide côté source
+ * (soit une valeur, soit un vrai NULL SQLite) — il n'y a donc pas de cas où
+ * '' devrait, pour elles, redevenir NULL. Les appels qui veulent un repli
+ * plutôt qu'un NULL le font déjà explicitement avant q() (p.unit ||
+ * 'piece', p.brand_type || 'common', i.unit || 'unité', c.icon ?? '').
+ */
 function q(v) {
-  if (v === null || v === undefined || v === '') return 'null';
+  if (v === null || v === undefined) return 'null';
   if (typeof v === 'number') return String(v);
   if (typeof v === 'boolean') return v ? 'true' : 'false';
   return `'${String(v).replace(/'/g, "''")}'`;
@@ -105,14 +125,25 @@ for (const i of lire('select * from recipe_ingredients')) {
 // --- Lignes d'achat : drive_config_id devient le nom de l'enseigne ---
 const drives = new Map(lire('select id, name from drive_configs').map((d) => [d.id, d.name]));
 let achatsIgnores = 0;
+let achatsDriveInconnu = 0;
 for (const l of lire('select * from purchase_lines')) {
   const productId = idProduit.get(l.product_id);
   if (!productId) { achatsIgnores += 1; continue; }
+  // Un drive_config_id absent de la table source ne doit pas retomber
+  // silencieusement sur 'carrefour' : un achat Leclerc se retrouverait
+  // étiqueté Carrefour sans que rien ne le signale. La colonne cible porte
+  // de toute façon `check (drive in ('carrefour', 'leclerc'))`, donc une
+  // valeur inventée ferait échouer l'insertion — autant l'exclure et le
+  // compter ici, à la manière des ingrédients et achats orphelins, plutôt
+  // que de laisser la migration échouer en aval sans indication de la ligne
+  // en cause.
+  const drive = drives.get(l.drive_config_id);
+  if (!drive) { achatsDriveInconnu += 1; continue; }
   ecrire(
     `insert into public.purchase_lines (user_id, product_id, drive, quantity_ordered, ` +
     `quantity_delivered, unit_price_ttc, total_ttc, purchase_date) values (` +
     [
-      q(USER_ID), q(productId), q(drives.get(l.drive_config_id) ?? 'carrefour'),
+      q(USER_ID), q(productId), q(drive),
       l.quantity_ordered ?? 0, l.quantity_delivered ?? 0,
       q(l.unit_price_ttc), q(l.total_ttc), q(l.purchase_date),
     ].join(', ') + ');',
@@ -123,10 +154,11 @@ db.close();
 
 // Les lignes orphelines partent sur stderr : elles ne doivent pas polluer le
 // SQL, mais elles ne doivent pas non plus disparaître en silence.
-if (ingredientsIgnores || achatsIgnores) {
+if (ingredientsIgnores || achatsIgnores || achatsDriveInconnu) {
   console.error(
     `Ignorés — ingrédients sans recette : ${ingredientsIgnores}, ` +
-    `lignes d'achat sans produit : ${achatsIgnores}`,
+    `lignes d'achat sans produit : ${achatsIgnores}, ` +
+    `lignes d'achat à drive_config_id inconnu : ${achatsDriveInconnu}`,
   );
 }
 console.log(lignes.join('\n'));
