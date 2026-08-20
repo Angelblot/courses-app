@@ -6,7 +6,7 @@
 
 **Architecture :** Les données quittent SQLite pour Postgres (Supabase), protégées par RLS. Une application Expo (expo-router) les lit directement via `supabase-js`, sans backend intermédiaire. Le scan lit un EAN13 avec `expo-camera`, interroge Open Food Facts et crée un produit dans le catalogue.
 
-**Tech Stack :** Expo SDK 54 · expo-router · TypeScript · @supabase/supabase-js · expo-camera · expo-haptics · Postgres 17 (Supabase) · `node --test` pour les fonctions pures.
+**Tech Stack :** Expo SDK 57 · expo-router · TypeScript · @supabase/supabase-js · expo-camera · expo-haptics · Postgres 17 (Supabase) · `node --test` pour les fonctions pures.
 
 ## Global Constraints
 
@@ -1027,7 +1027,13 @@ Six tests, dont ce cas d'ordre et le repli sur le premier mot significatif."
 - Create: `mobile/components/ProductRow.tsx`
 - Create: `mobile/components/EtatVide.tsx`
 - Create: `mobile/stores/products.ts`
-- Delete: `mobile/app/(tabs)/explore.tsx` (gabarit par défaut, s'il existe)
+- Delete: `mobile/app/index.tsx` et `mobile/app/explore.tsx` — écrans du gabarit
+  Expo, en anglais. `app/index.tsx` entrerait de surcroît en conflit de route
+  avec `app/(tabs)/index.tsx`, qui sert la même adresse.
+- Delete: les composants orphelins du gabarit — `animated-icon*`, `app-tabs*`,
+  `external-link`, `hint-row`, `themed-text`, `themed-view`, `web-badge`,
+  `ui/collapsible`. Aucun n'est utilisé par le code écrit ici, et plusieurs
+  portent du texte anglais.
 
 **Interfaces:**
 - Consomme : `supabase` (Task 3), `colors`/`spacing`/`radius` (Task 3).
@@ -1265,11 +1271,30 @@ const s = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 6: Supprimer les écrans du gabarit**
+- [ ] **Step 6: Supprimer les écrans et composants du gabarit**
+
+Le gabarit Expo SDK 57 pose ses propres écrans à la racine de `app/`, en
+anglais, et un jeu de composants de démonstration. `app/index.tsx` sert la
+même route que `app/(tabs)/index.tsx` : le laisser créerait un conflit.
 
 ```bash
-cd mobile && rm -f app/\(tabs\)/explore.tsx app/+not-found.tsx
+cd mobile
+rm -f app/index.tsx app/explore.tsx app/+not-found.tsx
+rm -f components/animated-icon.tsx components/animated-icon.web.tsx \
+      components/animated-icon.module.css components/app-tabs.tsx \
+      components/app-tabs.web.tsx components/external-link.tsx \
+      components/hint-row.tsx components/themed-text.tsx \
+      components/themed-view.tsx components/web-badge.tsx
+rm -rf components/ui
 ```
+
+Vérifier ensuite qu'aucune référence ne subsiste :
+
+```bash
+grep -rn "themed-text\|animated-icon\|app-tabs\|hint-row\|web-badge\|external-link\|collapsible" app components lib || echo "aucune référence orpheline"
+```
+
+Attendu : `aucune référence orpheline`.
 
 - [ ] **Step 7: Vérifier sur l'iPhone**
 
