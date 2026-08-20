@@ -98,6 +98,11 @@ const STOPWORDS = new Set([
   'tranches', 'x'
 ]);
 
+// Le portage normalise les accents avant comparaison, ce que la source Python
+// ne fait pas (elle se contente de `lower().strip()`). C'est une amélioration
+// délibérée : le Python rate ses propres règles dès qu'un nom porte un accent
+// (« Céréales Trésor » ne matche pas `cereale` et retombe sur `lait`, « Féta
+// cubes » ne matche pas `feta` et retombe sur `féta`). On assume cet écart.
 const sansAccents = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 
@@ -106,8 +111,14 @@ const echappe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /**
  * Extrait le type sémantique d'un produit depuis son nom.
  *
- * Les mots-clés de trois caractères ou moins sont cherchés comme mots entiers,
- * ce qui évite qu'« ail » matche « volaille ».
+ * Un mot-clé encadré d'espaces dans la table (ex. `' biere '`, `' ail '`,
+ * `' brosse '`) est une convention signifiant « chercher ce mot entier » :
+ * les espaces marqueurs sont retirés avant la recherche, qui utilise alors
+ * un motif de mot entier — pas un motif exigeant deux espaces consécutifs.
+ * Les mots-clés de trois caractères ou moins (une fois les espaces marqueurs
+ * retirés) sont traités de la même façon, ce qui évite qu'« ail » matche
+ * « volaille ». Cette convention reproduit celle de product_typology.py et
+ * n'est pas devinable en lisant seulement la table de règles.
  */
 export function normalizeProductType(name: string | null | undefined): string | null {
   if (!name) return null;
@@ -116,11 +127,13 @@ export function normalizeProductType(name: string | null | undefined): string | 
 
   for (const [motsCles, type] of TYPE_RULES) {
     for (const motCle of motsCles) {
-      if (motCle.length <= 3) {
-        if (new RegExp(`(^|\\s)${echappe(motCle)}($|\\s)`).test(nom)) return type;
-      } else if (motCle.includes(' ')) {
-        if (new RegExp(`(^|\\s)${echappe(motCle)}`).test(nom)) return type;
-      } else if (nom.includes(motCle)) {
+      const motCleStrip = motCle.trim();
+      const aMarqueurEspace = motCle !== motCleStrip;
+      if (aMarqueurEspace || motCleStrip.length <= 3) {
+        if (new RegExp(`(^|\\s)${echappe(motCleStrip)}($|\\s)`).test(nom)) return type;
+      } else if (motCleStrip.includes(' ')) {
+        if (new RegExp(`(^|\\s)${echappe(motCleStrip)}`).test(nom)) return type;
+      } else if (nom.includes(motCleStrip)) {
         return type;
       }
     }

@@ -35,3 +35,16 @@ test('un nom vide ne produit rien', () => {
   assert.equal(normalizeProductType(''), null);
   assert.equal(normalizeProductType(null), null);
 });
+
+test('un mot-clé encadré d\'espaces est cherché comme mot entier (régression)', () => {
+  // ' biere ' (7 caractères, avec espaces) tombait auparavant dans la
+  // branche « frontière à gauche » sans que les espaces marqueurs ne
+  // soient retirés, ce qui exigeait deux espaces consécutifs autour de
+  // "biere" dans le nom — un motif qui ne pouvait jamais correspondre.
+  assert.equal(
+    normalizeProductType('Bière Aromatisée Jus de Mangue et Passion Sans Alcool TOURTEL'),
+    'biere'
+  );
+  assert.equal(normalizeProductType('Biere IPA artisanale'), 'biere');
+  assert.equal(normalizeProductType('Brosse a dents souple'), 'brosse a dents');
+});
