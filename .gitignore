@@ -73,3 +73,6 @@ mobile/node_modules/
 mobile/ios/
 mobile/android/
 mobile/.env
+
+# Artefacts de compilation locale EAS
+mobile/build-*.ipa
