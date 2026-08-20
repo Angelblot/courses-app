@@ -311,6 +311,57 @@ check(
   { verdict: 'ambiguous' }
 );
 
+// --- Franchissement de la frontière executeScript ---
+// Les arguments d'executeScript sont sérialisés en JSON. Une RegExp y devient
+// un objet vide, et tout appel à .test() dans la page lève une exception qui
+// remonte en « page muette ». Ce bug a réellement cassé l'ajout au panier ;
+// ces vérifications empêchent de le réintroduire.
+
+const { SITES } = await import('./content/sites.js');
+
+for (const [key, cfg] of Object.entries(SITES)) {
+  const transmis = JSON.parse(JSON.stringify(cfg));
+
+  checkTrue(
+    `${key} : le motif d'URL produit survit à la sérialisation`,
+    typeof transmis.productUrlPattern === 'string' && transmis.productUrlPattern.length > 0,
+    `obtenu ${JSON.stringify(transmis.productUrlPattern)}`
+  );
+
+  checkTrue(
+    `${key} : le motif recompilé est une expression régulière valide`,
+    new RegExp(transmis.productUrlPattern) instanceof RegExp
+  );
+
+  // Tout ce que la page utilise doit traverser intact : un tableau de
+  // sélecteurs vidé par la sérialisation passerait inaperçu.
+  for (const champ of ['cards', 'title', 'price', 'addButton', 'cookieReject']) {
+    checkTrue(
+      `${key} : ${champ} traverse la sérialisation`,
+      Array.isArray(transmis[champ]) && transmis[champ].length === cfg[champ].length
+    );
+  }
+}
+
+checkTrue(
+  "le motif Carrefour extrait l'EAN d'une URL de fiche",
+  new RegExp(SITES.carrefour.productUrlPattern).exec(
+    'https://www.carrefour.fr/p/vin-blanc-cibadies-3443660013046'
+  )?.[1] === '3443660013046'
+);
+
+checkTrue(
+  'le motif Carrefour ignore une page de recherche',
+  !new RegExp(SITES.carrefour.productUrlPattern).test('https://www.carrefour.fr/s?q=lardons')
+);
+
+checkTrue(
+  'le motif Leclerc ignore une page de recherche de magasin',
+  !new RegExp(SITES.leclerc.productUrlPattern).test(
+    'https://fd3-courses.leclercdrive.fr/magasin-093401-093401-Le-Cres-Montpellier/recherche.aspx?TexteRecherche=lardons'
+  )
+);
+
 // --- Verdict ---
 
 console.log(`\n${passed} vérification(s) passée(s), ${failures.length} échec(s)\n`);

@@ -1,6 +1,13 @@
 /**
  * Configuration par enseigne.
  *
+ * ATTENTION — `productUrlPattern` est une **chaîne**, pas une expression
+ * régulière. Cet objet traverse `chrome.scripting.executeScript`, dont les
+ * arguments sont sérialisés en JSON : une RegExp y devient un objet vide, et
+ * tout appel à `.test()` dans la page lève une exception. Le motif est donc
+ * recompilé côté page. `hostPattern` et `storePathPattern`, qui ne servent que
+ * dans le service worker et le popup, restent de vraies RegExp.
+ *
  * Les sélecteurs sont donnés en listes de candidats, essayés dans l'ordre :
  * les sites de drive changent souvent de DOM et beaucoup de classes CSS sont
  * générées à la compilation (donc instables entre deux déploiements). Un
@@ -69,7 +76,7 @@ export const SITES = {
     // Fiche produit : l'accès direct évite toute recherche, donc toute
     // ambiguïté. La recherche par code-barres, elle, ne donne rien — Carrefour
     // n'indexe pas les EAN (vérifié le 18/08/2026, 0 résultat).
-    productUrlPattern: /\/p\/[^/?#]*?-(\d{13})(?:[/?#]|$)/,
+    productUrlPattern: '\\/p\\/[^/?#]*?-(\\d{13})(?:[/?#]|$)',
     // Le segment de l'URL est décoratif : seul l'EAN identifie la fiche
     // (vérifié le 18/08/2026, /p/x-<ean> ouvre bien le bon produit). On peut
     // donc atteindre n'importe quel produit du catalogue sans passer par la
@@ -144,7 +151,7 @@ export const SITES = {
     // navigation est pilotée en JavaScript. Aucun EAN n'est donc lisible dans
     // l'adresse, contrairement à Carrefour — l'accès direct par code-barres
     // n'est pas possible ici, et la recherche par nom reste la seule voie.
-    productUrlPattern: /-(\d{13})(?:[/?#]|$)/,
+    productUrlPattern: '-(\\d{13})(?:[/?#]|$)',
     productPage: {
       addButton: ["a:has-text('Ajouter au panier')", "button:has-text('Ajouter')"],
       title: ['h1'],

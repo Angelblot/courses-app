@@ -78,7 +78,20 @@ async function runAgent(tabId, cfg, item, mode) {
       .filter(Boolean);
 
     if (!answers.length) {
-      return { ok: false, reason: 'no_result', message: 'Aucune réponse de la page' };
+      // Sans ce détail, une exception dans le script injecté se résumait à
+      // « page muette » — un cul-de-sac au diagnostic. C'est exactement ce qui
+      // masquait la RegExp perdue à la sérialisation.
+      const causes = frames
+        .map((f) => f?.error?.message ?? (f?.result === undefined ? 'aucune valeur renvoyée' : null))
+        .filter(Boolean);
+      return {
+        ok: false,
+        reason: 'no_result',
+        message: causes.length
+          ? `Le script n'a rien renvoyé : ${causes.join(' · ')}`
+          : 'Aucune réponse de la page',
+        cadres: frames.length,
+      };
     }
 
     if (mode === 'diagnose') {

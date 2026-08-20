@@ -28,6 +28,10 @@ export function pageAgent(cfg, item, mode) {
    */
   const textOf = (el) => ((el?.innerText || '').trim() || (el?.textContent || '').trim());
 
+  // Recompilé ici : les arguments d'executeScript sont sérialisés en JSON, une
+  // RegExp transmise depuis le service worker arriverait vide.
+  const productUrlRe = cfg.productUrlPattern ? new RegExp(cfg.productUrlPattern) : null;
+
   const isVisible = (el) => {
     if (!el) return false;
     const r = el.getBoundingClientRect();
@@ -207,7 +211,8 @@ export function pageAgent(cfg, item, mode) {
    * de revenir directement au bon produit la fois suivante.
    */
   function eanFromUrl(url) {
-    const m = (url || '').match(cfg.productUrlPattern);
+    if (!productUrlRe) return null;
+    const m = (url || '').match(productUrlRe);
     return m ? m[1] : null;
   }
 
@@ -500,7 +505,7 @@ export function pageAgent(cfg, item, mode) {
     if (mode === 'diagnose') return { ok: true, reason: 'diagnose', report: diagnose() };
 
     // Accès direct à une fiche : aucune recherche, donc aucune ambiguïté.
-    if (cfg.productUrlPattern && cfg.productUrlPattern.test(location.href)) {
+    if (productUrlRe && productUrlRe.test(location.href)) {
       return addFromProductPage();
     }
 

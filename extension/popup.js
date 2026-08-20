@@ -86,7 +86,7 @@ const REASON_LABEL = {
   product_unavailable: 'produit non proposé par ce drive',
   challenge: 'vérification demandée',
   inject_failed: 'injection impossible',
-  no_result: 'page muette',
+  no_result: 'le script injecté n\'a rien renvoyé',
 };
 
 function render(state) {
@@ -123,7 +123,9 @@ function render(state) {
     const li = document.createElement('li');
     li.className = r.ok ? 'log__item log__item--ok' : 'log__item log__item--ko';
     const certain = r.ok && (r.via === 'direct_url' || r.via === 'ean_match');
-    const detail = r.ok ? r.label || '' : REASON_LABEL[r.reason] || r.reason || '';
+    const detail = r.ok
+      ? r.label || ''
+      : r.message || REASON_LABEL[r.reason] || r.reason || '';
     li.textContent = `${r.item} — ${detail}${certain ? ' (par code-barres)' : ''}`;
     $('log').appendChild(li);
   }
