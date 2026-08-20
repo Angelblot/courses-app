@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import type { FicheProduit } from '../lib/openfoodfacts.ts';
 
 export type Product = {
   id: string;
@@ -56,4 +57,37 @@ export function useProducts() {
   useEffect(() => { recharger(); }, [recharger]);
 
   return { produits, chargement, erreur, recharger };
+}
+
+/**
+ * Ajoute un produit scanné au catalogue.
+ *
+ * Un code-barres déjà présent n'est pas réinséré : la contrainte
+ * unique (user_id, ean13) le garantit en base, et on renvoie le produit
+ * existant pour que l'écran le signale au lieu d'afficher une erreur brute.
+ */
+export async function ajouterProduit(
+  fiche: FicheProduit,
+): Promise<{ ok: boolean; doublon?: Product; erreur?: string }> {
+  const { data: existant } = await supabase
+    .from('products')
+    .select(CHAMPS)
+    .eq('ean13', fiche.ean13)
+    .maybeSingle();
+
+  if (existant) return { ok: false, doublon: existant as Product };
+
+  const { error } = await supabase.from('products').insert({
+    ean13: fiche.ean13,
+    name: fiche.name,
+    brand: fiche.brand,
+    image_url: fiche.imageUrl,
+    grammage_g: fiche.grammageG,
+    volume_ml: fiche.volumeMl,
+    product_type: fiche.productType,
+    favorite: true, // un produit qu'on scanne chez soi est un produit qu'on aime
+    unit: fiche.volumeMl ? 'l' : 'piece',
+  });
+
+  return error ? { ok: false, erreur: error.message } : { ok: true };
 }
