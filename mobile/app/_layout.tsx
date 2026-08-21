@@ -24,9 +24,14 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!pret) return;
-    const surLogin = segments[0] === 'login';
-    if (!session && !surLogin) router.replace('/login');
-    if (session && surLogin) router.replace('/');
+    // Deux routes sont accessibles sans session. `reinitialisation` doit en
+    // outre rester atteignable AVEC une session : l'échange du code de
+    // récupération en crée une, et une redirection vers l'accueil à ce
+    // moment-là escamoterait l'écran de saisie du nouveau mot de passe.
+    const route = segments[0] ?? '';
+    const publique = route === 'login' || route === 'reinitialisation';
+    if (!session && !publique) router.replace('/login');
+    if (session && route === 'login') router.replace('/');
   }, [pret, session, segments, router]);
 
   // Jamais d'écran muet : tant que la session stockée n'a pas été relue,

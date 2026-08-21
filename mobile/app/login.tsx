@@ -25,6 +25,29 @@ export default function Login() {
   // rapprochés peuvent tous deux lire `enCours === false` avant le premier
   // rendu, une ref est mise à jour de façon synchrone et évite ce cas.
   const enCoursRef = useRef(false);
+  const [envoye, setEnvoye] = useState(false);
+
+  /**
+   * Demande un lien de récupération. Le message de confirmation est le même
+   * que l'adresse existe ou non : répondre différemment révélerait quels
+   * comptes existent.
+   */
+  const demanderLien = async () => {
+    if (!email.trim()) {
+      setErreur('Renseigne ton adresse e-mail, puis redemande le lien.');
+      return;
+    }
+    setErreur(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: 'coursesapp://reinitialisation',
+      });
+      if (error) console.error('[recuperation]', error.message);
+    } catch (err) {
+      console.error('[recuperation]', err);
+    }
+    setEnvoye(true);
+  };
 
   const connecter = async () => {
     if (enCoursRef.current) return;
@@ -94,6 +117,17 @@ export default function Login() {
             ? <ActivityIndicator color={colors.accentContrast} />
             : <Text style={s.boutonTexte}>Se connecter</Text>}
         </Pressable>
+
+        {envoye ? (
+          <Text style={s.info}>
+            Si un compte existe pour cette adresse, un lien vient d'y être envoyé.
+            Ouvre-le depuis ce téléphone.
+          </Text>
+        ) : (
+          <Pressable onPress={demanderLien}>
+            <Text style={s.lien}>Mot de passe oublié</Text>
+          </Pressable>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -120,4 +154,12 @@ const s = StyleSheet.create({
     alignItems: 'center', marginTop: spacing.lg,
   },
   boutonTexte: { color: colors.accentContrast, fontWeight: '700', fontSize: 16 },
+  lien: {
+    color: colors.textMuted, fontSize: 13, fontWeight: '600',
+    textAlign: 'center', textDecorationLine: 'underline', marginTop: spacing.lg,
+  },
+  info: {
+    color: colors.accent, fontSize: 13, fontWeight: '600',
+    textAlign: 'center', marginTop: spacing.lg,
+  },
 });
