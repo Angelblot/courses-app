@@ -96,6 +96,11 @@ export async function ajouterProduit(
     grammage_g: fiche.grammageG,
     volume_ml: fiche.volumeMl,
     product_type: fiche.productType,
+    // `?? 'autre'` et non `?? null` : une fiche peut venir de la file d'attente
+    // persistée dans AsyncStorage, écrite par une version antérieure qui ne
+    // connaissait pas ce champ. Le rayon est alors absent, pas nul — et un
+    // produit sans rayon est exactement le défaut que ce correctif supprime.
+    category: fiche.categoryKey ?? 'autre',
     favorite: true, // un produit qu'on scanne chez soi est un produit qu'on aime
     // Les 65 produits existants du catalogue utilisent tous unit = 'unité',
     // y compris les liquides (vin 750 ml, bière 200 ml) : la contenance vit

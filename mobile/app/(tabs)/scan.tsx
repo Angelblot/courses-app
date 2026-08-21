@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FicheScannee } from '../../components/FicheScannee';
 import { lookupEan, type FicheProduit, type ResultatRecherche } from '../../lib/openfoodfacts.ts';
 import { normalizeProductType } from '../../lib/typology.ts';
+import type { CleRayon } from '../../lib/rayons.ts';
 import { fileScan } from '../../stores/queue.ts';
 import { ajouterProduit } from '../../stores/products';
 import { colors, radius, spacing } from '../../lib/theme';
@@ -129,7 +130,7 @@ export default function Scan() {
     if (!ean) return;
     await fileScan.enfiler({
       ean13: ean, name: ean, brand: null, imageUrl: null,
-      grammageG: null, volumeMl: null, productType: null,
+      grammageG: null, volumeMl: null, productType: null, categoryKey: null,
     });
     await rafraichirCompteur();
     setMessage({ texte: 'Mis en attente — ajouté dès le retour du réseau', erreur: false });
@@ -227,7 +228,7 @@ export default function Scan() {
 
   /** Produit absent d'Open Food Facts : on compose la fiche depuis la saisie. */
   const ajouterManuel = useCallback(
-    (nom: string, marque: string) => {
+    (nom: string, marque: string, rayonChoisi: CleRayon) => {
       if (!ean || !nom) return;
       enregistrer({
         ean13: ean,
@@ -236,7 +237,9 @@ export default function Scan() {
         imageUrl: null,
         grammageG: null,
         volumeMl: null,
+        // Aucune catégorie Open Food Facts ici : le nom est la seule source.
         productType: normalizeProductType(nom),
+        categoryKey: rayonChoisi,
       });
     },
     [ean, enregistrer],

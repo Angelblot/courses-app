@@ -78,3 +78,20 @@ test('un mot-clé de liquide contenant un métacaractère ne casse pas la détec
   assert.doesNotThrow(() => new RegExp(`(^|\\s)${echappe(motCle)}`));
   assert.equal(new RegExp(`(^|\\s)${echappe(motCle)}`).test('la sauce(maison) du chef'), true);
 });
+
+test('la fiche porte le rayon déduit et la typologie corrigée', () => {
+  const fiche = mapOffProduct('3073781091861', {
+    product_name: 'Boursin® Onctueux Ail & Fines Herbes',
+    brands: 'BOURSIN',
+    product_quantity: 125,
+    categories_tags: ['en:dairies', 'en:cheeses', 'en:cheeses-perishable'],
+  });
+  assert.equal(fiche.categoryKey, 'pls');
+  assert.equal(fiche.productType, 'fromage');
+  assert.equal(fiche.grammageG, 125);
+});
+
+test('un produit sans catégorie reçoit le rayon « autre »', () => {
+  const fiche = mapOffProduct('1234567890123', { product_name: 'Chose' });
+  assert.equal(fiche.categoryKey, 'autre');
+});

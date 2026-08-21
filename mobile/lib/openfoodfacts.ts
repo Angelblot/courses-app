@@ -5,6 +5,7 @@
  * liquides et affectation de la quantité en grammes ou en millilitres.
  */
 import { normalizeProductType } from './typology.ts';
+import { rayonDepuisCategories, type CleRayon } from './rayons.ts';
 
 export type FicheProduit = {
   ean13: string;
@@ -14,6 +15,8 @@ export type FicheProduit = {
   grammageG: number | null;
   volumeMl: number | null;
   productType: string | null;
+  /** Rayon déduit des catégories Open Food Facts, corrigeable par l'utilisateur. */
+  categoryKey: CleRayon | null;
 };
 
 type OffData = {
@@ -68,7 +71,8 @@ export function mapOffProduct(ean: string, data: OffData): FicheProduit | null {
 
   const quantite = Number(data.product_quantity);
   const valide = Number.isFinite(quantite) && quantite > 0;
-  const liquide = estLiquide(name, data.categories_tags ?? []);
+  const categories = data.categories_tags ?? [];
+  const liquide = estLiquide(name, categories);
 
   return {
     ean13: ean,
@@ -80,7 +84,8 @@ export function mapOffProduct(ean: string, data: OffData): FicheProduit | null {
     imageUrl: data.image_url || null,
     grammageG: valide && !liquide ? Math.round(quantite) : null,
     volumeMl: valide && liquide ? Math.round(quantite) : null,
-    productType: normalizeProductType(name),
+    productType: normalizeProductType(name, categories),
+    categoryKey: rayonDepuisCategories(categories),
   };
 }
 
