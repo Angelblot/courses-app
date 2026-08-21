@@ -112,6 +112,37 @@ const sansAccents = (s: string) =>
 const echappe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
+ * (fragment d'étiquette Open Food Facts, type). Consultée AVANT les règles par
+ * nom.
+ *
+ * « Boursin Ail & Fines Herbes » est un fromage et non de l'ail ; « Menthe
+ * Verte » est un sirop et non de la menthe. Le nom seul ne peut pas le savoir :
+ * il porte l'arôme, la catégorie porte la nature. Les règles par nom ne sont
+ * pas fausses, elles étaient seulement interrogées trop tôt.
+ *
+ * L'ordre va du plus précis au plus général — `olive-oils` avant `oils`.
+ * Le vocabulaire des types reprend celui de TYPE_RULES, sauf `sirop`, absent
+ * jusqu'ici du catalogue.
+ */
+const TYPE_PAR_CATEGORIE: ReadonlyArray<readonly [string, string]> = [
+  ['olive-oils', 'huile'],
+  ['cheeses', 'fromage'],
+  ['yogurts', 'yaourt'],
+  ['syrups', 'sirop'],
+  ['juices', 'jus'],
+  ['beers', 'biere'],
+  ['wines', 'vin'],
+  ['hams', 'jambon'],
+  ['charcuteries', 'charcuterie'],
+  ['pastas', 'pate'],
+  ['rices', 'riz'],
+  ['milks', 'lait'],
+  ['butters', 'beurre'],
+  ['eggs', 'oeuf'],
+  ['coffees', 'cafe'],
+];
+
+/**
  * Extrait le type sémantique d'un produit depuis son nom.
  *
  * Un mot-clé encadré d'espaces dans la table (ex. `' biere '`, `' ail '`,
@@ -123,7 +154,17 @@ const echappe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * « volaille ». Cette convention reproduit celle de product_typology.py et
  * n'est pas devinable en lisant seulement la table de règles.
  */
-export function normalizeProductType(name: string | null | undefined): string | null {
+export function normalizeProductType(
+  name: string | null | undefined,
+  categories?: string[] | null,
+): string | null {
+  // Les catégories d'abord : elles décrivent la nature du produit, quand le nom
+  // ne porte souvent que son arôme. Ce test précède volontairement le garde-fou
+  // sur `name` — une fiche sans libellé mais catégorisée reste exploitable.
+  for (const [fragment, type] of TYPE_PAR_CATEGORIE) {
+    if (categories?.some((c) => c.includes(fragment))) return type;
+  }
+
   if (!name) return null;
   const nom = sansAccents(name);
   if (!nom) return null;
