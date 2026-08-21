@@ -20,6 +20,10 @@ export default function Scan() {
   const [resultat, setResultat] = useState<ResultatRecherche | null>(null);
   const [chargement, setChargement] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
+  // Rayon retenu pour la fiche en cours. Posé au rayon déduit dès qu'un
+  // résultat arrive, puis corrigeable ; remis à « autre » entre deux scans
+  // pour qu'un choix manuel ne déteigne pas sur le produit suivant.
+  const [rayon, setRayon] = useState<CleRayon>('autre');
   // Compteur de scans en attente et avis de reprise, affichés en permanence
   // sous la consigne de visée (défaut 5) : sans ceci, la file d'attente est
   // invisible pour l'utilisateur — il n'a aucun moyen de savoir combien de
@@ -51,6 +55,7 @@ export default function Scan() {
     setEan(null);
     setResultat(null);
     setMessage(null);
+    setRayon('autre');
   }, []);
 
   const surLecture = useCallback(
@@ -60,7 +65,9 @@ export default function Scan() {
       setEan(data);
       setChargement(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setResultat(await lookupEan(data));
+      const r = await lookupEan(data);
+      setResultat(r);
+      setRayon(r.etat === 'trouve' ? (r.fiche.categoryKey ?? 'autre') : 'autre');
       setChargement(false);
     },
     [],
@@ -223,8 +230,9 @@ export default function Scan() {
   useFocusEffect(reprendreFileEnAttente);
 
   const ajouter = useCallback(() => {
-    if (resultat?.etat === 'trouve') enregistrer(resultat.fiche);
-  }, [resultat, enregistrer]);
+    // Le rayon affiché prime sur celui déduit : l'utilisateur a pu le corriger.
+    if (resultat?.etat === 'trouve') enregistrer({ ...resultat.fiche, categoryKey: rayon });
+  }, [resultat, enregistrer, rayon]);
 
   /** Produit absent d'Open Food Facts : on compose la fiche depuis la saisie. */
   const ajouterManuel = useCallback(
@@ -290,6 +298,8 @@ export default function Scan() {
           onAjouterManuel={ajouterManuel}
           onMettreEnAttente={mettreEnAttente}
           onIgnorer={reprendre}
+          rayon={rayon}
+          onChangerRayon={setRayon}
         />
       )}
     </View>
