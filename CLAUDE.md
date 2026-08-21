@@ -73,6 +73,11 @@ cd ~/courses-app/frontend && npm run build
 
 # DB shell
 sqlite3 ~/courses-app/backend/app.db
+
+# Tests de l'app mobile — EXIGE Node >= 22
+# Node 20 échoue sur ERR_UNKNOWN_FILE_EXTENSION : il ne charge pas les .ts.
+# La version par défaut de la machine est la 20, d'où le `nvm use`.
+cd mobile && nvm use 22 && node --test lib/*.test.mjs
 ```
 
 ## Workflow d'autonomie
@@ -80,11 +85,6 @@ sqlite3 ~/courses-app/backend/app.db
 - Utiliser `--dangerously-skip-permissions` et `--max-turns 30` pour les tâches complexes
 - Ne pas hésiter à explorer, itérer, et utiliser `/compact` si le contexte est plein
 - En cas de blocage technique, chercher une solution par soi-même avant de demander
-
-## Validation par Hermes
-- Après chaque session, Hermes exécute les tests (`pytest`)
-- Hermes vérifie l'UX (build frontend + screenshot)
-- Le résultat est consigné dans Obsidian/Projets/Courses/Avancement.md
 
 ## Fichiers clés
 - `backend/app/main.py` — FastAPI app, routes enregistrées
