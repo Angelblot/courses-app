@@ -60,7 +60,7 @@ profond `coursesapp://reinitialisation`.
   - `function rayonDepuisCategories(tags: string[] | null | undefined): CleRayon`
   - `function libelleRayon(cle: string | null | undefined): string`
 
-- [ ] **Étape 1 : écrire le test qui échoue**
+- [x] **Étape 1 : écrire le test qui échoue**
 
 Créer `mobile/lib/rayons.test.mjs` :
 
@@ -131,7 +131,7 @@ test('les 10 rayons suivent l\'ordre d\'affichage de la base', () => {
 });
 ```
 
-- [ ] **Étape 2 : lancer le test et vérifier qu'il échoue**
+- [x] **Étape 2 : lancer le test et vérifier qu'il échoue**
 
 Depuis `mobile/` :
 
@@ -141,7 +141,7 @@ Depuis `mobile/` :
 
 Attendu : ÉCHEC, `ERR_MODULE_NOT_FOUND` sur `./rayons.ts`.
 
-- [ ] **Étape 3 : écrire l'implémentation**
+- [x] **Étape 3 : écrire l'implémentation**
 
 Créer `mobile/lib/rayons.ts` :
 
@@ -211,7 +211,7 @@ export function libelleRayon(cle: string | null | undefined): string {
 }
 ```
 
-- [ ] **Étape 4 : lancer le test et vérifier qu'il passe**
+- [x] **Étape 4 : lancer le test et vérifier qu'il passe**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/rayons.test.mjs
@@ -219,7 +219,7 @@ export function libelleRayon(cle: string | null | undefined): string {
 
 Attendu : `# pass 7`, `# fail 0`.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add mobile/lib/rayons.ts mobile/lib/rayons.test.mjs
@@ -239,7 +239,7 @@ git commit -m "feat: déduction du rayon depuis les catégories Open Food Facts"
 - Produit : `normalizeProductType(name: string | null | undefined, categories?: string[] | null): string | null`
   — le second paramètre est optionnel, tous les appels existants restent valides.
 
-- [ ] **Étape 1 : écrire les tests qui échouent**
+- [x] **Étape 1 : écrire les tests qui échouent**
 
 Ajouter à la fin de `mobile/lib/typology.test.mjs` :
 
@@ -284,7 +284,7 @@ test('une catégorie suffit même sans nom exploitable', () => {
 });
 ```
 
-- [ ] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
+- [x] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/typology.test.mjs
@@ -293,7 +293,7 @@ test('une catégorie suffit même sans nom exploitable', () => {
 Attendu : ÉCHEC sur les nouveaux tests — `'ail' !== 'fromage'` et `'menthe' !== 'sirop'`.
 Les tests préexistants doivent tous rester au vert.
 
-- [ ] **Étape 3 : écrire l'implémentation**
+- [x] **Étape 3 : écrire l'implémentation**
 
 Dans `mobile/lib/typology.ts`, insérer **juste avant** la déclaration
 `export function normalizeProductType` :
@@ -363,7 +363,7 @@ export function normalizeProductType(
 Le reste de la fonction — boucle sur `TYPE_RULES` et repli sur le premier mot
 significatif — n'est pas touché.
 
-- [ ] **Étape 4 : lancer les tests et vérifier qu'ils passent**
+- [x] **Étape 4 : lancer les tests et vérifier qu'ils passent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/*.test.mjs
@@ -371,7 +371,7 @@ significatif — n'est pas touché.
 
 Attendu : `# fail 0`, et un total au moins égal à 35 tests (30 existants + 5).
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add mobile/lib/typology.ts mobile/lib/typology.test.mjs
@@ -392,7 +392,7 @@ git commit -m "fix: la typologie lit la catégorie avant le nom du produit"
 - Consomme : `rayonDepuisCategories` de la tâche 1, `normalizeProductType(name, categories)` de la tâche 2.
 - Produit : `FicheProduit` gagne `categoryKey: CleRayon | null`.
 
-- [ ] **Étape 1 : écrire les tests qui échouent**
+- [x] **Étape 1 : écrire les tests qui échouent**
 
 Ajouter à la fin de `mobile/lib/openfoodfacts.test.mjs` :
 
@@ -415,7 +415,7 @@ test('un produit sans catégorie reçoit le rayon « autre »', () => {
 });
 ```
 
-- [ ] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
+- [x] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/openfoodfacts.test.mjs
@@ -423,7 +423,7 @@ test('un produit sans catégorie reçoit le rayon « autre »', () => {
 
 Attendu : ÉCHEC, `undefined !== 'pls'`.
 
-- [ ] **Étape 3 : écrire l'implémentation**
+- [x] **Étape 3 : écrire l'implémentation**
 
 Dans `mobile/lib/openfoodfacts.ts`, ajouter l'import après la ligne 7 :
 
@@ -513,7 +513,7 @@ Ajouter l'import en tête de `scan.tsx` :
 import type { CleRayon } from '../../lib/rayons.ts';
 ```
 
-- [ ] **Étape 4 : lancer les tests et vérifier qu'ils passent**
+- [x] **Étape 4 : lancer les tests et vérifier qu'ils passent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/*.test.mjs
@@ -524,7 +524,7 @@ Attendu : `# fail 0`. `tsc` doit signaler l'appel à `onAjouterManuel` dans
 `components/FicheScannee.tsx`, qui ne passe pas encore le rayon — c'est la
 tâche 5 qui le corrige. Noter l'erreur et poursuivre.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add mobile/lib/openfoodfacts.ts mobile/lib/openfoodfacts.test.mjs mobile/stores/products.ts "mobile/app/(tabs)/scan.tsx"
@@ -542,7 +542,7 @@ git commit -m "feat: le rayon déduit accompagne la fiche jusqu'au catalogue"
 - Consomme : rien du code applicatif.
 - Produit : `products.category` ne contient plus que des clés de `categories`.
 
-- [ ] **Étape 1 : constater l'état avant migration**
+- [x] **Étape 1 : constater l'état avant migration**
 
 Via l'outil MCP Supabase, projet `qmymwicsgilhoihtfdjm` :
 
@@ -555,7 +555,7 @@ Attendu : des libellés de ticket de caisse (`P.L.S.`, `EPICERIE`,
 à `NULL`. **Copier ce résultat dans le message de commit** — c'est la seule
 trace de l'état d'origine.
 
-- [ ] **Étape 2 : écrire la migration**
+- [x] **Étape 2 : écrire la migration**
 
 Créer `supabase/migrations/0005_normalisation_rayons.sql` :
 
@@ -587,12 +587,12 @@ set category = 'autre'
 where category is null;
 ```
 
-- [ ] **Étape 3 : appliquer la migration**
+- [x] **Étape 3 : appliquer la migration**
 
 Via l'outil MCP Supabase `apply_migration`, projet `qmymwicsgilhoihtfdjm`,
 nom `normalisation_rayons`, avec le contenu ci-dessus.
 
-- [ ] **Étape 4 : vérifier le résultat**
+- [x] **Étape 4 : vérifier le résultat**
 
 ```sql
 select p.category, count(*) as produits,
@@ -609,7 +609,7 @@ Attendu : **toutes** les valeurs sont des clés de `categories` (`pls`,
 Si une ligne rend un libellé nul, la migration a laissé une valeur non
 traduite : ne pas poursuivre, corriger la table `category_aliases` d'abord.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add supabase/migrations/0005_normalisation_rayons.sql
@@ -629,7 +629,7 @@ git commit -m "feat: normalise les rayons des produits en clés canoniques"
 - Consomme : `RAYONS`, `libelleRayon`, `CleRayon` (tâche 1) ; `FicheProduit.categoryKey` (tâche 3).
 - Produit : `FicheScannee` gagne les props `rayon: CleRayon` et `onChangerRayon: (cle: CleRayon) => void` ; `onAjouterManuel` gagne un troisième argument `rayon`.
 
-- [ ] **Étape 1 : créer le sélecteur**
+- [x] **Étape 1 : créer le sélecteur**
 
 Créer `mobile/components/SelecteurRayon.tsx` :
 
@@ -694,7 +694,7 @@ const s = StyleSheet.create({
 });
 ```
 
-- [ ] **Étape 2 : afficher le rayon dans la fiche**
+- [x] **Étape 2 : afficher le rayon dans la fiche**
 
 Dans `mobile/components/FicheScannee.tsx` :
 
@@ -788,7 +788,7 @@ Ajouter les styles à `StyleSheet.create` :
   rayonValeur: { fontSize: 15, fontWeight: '600', color: colors.accent },
 ```
 
-- [ ] **Étape 3 : câbler l'état dans l'écran de scan**
+- [x] **Étape 3 : câbler l'état dans l'écran de scan**
 
 Dans `mobile/app/(tabs)/scan.tsx` :
 
@@ -838,7 +838,7 @@ Transmettre les deux nouvelles props au composant :
         onChangerRayon={setRayon}
 ```
 
-- [ ] **Étape 4 : vérifier la compilation**
+- [x] **Étape 4 : vérifier la compilation**
 
 ```bash
 npx tsc --noEmit
@@ -847,7 +847,7 @@ npx tsc --noEmit
 
 Attendu : `tsc` ne signale plus rien, `# fail 0`.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add mobile/components/SelecteurRayon.tsx mobile/components/FicheScannee.tsx "mobile/app/(tabs)/scan.tsx"
@@ -868,7 +868,7 @@ git commit -m "feat: le rayon s'affiche sur la fiche scannée et se corrige d'un
 - Consomme : `supabase` de `lib/supabase.ts`.
 - Produit : route `/reinitialisation`, atteignable par `coursesapp://reinitialisation?code=...`.
 
-- [ ] **Étape 1 : passer le client en PKCE**
+- [x] **Étape 1 : passer le client en PKCE**
 
 Dans `mobile/lib/supabase.ts`, ajouter dans le bloc `auth` :
 
@@ -880,7 +880,7 @@ Dans `mobile/lib/supabase.ts`, ajouter dans le bloc `auth` :
     flowType: 'pkce',
 ```
 
-- [ ] **Étape 2 : ouvrir la route au visiteur non connecté**
+- [x] **Étape 2 : ouvrir la route au visiteur non connecté**
 
 Dans `mobile/app/_layout.tsx`, remplacer le second `useEffect` :
 
@@ -898,7 +898,7 @@ Dans `mobile/app/_layout.tsx`, remplacer le second `useEffect` :
   }, [pret, session, segments, router]);
 ```
 
-- [ ] **Étape 3 : écrire l'écran de réinitialisation**
+- [x] **Étape 3 : écrire l'écran de réinitialisation**
 
 Créer `mobile/app/reinitialisation.tsx` :
 
@@ -1063,7 +1063,7 @@ const s = StyleSheet.create({
 });
 ```
 
-- [ ] **Étape 4 : ajouter le lien sur l'écran de connexion**
+- [x] **Étape 4 : ajouter le lien sur l'écran de connexion**
 
 Dans `mobile/app/login.tsx`, ajouter l'état et la fonction d'envoi, après
 `const enCoursRef` :
@@ -1122,7 +1122,7 @@ Ajouter les styles :
   },
 ```
 
-- [ ] **Étape 5 : vérifier la compilation**
+- [x] **Étape 5 : vérifier la compilation**
 
 ```bash
 npx tsc --noEmit
@@ -1131,7 +1131,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 6 : commit**
+- [x] **Étape 6 : commit**
 
 ```bash
 git add mobile/lib/supabase.ts mobile/app/reinitialisation.tsx mobile/app/_layout.tsx mobile/app/login.tsx
@@ -1147,7 +1147,7 @@ git commit -m "feat: récupération de mot de passe par lien profond PKCE"
 - Créer : `mobile/.nvmrc`
 - Modifier : `mobile/package.json` (déjà modifié localement, à inclure)
 
-- [ ] **Étape 1 : figer la version de Node pour le dépôt**
+- [x] **Étape 1 : figer la version de Node pour le dépôt**
 
 Créer `mobile/.nvmrc` avec pour seul contenu :
 
@@ -1155,14 +1155,14 @@ Créer `mobile/.nvmrc` avec pour seul contenu :
 22
 ```
 
-- [ ] **Étape 2 : incrémenter le numéro de build**
+- [x] **Étape 2 : incrémenter le numéro de build**
 
 Dans `mobile/app.json`, passer `expo.ios.buildNumber` de `"1"` à `"2"`.
 
 App Store Connect refuse un numéro de build déjà déposé : sans cette
 incrémentation, la livraison échoue **après** une compilation complète.
 
-- [ ] **Étape 3 : vérification finale avant poussée**
+- [x] **Étape 3 : vérification finale avant poussée**
 
 ```bash
 npx tsc --noEmit
@@ -1173,7 +1173,7 @@ node -e "console.log(require('./app.json').expo.ios.buildNumber)"
 
 Attendu : aucune erreur TypeScript, `# fail 0`, expo-doctor au vert, et `2`.
 
-- [ ] **Étape 4 : commit et poussée**
+- [x] **Étape 4 : commit et poussée**
 
 ```bash
 git add mobile/.nvmrc mobile/app.json mobile/package.json
