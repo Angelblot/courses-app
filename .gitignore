@@ -70,7 +70,12 @@ claude-brief-*.md
 # Expo
 mobile/.expo/
 mobile/node_modules/
-mobile/ios/
+# Le projet iOS est versionné : Xcode Cloud compile un vrai projet Xcode et
+# ne peut pas exécuter `expo prebuild` avant de connaître le workspace.
+# Seuls les dossiers régénérés par ci_post_clone.sh restent exclus.
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/ios/.xcode.env.local
 mobile/android/
 mobile/.env
 

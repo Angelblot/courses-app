@@ -39,5 +39,10 @@ yarn-error.*
 example
 
 # generated native folders
-/ios
+# Le projet iOS est versionné depuis le passage à Xcode Cloud : celui-ci
+# compile un projet Xcode existant et n'exécute pas `expo prebuild`.
+# Seuls les dossiers régénérés par ios/ci_scripts/ci_post_clone.sh sont exclus.
+/ios/Pods
+/ios/build
+/ios/.xcode.env.local
 /android
