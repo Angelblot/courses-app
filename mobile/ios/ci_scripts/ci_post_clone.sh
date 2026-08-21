@@ -32,6 +32,24 @@ npm ci --no-audit --no-fund
 
 echo "Pods"
 cd ios
-pod install
+
+# CocoaPods télécharge hermes-engine depuis Maven Central à chaque build, et ce
+# téléchargement a déjà coupé en plein vol : curl 35, « Connection reset by
+# peer », build 2 du 21/08/2026. Tout l'archivage tombe alors sur un incident
+# réseau de quelques secondes. CocoaPods ne retente que deux fois, aussitôt.
+# On rejoue donc l'installation entière avec une pause, plutôt que de perdre
+# vingt-cinq minutes de compilation. Trois échecs d'affilée ne sont plus un
+# incident passager : on abandonne pour de bon.
+for tentative in 1 2 3; do
+  if pod install; then
+    break
+  fi
+  if [ "$tentative" = 3 ]; then
+    echo "pod install a échoué trois fois — ce n'est plus une coupure réseau."
+    exit 1
+  fi
+  echo "pod install a échoué (tentative $tentative), nouvel essai dans 15 s"
+  sleep 15
+done
 
 echo "Prêt pour l'archivage"
