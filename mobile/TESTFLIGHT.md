@@ -53,6 +53,33 @@ traitement, puis dans TestFlight.
 | Apparence | claire forcée — sans quoi la barre d'état devient illisible sur un iPhone en mode sombre |
 | Permission caméra | « L'appareil photo sert à scanner le code-barres de tes produits. » |
 
+## Version d'Xcode : contrainte vérifiée le 20/08/2026
+
+**App Store Connect refuse les envois compilés avec un Xcode bêta.** Le message
+d'erreur est explicite : *« you need to use the latest Release Candidates (RC)
+for SDKs and Xcode to submit the app »* (validation 409, Unsupported SDK or
+Xcode version).
+
+Une bêta suffit pour **compiler**, pas pour **envoyer**. La nuance a coûté une
+compilation complète ici : l'`.ipa` est produit, signé, valide, et rejeté au
+téléversement.
+
+Version requise à ce jour : **Xcode 26.6, build 17F113** (25 juin 2026), la
+dernière stable. Xcode 27 est en bêta 5 et ne passe pas.
+
+Vérifier ce qui est actif :
+
+```bash
+xcodebuild -version && xcode-select -p
+```
+
+Si `xcode-select` pointe sur une bêta, l'installer depuis le Mac App Store puis
+basculer dessus :
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
+
 ## À savoir avant de lancer
 
 **L'identifiant de bundle est définitif.** `com.coursesapp.mobile` est un
