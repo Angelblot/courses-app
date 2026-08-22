@@ -45,7 +45,7 @@ Supabase fournit la clé de service sans qu'on l'écrive nulle part.
 - Produit : tables `households`, `household_members` ; fonction
   `public.mon_foyer() returns uuid` ; colonne `household_id` sur huit tables.
 
-- [ ] **Étape 1 : constater l'état d'origine**
+- [x] **Étape 1 : constater l'état d'origine**
 
 Par l'outil MCP Supabase :
 
@@ -57,7 +57,7 @@ where schemaname = 'public' order by tablename, cmd;
 **Copier ce résultat dans le message de commit** : c'est la seule trace de ce
 qu'étaient les politiques avant la bascule.
 
-- [ ] **Étape 2 : écrire la migration**
+- [x] **Étape 2 : écrire la migration**
 
 Créer `supabase/migrations/0010_foyer.sql` :
 
@@ -233,11 +233,11 @@ create policy "retirer un membre" on public.household_members
   );
 ```
 
-- [ ] **Étape 3 : appliquer**
+- [x] **Étape 3 : appliquer**
 
 Par l'outil MCP Supabase `apply_migration`, nom `foyer`.
 
-- [ ] **Étape 4 : vérifier la structure**
+- [x] **Étape 4 : vérifier la structure**
 
 ```sql
 select
@@ -252,7 +252,7 @@ orphelin signifierait que la colonne obligatoire a été posée sur des lignes n
 rattachées — impossible ici, la migration aurait échoué, mais le vérifier coûte
 une seconde.
 
-- [ ] **Étape 5 : vérifier que les politiques ont bien basculé**
+- [x] **Étape 5 : vérifier que les politiques ont bien basculé**
 
 ```sql
 select tablename, policyname, qual from pg_policies
@@ -273,7 +273,7 @@ where schemaname = 'public' and qual like '%= user_id%';
 
 Attendu : aucune ligne.
 
-- [ ] **Étape 6 : commit**
+- [x] **Étape 6 : commit**
 
 ```bash
 git add supabase/migrations/0010_foyer.sql
@@ -291,7 +291,7 @@ git commit -m "feat: les données appartiennent au foyer, plus à la personne"
 - Consomme : le schéma de la tâche 1.
 - Produit : un script SQL qui échoue bruyamment si l'isolation ne tient pas.
 
-- [ ] **Étape 1 : écrire le script**
+- [x] **Étape 1 : écrire le script**
 
 Créer `supabase/tests/isolation_foyer.sql` :
 
@@ -341,7 +341,7 @@ begin
 end $$;
 ```
 
-- [ ] **Étape 2 : l'exécuter**
+- [x] **Étape 2 : l'exécuter**
 
 Par l'outil MCP Supabase `execute_sql`, avec le contenu du script.
 
@@ -349,7 +349,7 @@ Attendu : le message `ISOLATION VERIFIEE`. Une exception `ISOLATION ROMPUE`
 signifie que la bascule est incomplète — **ne pas poursuivre**, revenir à la
 tâche 1.
 
-- [ ] **Étape 3 : vérifier que le ménage a bien été fait**
+- [x] **Étape 3 : vérifier que le ménage a bien été fait**
 
 ```sql
 select count(*) as restes from auth.users where email like '%example.invalid';
@@ -359,7 +359,7 @@ select count(*) as foyers from public.households;
 Attendu : `0` reste, `1` foyer. Le script nettoie derrière lui, mais une
 exception au milieu l'aurait interrompu avant : il faut le constater.
 
-- [ ] **Étape 4 : commit**
+- [x] **Étape 4 : commit**
 
 ```bash
 git add supabase/tests/isolation_foyer.sql
@@ -379,7 +379,7 @@ git commit -m "test: éprouve que deux foyers ne se voient pas"
   `supabase.functions.invoke('inviter', { body: { email } })`, rendant
   `{ ok: true }` ou `{ ok: false, erreur: string }`.
 
-- [ ] **Étape 1 : le déclencheur de rattachement**
+- [x] **Étape 1 : le déclencheur de rattachement**
 
 Créer `supabase/migrations/0011_rattachement_invite.sql` :
 
@@ -416,7 +416,7 @@ create trigger rattacher_invite_apres_creation
 
 Appliquer par `apply_migration`, nom `rattachement_invite`.
 
-- [ ] **Étape 2 : la fonction Edge**
+- [x] **Étape 2 : la fonction Edge**
 
 Créer `supabase/functions/inviter/index.ts` :
 
@@ -489,12 +489,12 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Étape 3 : déployer**
+- [x] **Étape 3 : déployer**
 
 Par l'outil MCP Supabase `deploy_edge_function`, projet `qmymwicsgilhoihtfdjm`,
 nom `inviter`, avec le contenu ci-dessus.
 
-- [ ] **Étape 4 : vérifier le déploiement**
+- [x] **Étape 4 : vérifier le déploiement**
 
 Par l'outil MCP `list_edge_functions`. Attendu : `inviter` apparaît.
 
@@ -502,7 +502,7 @@ Par l'outil MCP `list_edge_functions`. Attendu : `inviter` apparaît.
 à quelques envois par heure, et il faut garder ce crédit pour l'essai sur
 l'appareil, à la tâche 6.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add supabase/functions/inviter supabase/migrations/0011_rattachement_invite.sql
@@ -528,7 +528,7 @@ git commit -m "feat: invitation d'un membre par courriel"
   - `retirerMembre(id: string): Promise<{ ok: boolean; erreur?: string }>`
   - `renommerFoyer(nom: string): Promise<{ ok: boolean; erreur?: string }>`
 
-- [ ] **Étape 1 : écrire le test qui échoue**
+- [x] **Étape 1 : écrire le test qui échoue**
 
 Créer `mobile/lib/foyer-libelles.test.mjs` :
 
@@ -595,7 +595,7 @@ test('le créateur ne peut pas être retiré', () => {
 });
 ```
 
-- [ ] **Étape 2 : lancer le test et vérifier qu'il échoue**
+- [x] **Étape 2 : lancer le test et vérifier qu'il échoue**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/foyer-libelles.test.mjs
@@ -603,7 +603,7 @@ test('le créateur ne peut pas être retiré', () => {
 
 Attendu : ÉCHEC, `ERR_MODULE_NOT_FOUND` sur `./foyer-libelles.ts`.
 
-- [ ] **Étape 3 : écrire les libellés**
+- [x] **Étape 3 : écrire les libellés**
 
 Créer `mobile/lib/foyer-libelles.ts` :
 
@@ -636,7 +636,7 @@ export function peutRetirer(
 }
 ```
 
-- [ ] **Étape 4 : écrire le magasin**
+- [x] **Étape 4 : écrire le magasin**
 
 Créer `mobile/stores/foyer.ts`, sur le patron de `stores/recipes.ts` — hook
 maison, compteur de génération, message français en cas d'échec.
@@ -655,7 +655,7 @@ retirer ce membre. »
 
 `renommerFoyer(nom)` met à jour `households.name`, refusant un nom vide.
 
-- [ ] **Étape 5 : lancer les tests et vérifier qu'ils passent**
+- [x] **Étape 5 : lancer les tests et vérifier qu'ils passent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/*.test.mjs
@@ -664,7 +664,7 @@ npx tsc --noEmit
 
 Attendu : `# fail 0`, aucune erreur TypeScript.
 
-- [ ] **Étape 6 : commit**
+- [x] **Étape 6 : commit**
 
 ```bash
 git add mobile/lib/foyer-libelles.ts mobile/lib/foyer-libelles.test.mjs mobile/stores/foyer.ts
@@ -683,7 +683,7 @@ git commit -m "feat: lecture et gestion du foyer côté application"
 - Consomme : `useFoyer`, `inviter`, `retirerMembre`, `renommerFoyer` ;
   `libelleMembre`, `peutRetirer`.
 
-- [ ] **Étape 1 : la vue des membres**
+- [x] **Étape 1 : la vue des membres**
 
 `auth.users` n'est pas lisible par RLS : sans vue, la liste des membres
 n'afficherait que des identifiants.
@@ -724,7 +724,7 @@ select user_id, role, email, joined_at from public.membres_du_foyer;
 
 Attendu : une ligne, avec l'adresse en clair et le rôle `createur`.
 
-- [ ] **Étape 2 : réécrire l'écran**
+- [x] **Étape 2 : réécrire l'écran**
 
 `mobile/app/(tabs)/compte.tsx` porte :
 
@@ -741,7 +741,7 @@ Attendu : une ligne, avec l'adresse en clair et le rôle `createur`.
 
 États : chargement, erreur avec « Réessayer ».
 
-- [ ] **Étape 3 : vérifier**
+- [x] **Étape 3 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -750,7 +750,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 4 : commit**
+- [x] **Étape 4 : commit**
 
 ```bash
 git add supabase/migrations/0012_vue_membres.sql "mobile/app/(tabs)/compte.tsx"
@@ -761,7 +761,7 @@ git commit -m "feat: écran Compte avec foyer, membres et invitation"
 
 ### Tâche 6 : livrer
 
-- [ ] **Étape 1 : vérification complète**
+- [x] **Étape 1 : vérification complète**
 
 ```bash
 npx tsc --noEmit
@@ -775,7 +775,7 @@ npx expo export --platform ios --output-dir /tmp/export-foyer
 Attendu : aucune erreur TypeScript, `# fail 0`, expo-doctor sans échec autre que
 les deux connus, et `Exported:`.
 
-- [ ] **Étape 2 : vérifier que l'application lit toujours ses données**
+- [x] **Étape 2 : vérifier que l'application lit toujours ses données**
 
 La bascule RLS est le risque de ce lot : si `mon_foyer()` ne rendait rien,
 l'application afficherait un catalogue vide sans erreur.
@@ -788,13 +788,13 @@ Exécuté par l'outil MCP — donc sans RLS — attendu : `68`. Puis, après
 installation, vérifier sur l'appareil que le catalogue en affiche bien 68 : c'est
 le seul contrôle qui traverse réellement RLS.
 
-- [ ] **Étape 3 : pousser**
+- [x] **Étape 3 : pousser**
 
 ```bash
 git push origin mobile/expo-scan
 ```
 
-- [ ] **Étape 4 : suivre le build**
+- [x] **Étape 4 : suivre le build**
 
 Avec `asc.mjs`, en **triant explicitement** : l'API ne rend pas les exécutions de
 la plus récente à la plus ancienne, et `limit=1` renvoie la première, pas la
