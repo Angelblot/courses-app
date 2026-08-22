@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mapOffProduct, estLiquide, echappe } from './openfoodfacts.ts';
+import { mapOffProduct, estLiquide, echappe, analyserRechercheNom } from './openfoodfacts.ts';
 
 test('un solide reçoit un grammage', () => {
   const fiche = mapOffProduct('3760040427577', {
@@ -114,4 +114,36 @@ test("un produit non noté garde null, ce n'est pas une erreur", () => {
     mapOffProduct('123', { product_name: 'X', nutriscore_grade: 'not-applicable' }).nutriscore,
     null,
   );
+});
+
+test('une réponse de recherche devient une liste de fiches', () => {
+  const fiches = analyserRechercheNom({
+    count: 2,
+    products: [
+      { code: '3154230802280', product_name: 'Lardons fumés', brands: 'Herta',
+        product_quantity: 150, categories_tags: ['en:charcuteries'], nutriscore_grade: 'd' },
+      { code: '3154230802136', product_name: 'Lardons Fumés 200g', brands: 'Herta' },
+    ],
+  });
+  assert.equal(fiches.length, 2);
+  assert.equal(fiches[0].ean13, '3154230802280');
+  assert.equal(fiches[0].nutriscore, 'd');
+  assert.equal(fiches[0].categoryKey, 'charcuterie');
+});
+
+test('les produits sans nom sont écartés, pas rendus vides', () => {
+  // mapOffProduct rend null pour une fiche sans libellé : elle serait
+  // inutilisable dans une liste de résultats.
+  const fiches = analyserRechercheNom({
+    products: [{ code: '111', product_name: '' }, { code: '222', product_name: 'Bon' }],
+  });
+  assert.equal(fiches.length, 1);
+  assert.equal(fiches[0].name, 'Bon');
+});
+
+test('une réponse vide ou malformée ne casse rien', () => {
+  assert.deepEqual(analyserRechercheNom({ products: [] }), []);
+  assert.deepEqual(analyserRechercheNom({}), []);
+  assert.deepEqual(analyserRechercheNom(null), []);
+  assert.deepEqual(analyserRechercheNom('pas du json'), []);
 });

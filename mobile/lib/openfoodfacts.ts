@@ -165,3 +165,61 @@ export async function lookupEan(ean: string): Promise<ResultatRecherche> {
     clearTimeout(minuteur);
   }
 }
+
+/**
+ * Convertit une réponse de recherche en fiches exploitables.
+ *
+ * Séparée de l'appel réseau pour être testable : c'est la partie où une
+ * réponse inattendue ferait le plus de dégâts.
+ */
+export function analyserRechercheNom(json: unknown): FicheProduit[] {
+  const produits = (json as { products?: unknown })?.products;
+  if (!Array.isArray(produits)) return [];
+  return produits
+    .map((p: OffData & { code?: string }) => mapOffProduct(p?.code ?? '', p ?? {}))
+    .filter((f): f is FicheProduit => f !== null);
+}
+
+export type ResultatRechercheNom =
+  | { etat: 'trouve'; fiches: FicheProduit[] }
+  | { etat: 'vide' }
+  | { etat: 'indisponible' };
+
+/** Nombre de résultats demandés : au-delà, la liste devient illisible au pouce. */
+const TAILLE_PAGE = 12;
+
+/**
+ * Cherche des produits par nom dans Open Food Facts.
+ *
+ * On emploie `cgi/search.pl` et non `/api/v2/search` : cette dernière répondait
+ * `503` le 22/08/2026 — « Page temporarily unavailable ». L'ancienne route
+ * fonctionne et rend les mêmes champs.
+ *
+ * L'indisponibilité est un état ordinaire, pas une erreur : Open Food Facts est
+ * un service gratuit, et le catalogue local reste utilisable sans lui.
+ */
+export async function rechercherParNom(requete: string): Promise<ResultatRechercheNom> {
+  const q = requete.trim();
+  if (q.length < 3) return { etat: 'vide' };
+
+  const controleur = new AbortController();
+  const minuteur = setTimeout(() => controleur.abort(), DELAI_MS);
+  try {
+    const url = 'https://world.openfoodfacts.org/cgi/search.pl'
+      + `?search_terms=${encodeURIComponent(q)}`
+      + '&search_simple=1&action=process&json=1'
+      + `&page_size=${TAILLE_PAGE}`
+      + `&fields=${CHAMPS},code`;
+    const reponse = await fetch(url, {
+      headers: { 'User-Agent': 'courses-app/1.0 (usage familial)' },
+      signal: controleur.signal,
+    });
+    if (!reponse.ok) return { etat: 'indisponible' };
+    const fiches = analyserRechercheNom(await reponse.json());
+    return fiches.length ? { etat: 'trouve', fiches } : { etat: 'vide' };
+  } catch {
+    return { etat: 'indisponible' };
+  } finally {
+    clearTimeout(minuteur);
+  }
+}
