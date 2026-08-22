@@ -745,14 +745,14 @@ git commit -m "feat: client Supabase de l'extension, en REST sans bundler"
 **Interfaces :**
 - Consomme : `connexion`, `deconnexion`, `sessionCourante` de `supabase.js`.
 
-- [ ] **Étape 1 : ajouter le bloc de connexion**
+- [x] **Étape 1 : ajouter le bloc de connexion**
 
 Dans `extension/popup.html`, avant le panneau existant, un bloc `#compte`
 portant : un champ e-mail, un champ mot de passe, un bouton **Se connecter**,
 une zone de message, et — une fois connecté — l'adresse affichée avec un lien
 **Se déconnecter**.
 
-- [ ] **Étape 2 : câbler le popup**
+- [x] **Étape 2 : câbler le popup**
 
 Dans `extension/popup.js`, importer les trois fonctions et, au chargement,
 appeler `sessionCourante()` :
@@ -767,12 +767,12 @@ afficher `res.erreur` — une phrase française, jamais la réponse brute.
 
 Le bouton est désactivé pendant l'appel.
 
-- [ ] **Étape 3 : styles**
+- [x] **Étape 3 : styles**
 
 Dans `extension/popup.css`, reprendre les classes existantes — `.field`,
 `.btn`, `.hint` — sans en inventer de nouvelles au-delà de ce que le bloc exige.
 
-- [ ] **Étape 4 : vérifier à la main**
+- [x] **Étape 4 : vérifier à la main**
 
 Recharger l'extension dans `chrome://extensions`, ouvrir le popup :
 
@@ -782,7 +782,7 @@ Recharger l'extension dans `chrome://extensions`, ouvrir le popup :
 3. Une connexion réussie affiche l'adresse et masque le bloc.
 4. Fermer et rouvrir le popup : la session persiste.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add extension/popup.html extension/popup.js extension/popup.css
@@ -802,7 +802,7 @@ git commit -m "feat: connexion Supabase depuis le popup de l'extension"
 - Consomme : `travauxEnAttente`, `travauxAbandonnes`, `revendiquer` de `supabase.js`.
 - Produit : message `travaux` renvoyant `{ enAttente: [...], total: number }` au popup.
 
-- [ ] **Étape 1 : l'alarme et la pastille**
+- [x] **Étape 1 : l'alarme et la pastille**
 
 Ajouter en tête de `background.js` :
 
@@ -841,7 +841,7 @@ async function rafraichirPastille() {
 }
 ```
 
-- [ ] **Étape 2 : exposer les travaux au popup**
+- [x] **Étape 2 : exposer les travaux au popup**
 
 Ajouter un gestionnaire de message, à côté des existants :
 
@@ -857,7 +857,7 @@ Ajouter un gestionnaire de message, à côté des existants :
   },
 ```
 
-- [ ] **Étape 3 : afficher la liste dans le popup**
+- [x] **Étape 3 : afficher la liste dans le popup**
 
 Dans `popup.js`, appeler `send({ type: 'travaux' })` au chargement quand une
 session existe, et afficher pour le premier travail : le nombre d'articles, les
@@ -866,7 +866,7 @@ enseignes visées, et un bouton **Remplir le panier**.
 Si `deconnecte` est vrai, afficher « Session expirée, reconnecte-toi » et
 montrer le bloc de connexion.
 
-- [ ] **Étape 4 : vérifier à la main**
+- [x] **Étape 4 : vérifier à la main**
 
 Envoyer une liste depuis le téléphone, puis attendre une minute :
 
@@ -874,7 +874,7 @@ Envoyer une liste depuis le téléphone, puis attendre une minute :
 2. Le popup montre le travail et ses enseignes.
 3. Rien ne démarre tant qu'on ne clique pas.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add extension/background.js extension/popup.js
@@ -892,7 +892,7 @@ git commit -m "feat: l'extension relève les listes en attente et l'annonce par 
 - Consomme : `progresser`, `terminer` de `supabase.js`.
 - Produit : l'état interne gagne `jobId`, `drivesRestants`, `resultatsParDrive`.
 
-- [ ] **Étape 1 : démarrer depuis un travail**
+- [x] **Étape 1 : démarrer depuis un travail**
 
 Ajouter un gestionnaire `demarrerTravail({ jobId })` qui :
 
@@ -903,7 +903,7 @@ Ajouter un gestionnaire `demarrerTravail({ jobId })` qui :
    `drivesRestants` = le reste, `jobId`, `resultatsParDrive` = `{}` ;
 4. lance `processJob()`.
 
-- [ ] **Étape 2 : écrire la progression**
+- [x] **Étape 2 : écrire la progression**
 
 Dans la boucle de `processJob`, après `await setState({ results, cursor: index + 1 })`,
 ajouter :
@@ -920,7 +920,7 @@ ajouter :
     }
 ```
 
-- [ ] **Étape 3 : passer à l'enseigne suivante**
+- [x] **Étape 3 : passer à l'enseigne suivante**
 
 Remplacer la branche de fin de liste — celle qui pose `status: 'done'` — par :
 
@@ -965,7 +965,7 @@ Remplacer la branche de fin de liste — celle qui pose `status: 'done'` — par
 `baseOrigin`, relevé sur l'onglet courant, reste préféré une fois sur place :
 chez Leclerc l'adresse dépend du magasin choisi.
 
-- [ ] **Étape 4 : marquer `needs_action` sur un blocage**
+- [x] **Étape 4 : marquer `needs_action` sur un blocage**
 
 Remplacer la branche du challenge par :
 
@@ -991,7 +991,7 @@ Remplacer la branche du challenge par :
     }
 ```
 
-- [ ] **Étape 5 : vérifier à la main**
+- [x] **Étape 5 : vérifier à la main**
 
 Avec une liste visant les deux enseignes, connecté aux deux :
 
@@ -1002,7 +1002,7 @@ Avec une liste visant les deux enseignes, connecté aux deux :
 4. En se déconnectant du second drive avant l'essai, `status` doit valoir
    `needs_action` et `results` contenir le travail du premier.
 
-- [ ] **Étape 6 : commit**
+- [x] **Étape 6 : commit**
 
 ```bash
 git add extension/background.js extension/content/sites.js
@@ -1020,7 +1020,7 @@ git commit -m "feat: les deux enseignes s'enchaînent, et un blocage devient nee
 - Consomme : `equivalencesDe`, `enregistrerEquivalence` de `supabase.js` ;
   `strategie`, `indexer` de `lib/equivalences.js`.
 
-- [ ] **Étape 1 : extraire la construction de l'URL de recherche**
+- [x] **Étape 1 : extraire la construction de l'URL de recherche**
 
 `attempt` construit son URL en ligne, aux lignes 140-142 de `background.js`.
 La branche « libellé mémorisé » en a besoin aussi. Extraire, plutôt que de la
@@ -1037,7 +1037,7 @@ function urlDeRecherche(cfg, item, baseOrigin) {
 
 et remplacer l'expression d'origine dans `attempt` par un appel.
 
-- [ ] **Étape 2 : consulter avant de chercher**
+- [x] **Étape 2 : consulter avant de chercher**
 
 Au démarrage d'une enseigne, charger ses équivalences et les indexer :
 
@@ -1075,7 +1075,7 @@ Dans `attempt`, avant toute recherche :
   }
 ```
 
-- [ ] **Étape 3 : enregistrer après un choix humain**
+- [x] **Étape 3 : enregistrer après un choix humain**
 
 Dans `chooseCandidate`, après un ajout réussi :
 
@@ -1100,7 +1100,7 @@ Dans `chooseCandidate`, après un ajout réussi :
   }
 ```
 
-- [ ] **Étape 4 : enregistrer une absence**
+- [x] **Étape 4 : enregistrer une absence**
 
 Dans la boucle, après un échec dont la raison est `no_match` ou
 `product_unavailable`, et si l'échec n'est pas déjà mémorisé :
@@ -1119,7 +1119,7 @@ Dans la boucle, après un échec dont la raison est `no_match` ou
     }
 ```
 
-- [ ] **Étape 5 : vérifier à la main**
+- [x] **Étape 5 : vérifier à la main**
 
 1. Lancer une liste, résoudre une ambiguïté par **Choisir**.
 2. Vérifier en base :
@@ -1127,7 +1127,7 @@ Dans la boucle, après un échec dont la raison est `no_match` ou
 3. Relancer la même liste : la ligne doit passer sans ambiguïté, et le journal
    du popup l'indiquer.
 
-- [ ] **Étape 6 : commit**
+- [x] **Étape 6 : commit**
 
 ```bash
 git add extension/background.js
