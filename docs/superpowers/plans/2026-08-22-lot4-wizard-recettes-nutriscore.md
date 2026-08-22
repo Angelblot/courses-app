@@ -635,7 +635,7 @@ git commit -m "feat: consolidation de la liste portée sur mobile"
 - Produit : `FicheProduit` gagne `nutriscore: NoteNutri | null` ;
   `type NoteNutri = 'a' | 'b' | 'c' | 'd' | 'e'`.
 
-- [ ] **Étape 1 : écrire les tests qui échouent**
+- [x] **Étape 1 : écrire les tests qui échouent**
 
 Ajouter à la fin de `mobile/lib/openfoodfacts.test.mjs` :
 
@@ -661,7 +661,7 @@ test('un produit non noté garde null, ce n\'est pas une erreur', () => {
 });
 ```
 
-- [ ] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
+- [x] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/openfoodfacts.test.mjs
@@ -669,7 +669,7 @@ test('un produit non noté garde null, ce n\'est pas une erreur', () => {
 
 Attendu : ÉCHEC, `undefined !== 'b'`.
 
-- [ ] **Étape 3 : écrire la migration**
+- [x] **Étape 3 : écrire la migration**
 
 Créer `supabase/migrations/0007_nutriscore.sql` :
 
@@ -693,7 +693,7 @@ comment on column public.products.nutriscore is
 Appliquer par l'outil MCP Supabase `apply_migration`, projet
 `qmymwicsgilhoihtfdjm`, nom `nutriscore`.
 
-- [ ] **Étape 4 : écrire l'implémentation**
+- [x] **Étape 4 : écrire l'implémentation**
 
 Dans `mobile/lib/openfoodfacts.ts` :
 
@@ -752,7 +752,7 @@ Dans `mobile/app/(tabs)/scan.tsx`, ajouter `nutriscore: null` aux deux fiches
 construites à la main — l'espace réservé hors ligne de `mettreEnAttente`, et
 `ajouterManuel`.
 
-- [ ] **Étape 5 : lancer les tests et vérifier qu'ils passent**
+- [x] **Étape 5 : lancer les tests et vérifier qu'ils passent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/*.test.mjs
@@ -761,7 +761,7 @@ npx tsc --noEmit
 
 Attendu : `# fail 0`, aucune erreur TypeScript.
 
-- [ ] **Étape 6 : commit**
+- [x] **Étape 6 : commit**
 
 ```bash
 git add mobile/lib/openfoodfacts.ts mobile/lib/openfoodfacts.test.mjs mobile/stores/products.ts "mobile/app/(tabs)/scan.tsx" supabase/migrations/0007_nutriscore.sql
@@ -782,7 +782,7 @@ git commit -m "feat: le Nutriscore accompagne les produits scannés"
 - Consomme : `NoteNutri` de `lib/openfoodfacts.ts`.
 - Produit : `<PastilleNutri note={note} />` — rend `null` si `note` est `null`.
 
-- [ ] **Étape 1 : ajouter les couleurs au thème**
+- [x] **Étape 1 : ajouter les couleurs au thème**
 
 Dans `mobile/lib/theme.ts`, ajouter à l'objet `colors`, avant la fermeture :
 
@@ -796,7 +796,7 @@ Dans `mobile/lib/theme.ts`, ajouter à l'objet `colors`, avant la fermeture :
   nutriE: '#C62828',
 ```
 
-- [ ] **Étape 2 : écrire le composant**
+- [x] **Étape 2 : écrire le composant**
 
 Créer `mobile/components/PastilleNutri.tsx` :
 
@@ -840,7 +840,7 @@ const s = StyleSheet.create({
 });
 ```
 
-- [ ] **Étape 3 : l'afficher dans le catalogue et sur la fiche de scan**
+- [x] **Étape 3 : l'afficher dans le catalogue et sur la fiche de scan**
 
 Dans `mobile/components/ProductRow.tsx`, importer le composant et le placer à
 la fin de la ligne, après le texte :
@@ -884,7 +884,7 @@ sans oublier l'import :
 import { PastilleNutri } from './PastilleNutri';
 ```
 
-- [ ] **Étape 4 : vérifier la compilation**
+- [x] **Étape 4 : vérifier la compilation**
 
 ```bash
 npx tsc --noEmit
@@ -893,7 +893,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add mobile/components/PastilleNutri.tsx mobile/lib/theme.ts mobile/components/ProductRow.tsx mobile/components/FicheScannee.tsx
@@ -911,7 +911,7 @@ git commit -m "feat: pastille Nutriscore au catalogue et au scan"
 - Consomme : l'API Open Food Facts et la clé publiable Supabase.
 - Produit : un script à lancer une fois, non appelé par l'application.
 
-- [ ] **Étape 1 : écrire le script**
+- [x] **Étape 1 : écrire le script**
 
 Créer `mobile/scripts/rattrapage_nutriscore.mjs` :
 
@@ -996,7 +996,7 @@ for (const [i, p] of produits.entries()) {
 console.log(`\nTerminé : ${notes} notés, ${sansNote} sans note.`);
 ```
 
-- [ ] **Étape 2 : vérifier la syntaxe sans exécuter**
+- [x] **Étape 2 : vérifier la syntaxe sans exécuter**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --check scripts/rattrapage_nutriscore.mjs
@@ -1004,7 +1004,7 @@ console.log(`\nTerminé : ${notes} notés, ${sansNote} sans note.`);
 
 Attendu : aucune sortie.
 
-- [ ] **Étape 3 : commit**
+- [x] **Étape 3 : commit**
 
 ```bash
 git add mobile/scripts/rattrapage_nutriscore.mjs
@@ -1039,7 +1039,7 @@ son résultat vérifié par :
   - `valideBrouillon(b: Brouillon): string | null` — message d'erreur français, ou `null` si valide
   - `rayonPropose(nom: string, produits: Array<{ product_type: string | null; category: string | null }>): CleRayon`
 
-- [ ] **Étape 1 : écrire les tests qui échouent**
+- [x] **Étape 1 : écrire les tests qui échouent**
 
 Créer `mobile/lib/recette-brouillon.test.mjs` :
 
@@ -1102,7 +1102,7 @@ test('sans produit correspondant, le rayon proposé est « autre »', () => {
 });
 ```
 
-- [ ] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
+- [x] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/recette-brouillon.test.mjs
@@ -1110,7 +1110,7 @@ test('sans produit correspondant, le rayon proposé est « autre »', () => {
 
 Attendu : ÉCHEC, `ERR_MODULE_NOT_FOUND` sur `./recette-brouillon.ts`.
 
-- [ ] **Étape 3 : écrire la validation**
+- [x] **Étape 3 : écrire la validation**
 
 Créer `mobile/lib/recette-brouillon.ts` :
 
@@ -1178,7 +1178,7 @@ export function rayonPropose(
 }
 ```
 
-- [ ] **Étape 4 : écrire le magasin de recettes**
+- [x] **Étape 4 : écrire le magasin de recettes**
 
 Créer `mobile/stores/recipes.ts`, en suivant le patron de `stores/products.ts`
 — hook maison, compteur de génération contre les réponses obsolètes, message
@@ -1301,7 +1301,7 @@ export async function creerRecette(
 }
 ```
 
-- [ ] **Étape 5 : lancer les tests et vérifier qu'ils passent**
+- [x] **Étape 5 : lancer les tests et vérifier qu'ils passent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/*.test.mjs
@@ -1310,7 +1310,7 @@ npx tsc --noEmit
 
 Attendu : `# fail 0`, aucune erreur TypeScript.
 
-- [ ] **Étape 6 : commit**
+- [x] **Étape 6 : commit**
 
 ```bash
 git add mobile/lib/recette-brouillon.ts mobile/lib/recette-brouillon.test.mjs mobile/stores/recipes.ts
@@ -1333,7 +1333,7 @@ git commit -m "feat: lecture et création de recettes"
   `SelecteurRayon` de `components/SelecteurRayon.tsx` ; `useProducts` de
   `stores/products.ts` ; `EtatVide` de `components/EtatVide.tsx`.
 
-- [ ] **Étape 1 : déclarer la pile de recettes**
+- [x] **Étape 1 : déclarer la pile de recettes**
 
 Créer `mobile/app/(tabs)/recettes/_layout.tsx` :
 
@@ -1345,7 +1345,7 @@ export default function RecettesLayout() {
 }
 ```
 
-- [ ] **Étape 2 : l'écran de liste**
+- [x] **Étape 2 : l'écran de liste**
 
 Créer `mobile/app/(tabs)/recettes/index.tsx`. Il affiche la liste des recettes
 avec leur nombre de parts et d'ingrédients, un bouton « Nouvelle recette » qui
@@ -1366,7 +1366,7 @@ useFocusEffect(useCallback(() => { recharger(); }, [recharger]));
 Sans cela, une recette créée n'apparaîtrait pas au retour — expo-router garde
 les onglets montés, le piège déjà rencontré sur le scan.
 
-- [ ] **Étape 3 : le formulaire**
+- [x] **Étape 3 : le formulaire**
 
 Créer `mobile/app/(tabs)/recettes/nouvelle.tsx`, modelé sur
 `frontend/src/components/recipes/RecipeForm.jsx` :
@@ -1383,7 +1383,7 @@ Créer `mobile/app/(tabs)/recettes/nouvelle.tsx`, modelé sur
 Le bouton d'enregistrement est désactivé pendant l'appel, avec un
 `ActivityIndicator` à la place du libellé — même patron que `app/login.tsx`.
 
-- [ ] **Étape 4 : ajouter l'onglet**
+- [x] **Étape 4 : ajouter l'onglet**
 
 Dans `mobile/app/(tabs)/_layout.tsx`, insérer **avant** l'écran `index` :
 
@@ -1397,7 +1397,7 @@ Dans `mobile/app/(tabs)/_layout.tsx`, insérer **avant** l'écran `index` :
       />
 ```
 
-- [ ] **Étape 5 : vérifier**
+- [x] **Étape 5 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -1406,7 +1406,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 6 : commit**
+- [x] **Étape 6 : commit**
 
 ```bash
 git add "mobile/app/(tabs)/recettes" "mobile/app/(tabs)/_layout.tsx"
