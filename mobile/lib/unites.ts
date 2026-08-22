@@ -70,6 +70,28 @@ function versMillilitres(qty: number, unit: string): number | null {
 }
 
 /**
+ * Ramène une quantité à sa famille d'unité, pour pouvoir additionner des
+ * ingrédients exprimés différemment avant de convertir.
+ *
+ * Convertir chaque ligne puis additionner surestime : 400 g et 100 g d'un
+ * produit vendu par 500 g donnent deux paquets alors qu'un suffit. Il faut
+ * additionner d'abord, convertir ensuite.
+ */
+export function quantiteNormalisee(
+  qty: number,
+  unit: string,
+): { famille: UniteNormalisee; valeur: number } | null {
+  const enGrammes = versGrammes(qty, unit);
+  if (enGrammes != null) return { famille: 'g', valeur: enGrammes };
+  const enMl = versMillilitres(qty, unit);
+  if (enMl != null) return { famille: 'ml', valeur: enMl };
+  if (COUNTABLE_UNITS.has((unit || '').trim().toLowerCase())) {
+    return { famille: 'unité', valeur: qty };
+  }
+  return null;
+}
+
+/**
  * Convertit une quantité d'ingrédient en nombre d'articles.
  *
  * L'arrondi est toujours au supérieur : acheter un paquet de trop se rattrape,
