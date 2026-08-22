@@ -772,13 +772,13 @@ npx expo export --platform ios --output-dir /tmp/export-recettes
 
 Attendu : `Exported:` sans erreur.
 
-- [ ] **Étape 3 : pousser**
+- [x] **Étape 3 : pousser**
 
 ```bash
 git push origin mobile/expo-scan
 ```
 
-- [ ] **Étape 4 : suivre le build**
+- [x] **Étape 4 : suivre le build**
 
 Avec `asc.mjs`, en **triant explicitement** : l'API ne rend pas les exécutions
 de la plus récente à la plus ancienne, et `limit=1` renvoie la première, pas la
@@ -803,7 +803,7 @@ de journal.
 **Fichiers :**
 - Créer : `supabase/migrations/0009_stockage_recettes.sql`
 
-- [ ] **Étape 1 : écrire la migration**
+- [x] **Étape 1 : écrire la migration**
 
 ```sql
 -- Bucket des photos de recettes.
@@ -846,7 +846,7 @@ create policy "suppression par le proprietaire" on storage.objects
   );
 ```
 
-- [ ] **Étape 2 : appliquer et vérifier**
+- [x] **Étape 2 : appliquer et vérifier**
 
 Par l'outil MCP Supabase `apply_migration`, nom `stockage_recettes`. Puis :
 
@@ -858,7 +858,7 @@ select policyname from pg_policies where schemaname='storage' and tablename='obj
 Attendu : le bucket existe, public, limité à 5 Mo, et les trois politiques
 apparaissent.
 
-- [ ] **Étape 3 : commit**
+- [x] **Étape 3 : commit**
 
 ```bash
 git add supabase/migrations/0009_stockage_recettes.sql
@@ -873,7 +873,7 @@ git commit -m "feat: bucket de stockage des photos de recettes"
 - Modifier : `mobile/package.json`, `mobile/app.json`
 - Modifier : `mobile/ios/` (régénéré)
 
-- [ ] **Étape 1 : sauvegarder ce que prebuild pourrait emporter**
+- [x] **Étape 1 : sauvegarder ce que prebuild pourrait emporter**
 
 Le dossier `ios/` est versionné et contient `ci_scripts/ci_post_clone.sh`, sans
 lequel Xcode Cloud ne sait plus compiler.
@@ -883,7 +883,7 @@ cp mobile/ios/ci_scripts/ci_post_clone.sh /tmp/ci_post_clone.sh.sauvegarde
 shasum /tmp/ci_post_clone.sh.sauvegarde
 ```
 
-- [ ] **Étape 2 : installer et régénérer**
+- [x] **Étape 2 : installer et régénérer**
 
 ```bash
 cd mobile
@@ -894,7 +894,7 @@ npx expo prebuild -p ios
 **Ne jamais passer `--clean`** : il effacerait `ios/` en entier, `ci_scripts`
 compris.
 
-- [ ] **Étape 3 : contrôler ce qui a changé**
+- [x] **Étape 3 : contrôler ce qui a changé**
 
 ```bash
 cd /Users/angel-assistant/app-saas/courses-app
@@ -919,7 +919,7 @@ quoi le lien de récupération de mot de passe cesserait de fonctionner :
 /usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes" mobile/ios/Courses/Info.plist
 ```
 
-- [ ] **Étape 4 : le texte d'autorisation**
+- [x] **Étape 4 : le texte d'autorisation**
 
 Dans `mobile/app.json`, ajouter au tableau `plugins` :
 
@@ -947,7 +947,7 @@ S'il manque, l'ajouter :
 /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Choisis une photo pour illustrer ta recette.'" mobile/ios/Courses/Info.plist
 ```
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add mobile/package.json mobile/package-lock.json mobile/app.json mobile/ios
@@ -967,7 +967,7 @@ git commit -m "chore: expo-image-picker et projet iOS régénéré"
   - `choisirPhoto(source: 'appareil' | 'bibliotheque'): Promise<string | null>` — rend une adresse locale
   - `deposerPhoto(uriLocale: string): Promise<{ ok: boolean; url?: string; erreur?: string }>`
 
-- [ ] **Étape 1 : écrire le module**
+- [x] **Étape 1 : écrire le module**
 
 `choisirPhoto` demande l'autorisation, ouvre l'appareil ou la bibliothèque,
 recadre en carré, compresse à `quality: 0.7`, et rend l'adresse locale ou `null`
@@ -982,7 +982,7 @@ d'écriture du bucket l'exige — `(storage.foldername(name))[1] = auth.uid()`.
 Un refus d'autorisation n'est pas une erreur : `choisirPhoto` rend `null`, et
 l'écran garde son aplat coloré.
 
-- [ ] **Étape 2 : câbler les deux écrans**
+- [x] **Étape 2 : câbler les deux écrans**
 
 Sur la création et la modification, au-dessus du champ **Nom** : la photo
 retenue, ou l'aplat coloré, avec un bouton **Ajouter une photo** ouvrant le
@@ -997,7 +997,7 @@ message le dit : « La recette est enregistrée, mais la photo n'a pas pu être
 envoyée. » Perdre une recette parce qu'une image n'est pas passée serait
 disproportionné.
 
-- [ ] **Étape 3 : vérifier**
+- [x] **Étape 3 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -1006,7 +1006,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 4 : commit**
+- [x] **Étape 4 : commit**
 
 ```bash
 git add mobile/lib/photo-recette.ts "mobile/app/(tabs)/recettes"
@@ -1017,7 +1017,7 @@ git commit -m "feat: photo de recette prise sur l'appareil et déposée sur Supa
 
 ### Tâche 12 : livraison de la seconde phase
 
-- [ ] **Étape 1 : vérification complète**
+- [x] **Étape 1 : vérification complète**
 
 ```bash
 npx tsc --noEmit
@@ -1028,7 +1028,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY="sb_publishable_PueJWmalqhZO0ctPu95GKQ_EaAgVulr" \
 npx expo export --platform ios --output-dir /tmp/export-photo
 ```
 
-- [ ] **Étape 2 : pousser et suivre**
+- [x] **Étape 2 : pousser et suivre**
 
 ```bash
 git push origin mobile/expo-scan
