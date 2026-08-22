@@ -52,10 +52,20 @@ ailleurs `"4 personnes"`, une chaîne.
 ## Le partage des rôles
 
 **La fonction Edge `importer-recette`** reçoit une adresse, récupère la page,
-extrait le bloc `Recipe`, et rend les champs bruts : nom, parts, image, et les
-lignes d'ingrédients **telles quelles**, sans les analyser.
+et rend **les blocs `application/ld+json` bruts** — rien de plus. Elle ne les
+interprète pas.
 
-**L'analyseur d'ingrédients vit dans l'application**, en fonction pure.
+**Tout le reste vit dans l'application**, en fonctions pures : l'extraction de
+la recette parmi ces blocs, la lecture du nombre de parts, et l'analyse des
+lignes d'ingrédients.
+
+Ce découpage est délibéré. Confier l'interprétation à la fonction Edge la
+rendrait intestable sous Node — c'est la leçon du lot 4, où `construireItems` a
+dû être déplacée pour cette raison. La fonction Edge ne garde donc que ce qu'on
+ne peut pas tester ainsi : un appel réseau et une découpe de balises.
+
+L'application ne reçoit par ailleurs jamais de HTML arbitraire, seulement des
+blocs JSON déjà isolés.
 
 Ce partage n'est pas arbitraire. La récupération est fragile — les sites
 changent — et doit pouvoir se corriger sans passer par un build : vingt-cinq
@@ -106,10 +116,10 @@ détail d'une recette.
 - **L'analyseur**, sur les cinq lignes réelles mesurées, plus les fractions, les
   décimales à la française, une unité inconnue sans « de », et une ligne vide.
 - **`recipeYield`** : chaîne, nombre, tableau, absent.
-- **Extraction du bloc JSON-LD** : bloc unique, tableau, `@graph`, aucun bloc,
-  JSON malformé.
-- La fonction Edge n'est pas couverte par des tests : son travail est un appel
-  réseau et une extraction, tous deux éprouvés sur des pages réelles.
+- **Extraction de la recette** parmi les blocs : bloc unique, tableau,
+  `@graph`, aucun bloc, JSON malformé, bloc d'un autre type que `Recipe`.
+- La fonction Edge n'est pas couverte par des tests unitaires : il ne lui reste
+  qu'un appel réseau et une découpe de balises, éprouvés sur des pages réelles.
 
 ## Ce qui n'est pas construit
 
