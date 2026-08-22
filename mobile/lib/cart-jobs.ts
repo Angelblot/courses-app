@@ -11,21 +11,21 @@ import type { ItemPanier } from './consolidation.ts';
 export async function envoyerListe(
   items: ItemPanier[],
   drives: string[],
-): Promise<{ ok: boolean; erreur?: string }> {
+): Promise<{ ok: boolean; id?: string; erreur?: string }> {
   const { data: utilisateur } = await supabase.auth.getUser();
   const userId = utilisateur?.user?.id;
   if (!userId) return { ok: false, erreur: 'Session expirée. Reconnecte-toi.' };
 
-  const { error } = await supabase.from('cart_jobs').insert({
-    user_id: userId,
-    status: 'pending',
-    drives,
-    items,
-  });
+  // L'identifiant est renvoyé : c'est lui que l'écran de suivi observe.
+  const { data, error } = await supabase
+    .from('cart_jobs')
+    .insert({ user_id: userId, status: 'pending', drives, items })
+    .select('id')
+    .single();
 
-  if (error) {
+  if (error || !data) {
     console.error('[envoyerListe]', error);
     return { ok: false, erreur: "Impossible d'envoyer la liste pour le moment." };
   }
-  return { ok: true };
+  return { ok: true, id: data.id as string };
 }
