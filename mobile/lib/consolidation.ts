@@ -21,6 +21,12 @@ export type LigneConsolidee = {
   rayon: CleRayon;
   totalQuantity: number;
   ean13: string | null;
+  /**
+   * Produit du catalogue dont cette ligne provient, quand l'origine est
+   * certaine. `null` dès que deux origines d'identifiants différents ont
+   * fusionné — voir `push` ci-dessous.
+   */
+  product_id: string | null;
   sources: Source[];
 };
 
@@ -189,7 +195,11 @@ export function buildConsolidatedItems({
     `${name.trim().toLowerCase()}__${(unit || '').toLowerCase()}`;
 
   const push = (
-    entry: { name: string; quantity: number; unit?: string | null; rayon?: string | null; category?: string | null; ean13?: string | null },
+    entry: {
+      name: string; quantity: number; unit?: string | null;
+      rayon?: string | null; category?: string | null;
+      ean13?: string | null; product_id?: string | null;
+    },
     source: Source,
   ) => {
     const k = keyOf(entry.name, entry.unit ?? 'unité');
@@ -199,6 +209,13 @@ export function buildConsolidatedItems({
       existant.sources.push(source);
       // Un code-barres connu d'un côté profite à la ligne entière.
       if (!existant.ean13 && entry.ean13) existant.ean13 = entry.ean13;
+      // Deux origines d'identifiants différents : on efface plutôt que de
+      // trancher au hasard. Une équivalence enregistrée sur le mauvais produit
+      // se rejouerait à chaque commande.
+      if (existant.product_id && entry.product_id
+          && existant.product_id !== entry.product_id) {
+        existant.product_id = null;
+      }
     } else {
       bucket.set(k, {
         key: k,
@@ -207,6 +224,7 @@ export function buildConsolidatedItems({
         rayon: rayonDepuisLibelle(entry.rayon ?? entry.category),
         totalQuantity: entry.quantity,
         ean13: entry.ean13 ?? null,
+        product_id: entry.product_id ?? null,
         sources: [source],
       });
     }
@@ -231,7 +249,11 @@ export function buildConsolidatedItems({
       if (type && typesCouverts.has(type)) return;
       const qty = (ing.quantity_per_serving || 0) * servings;
       push(
-        { name: ing.name, quantity: qty, unit: ing.unit, rayon: ing.rayon, category: ing.category },
+        {
+          name: ing.name, quantity: qty, unit: ing.unit,
+          rayon: ing.rayon, category: ing.category,
+          product_id: ing.product_id ?? null,
+        },
         { type: 'recipe', label: recipe.name, qty },
       );
     });
@@ -249,6 +271,7 @@ export function buildConsolidatedItems({
         unit: p.unit ?? 'unité',
         category: p.category,
         ean13: p.ean13,
+        product_id: p.id,
       },
       { type: 'quotidien', label: 'Quotidien', qty },
     );
@@ -353,6 +376,8 @@ export type ItemPanier = {
   unit: string;
   ean13: string | null;
   category: CleRayon;
+  /** Nécessaire pour enregistrer une équivalence ; `null` si l'origine est incertaine. */
+  product_id: string | null;
 };
 
 /**
@@ -374,5 +399,6 @@ export function construireItems(lignes: LigneConsolidee[]): ItemPanier[] {
     unit: l.unit,
     ean13: l.ean13 ?? null,
     category: l.rayon,
+    product_id: l.product_id ?? null,
   }));
 }
