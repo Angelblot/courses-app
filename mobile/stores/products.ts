@@ -80,7 +80,7 @@ export function useProducts() {
  */
 export async function ajouterProduit(
   fiche: FicheProduit,
-): Promise<{ ok: boolean; doublon?: Product; reseau?: boolean; erreur?: string }> {
+): Promise<{ ok: boolean; produit?: Product; doublon?: Product; reseau?: boolean; erreur?: string }> {
   const { data: existant } = await supabase
     .from('products')
     .select(CHAMPS)
@@ -89,7 +89,9 @@ export async function ajouterProduit(
 
   if (existant) return { ok: false, doublon: existant as Product };
 
-  const { error } = await supabase.from('products').insert({
+  // On relit la ligne insérée : le sélecteur d'ingrédient a besoin de son
+  // identifiant pour y rattacher l'ingrédient qui vient d'être choisi.
+  const { data: cree, error } = await supabase.from('products').insert({
     ean13: fiche.ean13,
     name: fiche.name,
     brand: fiche.brand,
@@ -114,9 +116,9 @@ export async function ajouterProduit(
     // quantité à acheter, au lieu de diviser par volume_ml pour trouver
     // « 1 brique ».
     unit: 'unité',
-  });
+  }).select(CHAMPS).single();
 
-  if (!error) return { ok: true };
+  if (!error && cree) return { ok: true, produit: cree as Product };
 
   // Contrainte unique (user_id, ean13) : la vérification préalable n'est pas
   // atomique, deux scans rapprochés du même code-barres peuvent tous deux la
