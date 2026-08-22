@@ -10,9 +10,35 @@
       <span id="site-label" class="site"></span>
     </header>
 
+    <section id="compte" class="panel compte">
+      <div id="compte-connecte" hidden>
+        <span id="compte-email" class="hint"></span>
+        <button id="deconnexion" class="lien">Se déconnecter</button>
+      </div>
+      <div id="compte-formulaire">
+        <p class="hint">Connecte-toi pour relever les listes envoyées depuis l'application.</p>
+        <label class="field">
+          <span>Adresse e-mail</span>
+          <input id="email" type="email" autocomplete="username" />
+        </label>
+        <label class="field">
+          <span>Mot de passe</span>
+          <input id="mdp" type="password" autocomplete="current-password" />
+        </label>
+        <p id="compte-erreur" class="erreur" hidden></p>
+        <button id="connexion" class="btn">Se connecter</button>
+      </div>
+    </section>
+
+    <section id="travaux" class="panel" hidden>
+      <p id="travaux-resume" class="hint"></p>
+      <button id="remplir" class="btn">Remplir le panier</button>
+    </section>
+
     <section id="idle" class="panel">
       <p class="hint">
-        Colle ta liste de courses, ou envoie-la depuis l'application.
+        Saisie manuelle — elle reste disponible même sans connexion, et
+        c'est le seul recours si Supabase est injoignable.
       </p>
       <label class="field">
         <span>Enseigne</span>

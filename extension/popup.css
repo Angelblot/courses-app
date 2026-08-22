@@ -84,3 +84,23 @@ select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-col
 .log__choose { flex-shrink: 0; font: inherit; font-size: 10px; font-weight: 600; padding: 2px 7px; border: 1px solid var(--accent); border-radius: 999px; background: transparent; color: var(--accent); cursor: pointer; }
 .log__choose:hover:not(:disabled) { background: var(--accent); color: #fff; }
 .log__choose:disabled { opacity: 0.45; cursor: default; }
+
+/* Bloc de compte et liste des travaux relevés depuis l'application. */
+.compte { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px; }
+.compte input {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+}
+.compte input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+#compte-connecte { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lien {
+  font: inherit; font-size: 12px; font-weight: 600;
+  background: none; border: 0; padding: 0;
+  color: var(--muted); text-decoration: underline; cursor: pointer;
+}
+.erreur { font-size: 12px; color: var(--danger); margin: 0; }

@@ -1,6 +1,7 @@
 /** Interface du popup : lancement, suivi, reprise après vérification. */
 
 import { SITES } from './content/sites.js';
+import { connexion, deconnexion, sessionCourante } from './supabase.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -179,6 +180,95 @@ function render(state) {
   }
 }
 
+const LIBELLE_DRIVE = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' };
+
+/**
+ * Affiche l'état du compte.
+ *
+ * La saisie manuelle reste visible dans tous les cas : elle ne dépend pas de
+ * Supabase, et c'est le seul recours quand la session a expiré ou que le
+ * service est injoignable.
+ */
+function rendreCompte(session) {
+  const connecte = Boolean(session?.jeton);
+  $('compte-connecte').hidden = !connecte;
+  $('compte-formulaire').hidden = connecte;
+  if (connecte) $('compte-email').textContent = session.email ?? 'Connecté';
+}
+
+function rendreTravaux(donnees) {
+  const premier = donnees?.enAttente?.[0];
+  if (!premier) {
+    $('travaux').hidden = true;
+    return;
+  }
+  $('travaux').hidden = false;
+  const n = premier.items?.length ?? 0;
+  const enseignes = (premier.drives ?? []).map((d) => LIBELLE_DRIVE[d] ?? d).join(' puis ');
+  const suite = donnees.total > 1 ? ` · ${donnees.total - 1} autre(s) en attente` : '';
+  $('travaux-resume').textContent =
+    `${n} article${n > 1 ? 's' : ''} à mettre au panier — ${enseignes}${suite}`;
+  $('remplir').dataset.jobId = premier.id;
+}
+
+async function relireCompte() {
+  const session = await sessionCourante();
+  rendreCompte(session);
+  if (!session?.jeton) {
+    $('travaux').hidden = true;
+    return;
+  }
+  const res = await send({ type: 'travaux' });
+  if (res?.deconnecte) {
+    // Le jeton de rafraîchissement est mort : on le dit plutôt que de laisser
+    // une pastille muette.
+    $('compte-erreur').textContent = 'Session expirée, reconnecte-toi.';
+    $('compte-erreur').hidden = false;
+    rendreCompte(null);
+    return;
+  }
+  if (res?.ok) rendreTravaux(res.data);
+}
+
+$('connexion').addEventListener('click', async () => {
+  const email = $('email').value.trim();
+  const mdp = $('mdp').value;
+  if (!email || !mdp) {
+    $('compte-erreur').textContent = 'Renseigne ton adresse et ton mot de passe.';
+    $('compte-erreur').hidden = false;
+    return;
+  }
+  $('compte-erreur').hidden = true;
+  $('connexion').disabled = true;
+  $('connexion').textContent = 'Connexion…';
+  const res = await connexion(email, mdp);
+  $('connexion').disabled = false;
+  $('connexion').textContent = 'Se connecter';
+  if (!res.ok) {
+    $('compte-erreur').textContent = res.erreur;
+    $('compte-erreur').hidden = false;
+    return;
+  }
+  $('mdp').value = '';
+  await relireCompte();
+});
+
+$('deconnexion').addEventListener('click', async () => {
+  await deconnexion();
+  await relireCompte();
+});
+
+$('remplir').addEventListener('click', async () => {
+  const jobId = $('remplir').dataset.jobId;
+  if (!jobId) return;
+  $('remplir').disabled = true;
+  const res = await send({ type: 'demarrerTravail', jobId });
+  $('remplir').disabled = false;
+  if (!res?.ok) {
+    $('travaux-resume').textContent = `Échec : ${res?.error ?? 'inconnu'}`;
+  }
+});
+
 $('start').addEventListener('click', async () => {
   const items = parseItems($('items').value);
   if (!items.length) return;
@@ -203,4 +293,5 @@ chrome.runtime.onMessage.addListener((msg) => {
 });
 
 detectSite();
+relireCompte();
 send({ type: 'getState' }).then((r) => render(r?.data ?? null));
