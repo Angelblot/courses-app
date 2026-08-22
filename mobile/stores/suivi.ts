@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { doitAfficher, ETATS_ACTIFS } from '../lib/suivi-bandeau.ts';
+import { lireAcquittement, ecrireAcquittement } from './acquittement';
 
 export type Travail = {
   id: string;
@@ -56,4 +58,66 @@ export function useSuiviTravail(jobId: string | null) {
   }, [jobId]);
 
   return { travail, chargement };
+}
+
+/**
+ * Suit le travail à signaler, quel qu'il soit.
+ *
+ * Distinct de `useSuiviTravail`, qui suit un travail dont on connaît déjà
+ * l'identifiant : ici on ne le connaît pas, et la requête comme l'abonnement
+ * en diffèrent.
+ *
+ * L'abonnement ne porte aucun filtre d'identifiant ; RLS garantit que seuls
+ * les travaux de l'utilisateur remontent. `cart_jobs` est déjà publiée dans
+ * `supabase_realtime` — vérifié le 22/08.
+ */
+export function useTravailActif() {
+  const [travail, setTravail] = useState<Travail | null>(null);
+  const [dernierAcquitte, setDernierAcquitte] = useState<string | null>(null);
+
+  const relire = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('cart_jobs')
+      .select('id, status, progress, results, error')
+      .in('status', [...ETATS_ACTIFS, 'done', 'failed'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.error('[travailActif]', error);
+      return;
+    }
+    setTravail((data as Travail) ?? null);
+  }, []);
+
+  useEffect(() => {
+    let vivant = true;
+    lireAcquittement().then((v) => { if (vivant) setDernierAcquitte(v); });
+    relire();
+
+    const canal = supabase
+      .channel('travail-actif')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'cart_jobs' },
+        // On relit plutôt que de se fier à la charge de l'événement : une
+        // insertion et une mise à jour n'ont pas la même forme, et le travail
+        // le plus récent peut changer d'identité.
+        () => { if (vivant) relire(); },
+      )
+      .subscribe();
+
+    return () => {
+      vivant = false;
+      supabase.removeChannel(canal);
+    };
+  }, [relire]);
+
+  const acquitte = useCallback(async (id: string) => {
+    await ecrireAcquittement(id);
+    setDernierAcquitte(id);
+  }, []);
+
+  const aMontrer = doitAfficher(travail, dernierAcquitte) ? travail : null;
+  return { travail: aMontrer, acquitte };
 }
