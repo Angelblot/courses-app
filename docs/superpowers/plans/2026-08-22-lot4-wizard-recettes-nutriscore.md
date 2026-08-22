@@ -1980,7 +1980,7 @@ git push origin mobile/expo-scan
 
 La poussée déclenche Xcode Cloud. Compter vingt à trente minutes.
 
-- [ ] **Étape 5 : suivre le build sans demander à Angelo**
+- [x] **Étape 5 : suivre le build sans demander à Angelo**
 
 L'accès à l'API App Store Connect est en place. Depuis le répertoire de travail
 de la session, avec `asc.mjs` :
