@@ -125,7 +125,12 @@ export async function creerRecette(
 
   const { data: recette, error } = await supabase
     .from('recipes')
-    .insert({ name: b.name.trim(), servings_default: b.servings_default, user_id: userId })
+    .insert({
+      name: b.name.trim(),
+      servings_default: b.servings_default,
+      image_url: b.image_url ?? null,
+      user_id: userId,
+    })
     .select('id')
     .single();
 
@@ -176,7 +181,11 @@ export async function modifierRecette(
 
   const { error: err1 } = await supabase
     .from('recipes')
-    .update({ name: b.name.trim(), servings_default: b.servings_default })
+    .update({
+      name: b.name.trim(),
+      servings_default: b.servings_default,
+      image_url: b.image_url ?? null,
+    })
     .eq('id', id);
   if (err1) {
     console.error('[modifierRecette]', err1);

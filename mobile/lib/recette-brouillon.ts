@@ -13,6 +13,8 @@ export type Brouillon = {
   name: string;
   servings_default: number;
   ingredients: IngredientBrouillon[];
+  /** Adresse de la photo déposée, ou `null` : la recette prend alors un aplat. */
+  image_url?: string | null;
 };
 
 /** Unités proposées, reprises du formulaire web. */

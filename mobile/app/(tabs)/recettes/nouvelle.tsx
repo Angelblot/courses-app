@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable,
+  ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,8 +8,12 @@ import { useRouter } from 'expo-router';
 import { SelecteurIngredient, type ChoixIngredient } from '../../../components/SelecteurIngredient';
 import { useProducts } from '../../../stores/products';
 import { creerRecette } from '../../../stores/recipes';
-import { UNITES, valideBrouillon, type IngredientBrouillon } from '../../../lib/recette-brouillon.ts';
+import {
+  UNITES, valideBrouillon,
+  type Brouillon, type IngredientBrouillon,
+} from '../../../lib/recette-brouillon.ts';
 import { libelleRayon } from '../../../lib/rayons.ts';
+import { choisirPhoto, deposerPhoto } from '../../../lib/photo-recette.ts';
 import { colors, radius, spacing } from '../../../lib/theme';
 
 export default function NouvelleRecette() {
@@ -19,6 +23,17 @@ export default function NouvelleRecette() {
   const [parts, setParts] = useState('4');
   const [ingredients, setIngredients] = useState<IngredientBrouillon[]>([]);
   const [selecteurOuvert, setSelecteurOuvert] = useState(false);
+  const [photo, setPhoto] = useState<{ base64: string } | null>(null);
+  const [photoExistante, setPhotoExistante] = useState<string | null>(null);
+  const [avertissement, setAvertissement] = useState<string | null>(null);
+
+  const proposerPhoto = () => {
+    Alert.alert('Photo de la recette', undefined, [
+      { text: 'Prendre une photo', onPress: async () => setPhoto(await choisirPhoto('appareil')) },
+      { text: 'Choisir dans la photothèque', onPress: async () => setPhoto(await choisirPhoto('bibliotheque')) },
+      { text: 'Annuler', style: 'cancel' },
+    ]);
+  };
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
 
@@ -38,11 +53,23 @@ export default function NouvelleRecette() {
 
   const enregistrer = async () => {
     if (enCours) return;
-    const brouillon = { name: nom, servings_default: Number.parseInt(parts, 10), ingredients };
+    const brouillon: Brouillon = { name: nom, servings_default: Number.parseInt(parts, 10), ingredients };
     const probleme = valideBrouillon(brouillon);
     if (probleme) { setErreur(probleme); return; }
     setErreur(null);
+    setAvertissement(null);
     setEnCours(true);
+
+    // Le dépôt a lieu ici et pas au choix de la photo : inutile d'encombrer le
+    // stockage si la recette n'est finalement pas enregistrée.
+    let adressePhoto = photoExistante;
+    if (photo) {
+      const d = await deposerPhoto(photo.base64);
+      if (d.ok && d.url) adressePhoto = d.url;
+      // Une photo qui ne passe pas ne doit pas faire perdre la recette.
+      else setAvertissement("La recette est enregistrée, mais la photo n'a pas pu être envoyée.");
+    }
+    brouillon.image_url = adressePhoto;
     const r = await creerRecette(brouillon);
     setEnCours(false);
     if (r.ok) router.back();
@@ -61,6 +88,20 @@ export default function NouvelleRecette() {
         </View>
 
         <ScrollView contentContainerStyle={s.corps} keyboardShouldPersistTaps="handled">
+          <Pressable style={s.photo} onPress={proposerPhoto}>
+            {photo || photoExistante ? (
+              <Image
+                source={{ uri: photo ? `data:image/jpeg;base64,${photo.base64}` : photoExistante! }}
+                style={s.photoImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[s.photoImage, s.photoVide]}>
+                <Text style={s.photoTexte}>Ajouter une photo</Text>
+              </View>
+            )}
+          </Pressable>
+
           <Text style={s.label}>Nom de la recette</Text>
           <TextInput
             style={s.champ}
@@ -136,6 +177,7 @@ export default function NouvelleRecette() {
             <Text style={s.ajouterTexte}>Ajouter un ingrédient</Text>
           </Pressable>
 
+          {avertissement && <Text style={s.avertissement}>{avertissement}</Text>}
           {erreur && <Text style={s.erreur}>{erreur}</Text>}
 
           <Pressable style={s.bouton} onPress={enregistrer} disabled={enCours}>
@@ -163,6 +205,15 @@ const s = StyleSheet.create({
   titre: { fontSize: 17, fontWeight: '700', color: colors.text },
   equilibre: { width: 56 },
   corps: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xxl },
+  photo: { borderRadius: radius.lg, overflow: 'hidden', marginBottom: spacing.md },
+  photoImage: { width: '100%', height: 180, backgroundColor: colors.surface },
+  photoVide: {
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed',
+  },
+  photoTexte: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+  avertissement: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
+
   label: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginTop: spacing.sm },
   section: {
     fontSize: 17, fontWeight: '700', color: colors.text,
