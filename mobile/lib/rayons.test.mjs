@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rayonDepuisCategories, libelleRayon, RAYONS } from './rayons.ts';
+import { rayonDepuisCategories, rayonDepuisLibelle, libelleRayon, RAYONS } from './rayons.ts';
 
 // Étiquettes relevées sur l'API le 21/08/2026 pour les deux produits scannés.
 const BOURSIN = [
@@ -61,4 +61,35 @@ test("les 10 rayons suivent l'ordre d'affichage de la base", () => {
     'fruits_legumes', 'pls', 'charcuterie', 'boissons', 'epicerie',
     'droguerie', 'parfumerie', 'maison', 'surgeles', 'autre',
   ]);
+});
+
+test('les libellés des ingrédients migrés se ramènent aux clés canoniques', () => {
+  assert.equal(rayonDepuisLibelle('Produits laitiers'), 'pls');
+  assert.equal(rayonDepuisLibelle('Fruits et légumes'), 'fruits_legumes');
+  assert.equal(rayonDepuisLibelle('Épicerie'), 'epicerie');
+  assert.equal(rayonDepuisLibelle('Charcuterie'), 'charcuterie');
+});
+
+test('« Boucherie » suit Carrefour et tombe en P.L.S.', () => {
+  // Les 10 rayons viennent des sections du ticket Carrefour, où la boucherie
+  // n'existe pas : « Filets de poulet jaune CARREFOUR » y est rangé en P.L.S.
+  assert.equal(rayonDepuisLibelle('Boucherie'), 'pls');
+});
+
+test('la reconnaissance ignore casse, accents et esperluette', () => {
+  assert.equal(rayonDepuisLibelle('FRUITS & LEGUMES'), 'fruits_legumes');
+  assert.equal(rayonDepuisLibelle('epicerie'), 'epicerie');
+  assert.equal(rayonDepuisLibelle('Charcuterie & traiteur'), 'charcuterie');
+});
+
+test('un libellé inconnu ou absent tombe en « autre »', () => {
+  assert.equal(rayonDepuisLibelle('Cave à vin'), 'autre');
+  assert.equal(rayonDepuisLibelle(''), 'autre');
+  assert.equal(rayonDepuisLibelle(null), 'autre');
+});
+
+test('une clé canonique passée par mégarde est rendue telle quelle', () => {
+  // Le récapitulatif mélange des ingrédients (libellés) et des produits (clés).
+  assert.equal(rayonDepuisLibelle('pls'), 'pls');
+  assert.equal(rayonDepuisLibelle('fruits_legumes'), 'fruits_legumes');
 });

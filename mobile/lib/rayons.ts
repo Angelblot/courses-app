@@ -61,3 +61,54 @@ export function rayonDepuisCategories(tags: string[] | null | undefined): CleRay
 export function libelleRayon(cle: string | null | undefined): string {
   return RAYONS.find((r) => r.cle === cle)?.label ?? 'Autres';
 }
+
+/**
+ * Ramène un libellé de rayon en clair vers une clé canonique.
+ *
+ * `recipe_ingredients.rayon` porte un troisième vocabulaire, saisi à la main :
+ * « Produits laitiers », « Fruits et légumes », « Boucherie ». Sans cette
+ * traduction, le récapitulatif afficherait le même rayon deux fois sous deux
+ * noms — une fois pour les ingrédients, une fois pour les produits.
+ *
+ * Accepte aussi une clé canonique telle quelle : le récapitulatif mélange des
+ * lignes venant des ingrédients (libellés) et des produits (clés).
+ */
+const LIBELLES: ReadonlyArray<readonly [string, CleRayon]> = [
+  ['produits laitiers', 'pls'],
+  ['pls', 'pls'],
+  // Carrefour n'a pas de rayon boucherie : la volaille est en P.L.S.
+  ['boucherie', 'pls'],
+  ['volaille', 'pls'],
+  ['fruits et legumes', 'fruits_legumes'],
+  ['fruits legumes', 'fruits_legumes'],
+  ['charcuterie', 'charcuterie'],
+  ['charcuterie et traiteur', 'charcuterie'],
+  ['traiteur', 'charcuterie'],
+  ['epicerie', 'epicerie'],
+  ['boissons', 'boissons'],
+  ['surgeles', 'surgeles'],
+  ['droguerie', 'droguerie'],
+  ['hygiene', 'parfumerie'],
+  ['parfumerie', 'parfumerie'],
+  ['maison', 'maison'],
+];
+
+export function rayonDepuisLibelle(libelle: string | null | undefined): CleRayon {
+  if (!libelle) return 'autre';
+  const n = libelle
+    .toLowerCase()
+    .normalize('NFD')
+    // Points de code plutôt que caractères littéraux : ces marques sont
+    // invisibles dans un éditeur et se perdent au copier-coller.
+    .replace(/[\u0300-\u036F]/g, '')
+    .replace(/&/g, 'et')
+    .replace(/[^a-z_ ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!n) return 'autre';
+  // Clé canonique passée telle quelle.
+  const cle = RAYONS.find((r) => r.cle === n);
+  if (cle) return cle.cle;
+  const trouve = LIBELLES.find(([l]) => l === n);
+  return trouve ? trouve[1] : 'autre';
+}
