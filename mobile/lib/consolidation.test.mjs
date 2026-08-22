@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildConsolidatedItems, groupByRayon, getRecipeUsage, getRecipeIngredientMatches,
+  construireItems,
 } from './consolidation.ts';
 
 const RECETTES = [
@@ -144,4 +145,29 @@ test('cinq recettes partageant un ingrédient ne font pas acheter cinq paquets',
   // 5 × 25 g × 4 parts = 500 g : un paquet.
   assert.equal(u.totalQuantity, 1);
   assert.equal(u.breakdown.length, 5);
+});
+
+test('chaque ligne consolidée devient un article de panier', () => {
+  const items = construireItems([
+    { key: 'a', name: 'Lardons', unit: 'g', rayon: 'charcuterie',
+      totalQuantity: 200, ean13: '3760040427577', sources: [] },
+  ]);
+  assert.deepEqual(items, [{
+    name: 'Lardons', quantity: 200, unit: 'g',
+    ean13: '3760040427577', category: 'charcuterie',
+  }]);
+});
+
+test('un article sans code-barres part quand même, avec ean13 à null', () => {
+  // C'est le cas des ajouts manuels : l'extension retombera sur la recherche
+  // par nom, avec son score et sa détection d'ambiguïté.
+  const items = construireItems([
+    { key: 'b', name: 'Piles AA', unit: 'unité', rayon: 'maison',
+      totalQuantity: 1, ean13: null, sources: [] },
+  ]);
+  assert.equal(items[0].ean13, null);
+});
+
+test('une liste vide ne produit aucun article', () => {
+  assert.deepEqual(construireItems([]), []);
 });

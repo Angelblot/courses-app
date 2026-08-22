@@ -20,6 +20,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="wizard"
+        options={{
+          title: 'Wizard',
+          tabBarIcon: ({ color, size }) => <Feather name="list" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           title: 'Produits',

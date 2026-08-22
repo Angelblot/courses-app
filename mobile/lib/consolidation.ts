@@ -346,3 +346,33 @@ export function getRecipeIngredientMatches({
       : [],
   }));
 }
+
+export type ItemPanier = {
+  name: string;
+  quantity: number;
+  unit: string;
+  ean13: string | null;
+  category: CleRayon;
+};
+
+/**
+ * Met la liste consolidée à la forme attendue dans `cart_jobs.items`.
+ *
+ * Fonction pure, volontairement ici et non dans `cart-jobs.ts` : ce dernier
+ * importe le client Supabase, que Node ne sait pas charger hors de Metro, et
+ * ne peut donc pas être couvert par `node --test`.
+ *
+ * `ean13` est conservé même absent : c'est lui qui rendra l'ajout certain chez
+ * Carrefour au lot 5, dont les fiches exposent le code-barres dans leur
+ * adresse. Sans lui, l'extension retombe sur la recherche par nom et son
+ * risque d'ambiguïté.
+ */
+export function construireItems(lignes: LigneConsolidee[]): ItemPanier[] {
+  return lignes.map((l) => ({
+    name: l.name,
+    quantity: l.totalQuantity,
+    unit: l.unit,
+    ean13: l.ean13 ?? null,
+    category: l.rayon,
+  }));
+}
