@@ -19,6 +19,9 @@ export const colors = {
   nutriC: '#F5B700',
   nutriD: '#E67E22',
   nutriE: '#C62828',
+  // Aplats des recettes sans photo. Six teintes sourdes, assez contrastées
+  // pour porter du texte blanc, assez proches pour ne pas jurer entre elles.
+  aplats: ['#2D6A4F', '#52796F', '#B08968', '#6B705C', '#8A5A44', '#4A6FA5'],
 } as const;
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
