@@ -1153,7 +1153,7 @@ git commit -m "feat: une ambiguïté tranchée une fois ne se repose plus"
   - `libelleEtat(statut: string): string`
   - `resume(travail: Travail): string`
 
-- [ ] **Étape 1 : écrire les tests qui échouent**
+- [x] **Étape 1 : écrire les tests qui échouent**
 
 Créer `mobile/lib/suivi-libelles.test.mjs` :
 
@@ -1196,7 +1196,7 @@ test('un travail à reprendre le dit clairement', () => {
 });
 ```
 
-- [ ] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
+- [x] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/suivi-libelles.test.mjs
@@ -1204,7 +1204,7 @@ test('un travail à reprendre le dit clairement', () => {
 
 Attendu : ÉCHEC, `ERR_MODULE_NOT_FOUND`.
 
-- [ ] **Étape 3 : écrire les libellés**
+- [x] **Étape 3 : écrire les libellés**
 
 Créer `mobile/lib/suivi-libelles.ts` :
 
@@ -1254,7 +1254,7 @@ export function resume(travail: {
 }
 ```
 
-- [ ] **Étape 4 : lancer les tests et vérifier qu'ils passent**
+- [x] **Étape 4 : lancer les tests et vérifier qu'ils passent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/*.test.mjs
@@ -1262,7 +1262,7 @@ export function resume(travail: {
 
 Attendu : `# fail 0`.
 
-- [ ] **Étape 5 : l'abonnement temps réel**
+- [x] **Étape 5 : l'abonnement temps réel**
 
 Créer `mobile/stores/suivi.ts` :
 
@@ -1328,7 +1328,7 @@ export function useSuiviTravail(jobId: string | null) {
 }
 ```
 
-- [ ] **Étape 6 : transformer l'écran de confirmation en écran de suivi**
+- [x] **Étape 6 : transformer l'écran de confirmation en écran de suivi**
 
 Dans `mobile/components/wizard/EtapeGeneration.tsx` :
 
@@ -1342,7 +1342,7 @@ dessous, et à la fin la liste de ce qui n'a pas été trouvé, tirée de `resul
 
 Le bouton **Terminer** reste, et réinitialise le wizard.
 
-- [ ] **Étape 7 : vérifier**
+- [x] **Étape 7 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -1351,7 +1351,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 8 : commit**
+- [x] **Étape 8 : commit**
 
 ```bash
 git add mobile/lib/suivi-libelles.ts mobile/lib/suivi-libelles.test.mjs mobile/stores/suivi.ts mobile/lib/cart-jobs.ts mobile/components/wizard/EtapeGeneration.tsx
@@ -1364,7 +1364,7 @@ git commit -m "feat: écran de suivi du remplissage en temps réel"
 
 ### Tâche 9 : livrer et éprouver la boucle
 
-- [ ] **Étape 1 : vérification complète**
+- [x] **Étape 1 : vérification complète**
 
 Depuis `mobile/` :
 
@@ -1383,7 +1383,7 @@ Depuis `extension/` :
 Attendu : aucune erreur TypeScript, `# fail 0` des deux côtés, expo-doctor sans
 échec autre que les deux connus — CocoaPods local et l'avertissement CNG.
 
-- [ ] **Étape 2 : vérifier le bundle, comme la CI**
+- [x] **Étape 2 : vérifier le bundle, comme la CI**
 
 ```bash
 EXPO_PUBLIC_SUPABASE_URL="https://qmymwicsgilhoihtfdjm.supabase.co" \
@@ -1393,18 +1393,18 @@ npx expo export --platform ios --output-dir /tmp/export-lot5
 
 Attendu : `Exported:` sans erreur.
 
-- [ ] **Étape 3 : ne pas toucher au numéro de build**
+- [x] **Étape 3 : ne pas toucher au numéro de build**
 
 Xcode Cloud impose le sien, repris du numéro d'exécution. Ni `app.json` ni
 `Info.plist` ne sont à modifier.
 
-- [ ] **Étape 4 : pousser**
+- [x] **Étape 4 : pousser**
 
 ```bash
 git push origin mobile/expo-scan
 ```
 
-- [ ] **Étape 5 : suivre le build par l'API**
+- [x] **Étape 5 : suivre le build par l'API**
 
 Depuis le répertoire de travail de la session, avec `asc.mjs`. **Trier
 explicitement** : l'API ne rend pas les exécutions de la plus récente à la plus
