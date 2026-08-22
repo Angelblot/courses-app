@@ -22,10 +22,11 @@ export type Product = {
   grammage_g: number | null;
   volume_ml: number | null;
   product_type: string | null;
+  nutriscore: string | null;
 };
 
 const CHAMPS =
-  'id, ean13, name, brand, category, unit, favorite, image_url, grammage_g, volume_ml, product_type';
+  'id, ean13, name, brand, category, unit, favorite, image_url, grammage_g, volume_ml, product_type, nutriscore';
 
 export function useProducts() {
   const [produits, setProduits] = useState<Product[]>([]);
@@ -101,6 +102,7 @@ export async function ajouterProduit(
     // connaissait pas ce champ. Le rayon est alors absent, pas nul — et un
     // produit sans rayon est exactement le défaut que ce correctif supprime.
     category: fiche.categoryKey ?? 'autre',
+    nutriscore: fiche.nutriscore ?? null,
     favorite: true, // un produit qu'on scanne chez soi est un produit qu'on aime
     // Les 65 produits existants du catalogue utilisent tous unit = 'unité',
     // y compris les liquides (vin 750 ml, bière 200 ml) : la contenance vit

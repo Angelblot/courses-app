@@ -95,3 +95,23 @@ test('un produit sans catégorie reçoit le rayon « autre »', () => {
   const fiche = mapOffProduct('1234567890123', { product_name: 'Chose' });
   assert.equal(fiche.categoryKey, 'autre');
 });
+
+test('la note Nutriscore est reprise et normalisée en minuscule', () => {
+  const fiche = mapOffProduct('123', {
+    product_name: 'Yaourt nature', nutriscore_grade: 'B',
+  });
+  assert.equal(fiche.nutriscore, 'b');
+});
+
+test("un produit non noté garde null, ce n'est pas une erreur", () => {
+  // Beaucoup de produits n'ont pas de Nutriscore : sel, café, épices.
+  assert.equal(mapOffProduct('123', { product_name: 'Sel fin' }).nutriscore, null);
+  assert.equal(
+    mapOffProduct('123', { product_name: 'X', nutriscore_grade: 'unknown' }).nutriscore,
+    null,
+  );
+  assert.equal(
+    mapOffProduct('123', { product_name: 'X', nutriscore_grade: 'not-applicable' }).nutriscore,
+    null,
+  );
+});

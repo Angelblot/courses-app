@@ -7,6 +7,8 @@
 import { normalizeProductType } from './typology.ts';
 import { rayonDepuisCategories, type CleRayon } from './rayons.ts';
 
+export type NoteNutri = 'a' | 'b' | 'c' | 'd' | 'e';
+
 export type FicheProduit = {
   ean13: string;
   name: string;
@@ -17,6 +19,8 @@ export type FicheProduit = {
   productType: string | null;
   /** Rayon déduit des catégories Open Food Facts, corrigeable par l'utilisateur. */
   categoryKey: CleRayon | null;
+  /** Note Open Food Facts. `null` est fréquent et légitime : sel, café, épices. */
+  nutriscore: NoteNutri | null;
 };
 
 type OffData = {
@@ -25,6 +29,7 @@ type OffData = {
   image_url?: string;
   product_quantity?: number | string;
   categories_tags?: string[];
+  nutriscore_grade?: string;
 };
 
 const MOTS_LIQUIDES = [
@@ -60,6 +65,17 @@ export function estLiquide(nom: string, categories: string[] = []): boolean {
 }
 
 /**
+ * Lit la note Nutriscore d'Open Food Facts.
+ *
+ * L'API renvoie aussi « unknown » et « not-applicable » pour les produits non
+ * notés : les deux valent `null`, pas une note.
+ */
+function litNutriscore(brut: string | undefined): NoteNutri | null {
+  const n = (brut ?? '').trim().toLowerCase();
+  return ['a', 'b', 'c', 'd', 'e'].includes(n) ? (n as NoteNutri) : null;
+}
+
+/**
  * Convertit une réponse Open Food Facts en fiche exploitable.
  *
  * @returns null si la fiche n'a pas de nom — un produit sans libellé serait
@@ -86,11 +102,12 @@ export function mapOffProduct(ean: string, data: OffData): FicheProduit | null {
     volumeMl: valide && liquide ? Math.round(quantite) : null,
     productType: normalizeProductType(name, categories),
     categoryKey: rayonDepuisCategories(categories),
+    nutriscore: litNutriscore(data.nutriscore_grade),
   };
 }
 
 const URL_OFF = 'https://world.openfoodfacts.org/api/v2/product';
-const CHAMPS = 'product_name,brands,image_url,product_quantity,categories_tags';
+const CHAMPS = 'product_name,brands,image_url,product_quantity,categories_tags,nutriscore_grade';
 
 // Délai avant d'abandonner la requête. La source Python (enrich_ean.py) pose
 // 10 secondes, mais elle tourne côté serveur pour un traitement par lot :

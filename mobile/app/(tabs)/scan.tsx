@@ -138,6 +138,7 @@ export default function Scan() {
     await fileScan.enfiler({
       ean13: ean, name: ean, brand: null, imageUrl: null,
       grammageG: null, volumeMl: null, productType: null, categoryKey: null,
+      nutriscore: null,
     });
     await rafraichirCompteur();
     setMessage({ texte: 'Mis en attente — ajouté dès le retour du réseau', erreur: false });
@@ -248,6 +249,7 @@ export default function Scan() {
         // Aucune catégorie Open Food Facts ici : le nom est la seule source.
         productType: normalizeProductType(nom),
         categoryKey: rayonChoisi,
+        nutriscore: null,
       });
     },
     [ean, enregistrer],
