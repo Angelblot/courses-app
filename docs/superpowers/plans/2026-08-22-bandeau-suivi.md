@@ -48,7 +48,7 @@ React Native, AsyncStorage, `node:test`.
   - `estClos(statut: string): boolean` — `done` ou `failed`
   - `doitAfficher(travail: { id: string; status: string } | null, dernierAcquitte: string | null): boolean`
 
-- [ ] **Étape 1 : écrire le test qui échoue**
+- [x] **Étape 1 : écrire le test qui échoue**
 
 Créer `mobile/lib/suivi-bandeau.test.mjs` :
 
@@ -104,7 +104,7 @@ test('un état inconnu ne fait pas apparaître le bandeau', () => {
 });
 ```
 
-- [ ] **Étape 2 : lancer le test et vérifier qu'il échoue**
+- [x] **Étape 2 : lancer le test et vérifier qu'il échoue**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/suivi-bandeau.test.mjs
@@ -112,7 +112,7 @@ test('un état inconnu ne fait pas apparaître le bandeau', () => {
 
 Attendu : ÉCHEC, `ERR_MODULE_NOT_FOUND` sur `./suivi-bandeau.ts`.
 
-- [ ] **Étape 3 : écrire le module**
+- [x] **Étape 3 : écrire le module**
 
 Créer `mobile/lib/suivi-bandeau.ts` :
 
@@ -158,7 +158,7 @@ export function doitAfficher(
 }
 ```
 
-- [ ] **Étape 4 : lancer les tests et vérifier qu'ils passent**
+- [x] **Étape 4 : lancer les tests et vérifier qu'ils passent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/*.test.mjs
@@ -167,7 +167,7 @@ npx tsc --noEmit
 
 Attendu : `# fail 0`, aucune erreur TypeScript.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add mobile/lib/suivi-bandeau.ts mobile/lib/suivi-bandeau.test.mjs
@@ -189,7 +189,7 @@ git commit -m "feat: règle d'affichage du bandeau de suivi"
   - `ecrireAcquittement(id: string): Promise<void>`
   - `useTravailActif(): { travail: Travail | null; acquitte: (id: string) => Promise<void> }`
 
-- [ ] **Étape 1 : le stockage de l'acquittement**
+- [x] **Étape 1 : le stockage de l'acquittement**
 
 Créer `mobile/stores/acquittement.ts` :
 
@@ -225,7 +225,7 @@ export async function ecrireAcquittement(id: string): Promise<void> {
 }
 ```
 
-- [ ] **Étape 2 : le hook du travail actif**
+- [x] **Étape 2 : le hook du travail actif**
 
 Ajouter à la fin de `mobile/stores/suivi.ts` :
 
@@ -303,7 +303,7 @@ import { lireAcquittement, ecrireAcquittement } from './acquittement';
 
 `useCallback` rejoint l'import de React existant.
 
-- [ ] **Étape 3 : vérifier**
+- [x] **Étape 3 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -312,7 +312,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 4 : commit**
+- [x] **Étape 4 : commit**
 
 ```bash
 git add mobile/stores/acquittement.ts mobile/stores/suivi.ts
@@ -331,7 +331,7 @@ git commit -m "feat: suivi du travail actif et acquittement local"
 **Interfaces :**
 - Consomme : `useSuiviTravail`, `useTravailActif` ; `libelleEtat`, `libelleDrive`, `resume` ; `estClos`.
 
-- [ ] **Étape 1 : la pile**
+- [x] **Étape 1 : la pile**
 
 Créer `mobile/app/(tabs)/suivi/_layout.tsx` :
 
@@ -343,7 +343,7 @@ export default function SuiviLayout() {
 }
 ```
 
-- [ ] **Étape 2 : l'écran autonome**
+- [x] **Étape 2 : l'écran autonome**
 
 Créer `mobile/app/(tabs)/suivi/[id].tsx`. Il reprend ce qu'affichait
 `EtapeGeneration` après l'envoi, sans dépendre du contexte du wizard :
@@ -360,7 +360,7 @@ disparaître le bandeau.
 États : chargement, travail introuvable avec
 `<EtatVide titre="Suivi introuvable">`.
 
-- [ ] **Étape 3 : le wizard redirige au lieu d'afficher**
+- [x] **Étape 3 : le wizard redirige au lieu d'afficher**
 
 Dans `mobile/components/wizard/EtapeGeneration.tsx`, remplacer tout le bloc
 `if (jobId) { … }` — l'écran de suivi intégré — par une redirection :
@@ -380,7 +380,7 @@ Retirer alors `useSuiviTravail`, `libelleEtat`, `libelleDrive`, `resume`, l'éta
 `jobId` et les styles devenus inutiles — `suivi`, `manquants`, `manquantsTitre`,
 `manquant`, `confirmeTitre`, `confirmeCorps`.
 
-- [ ] **Étape 4 : régénérer les types de routes**
+- [x] **Étape 4 : régénérer les types de routes**
 
 expo-router engendre ses types au démarrage du serveur. La route `/suivi/[id]`
 est nouvelle :
@@ -401,7 +401,7 @@ grep -c "suivi" .expo/types/router.d.ts
 Attendu : un compte supérieur à zéro. Sans cette régénération, `router.replace`
 vers `/suivi/…` échoue au typage.
 
-- [ ] **Étape 5 : vérifier**
+- [x] **Étape 5 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -410,7 +410,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 6 : commit**
+- [x] **Étape 6 : commit**
 
 ```bash
 git add "mobile/app/(tabs)/suivi" mobile/components/wizard/EtapeGeneration.tsx
