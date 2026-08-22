@@ -1431,7 +1431,7 @@ git commit -m "feat: écrans de consultation et de création de recettes"
   - `etatVide: ReactNode`
   - `getId?: (item: T) => string`
 
-- [ ] **Étape 1 : écrire le composant**
+- [x] **Étape 1 : écrire le composant**
 
 `frontend/src/components/ui/SwipeStack.jsx` n'est **pas portable** : il repose
 sur les événements de pointeur du DOM et sur des transformations CSS. Le
@@ -1561,7 +1561,7 @@ const s = StyleSheet.create({
 });
 ```
 
-- [ ] **Étape 2 : vérifier la compilation**
+- [x] **Étape 2 : vérifier la compilation**
 
 ```bash
 npx tsc --noEmit
@@ -1569,7 +1569,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur.
 
-- [ ] **Étape 3 : commit**
+- [x] **Étape 3 : commit**
 
 ```bash
 git add mobile/components/wizard/PileSwipe.tsx
@@ -1593,7 +1593,7 @@ git commit -m "feat: pile de cartes à faire glisser, en React Native"
   - `useWizard(): { selectedRecipes: Record<string, number>; quotidien: Record<string, 'needed' | 'have'>; quotidienQty: Record<string, number>; extras: LigneExtra[]; choixProduits: Record<string, string>; drives: string[]; …actions }`
   - actions : `toggleRecette(id, partsParDefaut)`, `setParts(id, n)`, `marquerProduit(id, statut)`, `setQuantite(id, n)`, `ajouterExtra(e)`, `retirerExtra(id)`, `choisirProduit(cleGroupe, produitId)`, `basculerDrive(nom)`, `reinitialiser()`
 
-- [ ] **Étape 1 : écrire le contexte**
+- [x] **Étape 1 : écrire le contexte**
 
 Créer `mobile/contexts/WizardContext.tsx`. L'état reprend `INITIAL` de
 `frontend/src/stores/wizardStore.js:14-22`, augmenté de `choixProduits` — la
@@ -1607,7 +1607,7 @@ Un `WizardProvider` enveloppe la pile du wizard. Les actions sont mémoïsées p
 `useCallback`, et la valeur du contexte par `useMemo`, pour ne pas rendre les
 cinq étapes à chaque frappe.
 
-- [ ] **Étape 2 : la coquille**
+- [x] **Étape 2 : la coquille**
 
 Créer `mobile/app/(tabs)/wizard/_layout.tsx` qui monte `<WizardProvider>` autour
 d'un `<Stack screenOptions={{ headerShown: false }} />`.
@@ -1639,7 +1639,7 @@ Le bouton d'action reprend les conditions d'affichage de `WizardPage.jsx:64-78` 
 | `recap` | la liste consolidée n'est pas vide |
 | `generation` | au moins un drive retenu |
 
-- [ ] **Étape 3 : ajouter l'onglet**
+- [x] **Étape 3 : ajouter l'onglet**
 
 Dans `mobile/app/(tabs)/_layout.tsx`, insérer entre `recettes` et `scan` :
 
@@ -1655,7 +1655,7 @@ Dans `mobile/app/(tabs)/_layout.tsx`, insérer entre `recettes` et `scan` :
 
 L'ordre final de la barre est : Recettes · Wizard · Scan · Produits · Compte.
 
-- [ ] **Étape 4 : vérifier**
+- [x] **Étape 4 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -1665,7 +1665,7 @@ Attendu : des erreurs sur les cinq composants d'étape, qui n'existent pas
 encore. Les créer en coquilles vides rendant `null` pour lever le blocage, les
 tâches 11 à 13 les remplissent.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add mobile/contexts/WizardContext.tsx "mobile/app/(tabs)/wizard" "mobile/app/(tabs)/_layout.tsx"
@@ -1683,7 +1683,7 @@ git commit -m "feat: état partagé et coquille du wizard"
 **Interfaces :**
 - Consomme : `PileSwipe`, `useWizard`, `useRecipes`, `useProducts`, `PastilleNutri`.
 
-- [ ] **Étape 1 : l'étape recettes**
+- [x] **Étape 1 : l'étape recettes**
 
 `EtapeRecettes.tsx` affiche les recettes en pile de cartes : image si elle
 existe, nom, nombre d'ingrédients, nombre de parts.
@@ -1697,7 +1697,7 @@ L'état vide, une fois la pile épuisée : « Tu as vu toutes tes recettes. »
 Si le catalogue de recettes est vide, afficher plutôt un `<EtatVide>` renvoyant
 vers l'onglet Recettes — sans recette, le wizard n'a rien à consolider.
 
-- [ ] **Étape 2 : l'étape quotidien**
+- [x] **Étape 2 : l'étape quotidien**
 
 `EtapeQuotidien.tsx` reprend le même patron avec les produits marqués
 `favorite`. La carte porte le nom, la marque, l'image et la pastille Nutriscore.
@@ -1708,7 +1708,7 @@ réglable.
 
 Un champ en bas permet d'ajouter un article libre, qui alimente `extras`.
 
-- [ ] **Étape 3 : vérifier**
+- [x] **Étape 3 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -1716,7 +1716,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur sur ces deux fichiers.
 
-- [ ] **Étape 4 : commit**
+- [x] **Étape 4 : commit**
 
 ```bash
 git add mobile/components/wizard/EtapeRecettes.tsx mobile/components/wizard/EtapeQuotidien.tsx
@@ -1734,7 +1734,7 @@ git commit -m "feat: étapes recettes et quotidien du wizard"
 - Consomme : `getRecipeIngredientMatches` de `lib/consolidation.ts` ;
   `useWizard`, `useRecipes`, `useProducts`.
 
-- [ ] **Étape 1 : écrire l'étape**
+- [x] **Étape 1 : écrire l'étape**
 
 Pour chaque groupe rendu par `getRecipeIngredientMatches`, une carte affichant :
 
@@ -1754,7 +1754,7 @@ Trois cas doivent se distinguer à l'écran :
    correspond. Il partira sous son nom générique. » Ce cas doit se voir : c'est
    celui où l'extension devra deviner, avec le risque d'ambiguïté connu.
 
-- [ ] **Étape 2 : vérifier**
+- [x] **Étape 2 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -1762,7 +1762,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur.
 
-- [ ] **Étape 3 : commit**
+- [x] **Étape 3 : commit**
 
 ```bash
 git add mobile/components/wizard/EtapeIngredients.tsx
@@ -1785,7 +1785,7 @@ git commit -m "feat: étape de rapprochement ingrédient et produit"
   - `type ItemPanier = { name: string; quantity: number; unit: string; ean13: string | null; category: CleRayon }`
   - `envoyerListe(items: ItemPanier[], drives: string[]): Promise<{ ok: boolean; erreur?: string }>`
 
-- [ ] **Étape 1 : écrire le test qui échoue**
+- [x] **Étape 1 : écrire le test qui échoue**
 
 Créer `mobile/lib/cart-jobs.test.mjs` :
 
@@ -1824,7 +1824,7 @@ test('une liste vide ne produit aucun article', () => {
 });
 ```
 
-- [ ] **Étape 2 : lancer le test et vérifier qu'il échoue**
+- [x] **Étape 2 : lancer le test et vérifier qu'il échoue**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/cart-jobs.test.mjs
@@ -1832,7 +1832,7 @@ test('une liste vide ne produit aucun article', () => {
 
 Attendu : ÉCHEC, `ERR_MODULE_NOT_FOUND` sur `./cart-jobs.ts`.
 
-- [ ] **Étape 3 : écrire le module**
+- [x] **Étape 3 : écrire le module**
 
 Créer `mobile/lib/cart-jobs.ts` :
 
@@ -1897,7 +1897,7 @@ export async function envoyerListe(
 }
 ```
 
-- [ ] **Étape 4 : écrire les deux étapes**
+- [x] **Étape 4 : écrire les deux étapes**
 
 `EtapeRecap.tsx` : appelle `buildConsolidatedItems` puis `groupByRayon`, et
 affiche un en-tête par rayon — le **libellé**, jamais la clé — suivi de ses
@@ -1919,7 +1919,7 @@ En cas de succès, un écran de confirmation qui dit la vérité :
 Ne pas promettre que le panier va se remplir : rien ne lira cette liste avant le
 lot 5.
 
-- [ ] **Étape 5 : vérifier**
+- [x] **Étape 5 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -1928,7 +1928,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 6 : commit**
+- [x] **Étape 6 : commit**
 
 ```bash
 git add mobile/lib/cart-jobs.ts mobile/lib/cart-jobs.test.mjs mobile/components/wizard/EtapeRecap.tsx mobile/components/wizard/EtapeGeneration.tsx
@@ -1942,7 +1942,7 @@ git commit -m "feat: récapitulatif et envoi de la liste vers cart_jobs"
 **Fichiers :**
 - Modifier : `mobile/app.json` si nécessaire
 
-- [ ] **Étape 1 : vérification complète**
+- [x] **Étape 1 : vérification complète**
 
 ```bash
 npx tsc --noEmit
@@ -1954,7 +1954,7 @@ Attendu : aucune erreur TypeScript, `# fail 0`, et expo-doctor sans échec autre
 que les deux connus — la version de CocoaPods locale et l'avertissement CNG,
 tous deux sans effet sur Xcode Cloud.
 
-- [ ] **Étape 2 : vérifier le bundle, comme le fera la CI**
+- [x] **Étape 2 : vérifier le bundle, comme le fera la CI**
 
 ```bash
 EXPO_PUBLIC_SUPABASE_URL="https://qmymwicsgilhoihtfdjm.supabase.co" \
@@ -1966,13 +1966,13 @@ Attendu : `Exported:` sans erreur. C'est la même étape que la phase de bundle
 d'Xcode Cloud : la faire échouer ici coûte une minute, l'y faire échouer coûte
 vingt-cinq.
 
-- [ ] **Étape 3 : ne pas toucher au numéro de build**
+- [x] **Étape 3 : ne pas toucher au numéro de build**
 
 Xcode Cloud impose son propre numéro, repris de celui de l'exécution : le build
 run n°3 a produit le build 3 alors que `CFBundleVersion` valait 2. Ni `app.json`
 ni `Info.plist` ne sont à modifier.
 
-- [ ] **Étape 4 : commit et poussée**
+- [x] **Étape 4 : commit et poussée**
 
 ```bash
 git push origin mobile/expo-scan
