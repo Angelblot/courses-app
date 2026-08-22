@@ -154,3 +154,71 @@ export async function creerRecette(
 
   return { ok: true };
 }
+
+/**
+ * Remplace une recette et ses ingrédients.
+ *
+ * Les ingrédients sont supprimés puis réinsérés, sans tentative de fusion :
+ * rapprocher l'ancienne et la nouvelle liste demanderait des règles subtiles
+ * et invérifiables d'un coup d'œil. Le remplacement est prévisible.
+ *
+ * Les opérations ne sont pas dans une transaction — PostgREST n'en expose pas.
+ * En cas d'échec de la réinsertion, la recette resterait sans ingrédient : on
+ * le signale explicitement plutôt que de laisser une coquille silencieuse.
+ */
+export async function modifierRecette(
+  id: string,
+  b: Brouillon,
+): Promise<{ ok: boolean; erreur?: string }> {
+  const { data: utilisateur } = await supabase.auth.getUser();
+  const userId = utilisateur?.user?.id;
+  if (!userId) return { ok: false, erreur: 'Session expirée. Reconnecte-toi.' };
+
+  const { error: err1 } = await supabase
+    .from('recipes')
+    .update({ name: b.name.trim(), servings_default: b.servings_default })
+    .eq('id', id);
+  if (err1) {
+    console.error('[modifierRecette]', err1);
+    return { ok: false, erreur: "Impossible d'enregistrer la recette." };
+  }
+
+  const { error: err2 } = await supabase.from('recipe_ingredients').delete().eq('recipe_id', id);
+  if (err2) {
+    console.error('[modifierRecette:purge]', err2);
+    return { ok: false, erreur: 'Impossible de mettre à jour les ingrédients.' };
+  }
+
+  const { error: err3 } = await supabase.from('recipe_ingredients').insert(
+    b.ingredients.map((i) => ({
+      recipe_id: id,
+      user_id: userId,
+      name: i.name.trim(),
+      quantity_per_serving: i.quantity_per_serving,
+      unit: i.unit,
+      rayon: i.rayon,
+      product_id: i.product_id,
+    })),
+  );
+  if (err3) {
+    console.error('[modifierRecette:ingredients]', err3);
+    return {
+      ok: false,
+      erreur: "Les ingrédients n'ont pas pu être enregistrés. Rouvre la recette et réessaie.",
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * Supprime une recette. Ses ingrédients partent avec elle : la clé étrangère
+ * `recipe_ingredients.recipe_id` est en ON DELETE CASCADE — vérifié le 22/08.
+ */
+export async function supprimerRecette(id: string): Promise<{ ok: boolean; erreur?: string }> {
+  const { error } = await supabase.from('recipes').delete().eq('id', id);
+  if (error) {
+    console.error('[supprimerRecette]', error);
+    return { ok: false, erreur: 'Impossible de supprimer cette recette.' };
+  }
+  return { ok: true };
+}

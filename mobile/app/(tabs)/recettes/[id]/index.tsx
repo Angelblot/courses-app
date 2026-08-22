@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { EtatVide } from '../../../../components/EtatVide';
-import { useRecette } from '../../../../stores/recipes';
+import { useRecette, supprimerRecette } from '../../../../stores/recipes';
 import { useProducts } from '../../../../stores/products';
 import { quantitePourParts, initiale, indiceAplat } from '../../../../lib/recettes-affichage.ts';
 import { formatIngredientQty } from '../../../../lib/unites.ts';
@@ -20,6 +20,26 @@ export default function DetailRecette() {
   // Le réglage n'est qu'une aide à la lecture : il repart de la valeur
   // enregistrée à chaque ouverture et ne modifie jamais la recette.
   const [parts, setParts] = useState<number | null>(null);
+  const [erreurSuppression, setErreurSuppression] = useState<string | null>(null);
+
+  const demanderSuppression = (id: string) => {
+    Alert.alert(
+      'Supprimer cette recette ?',
+      'Ses ingrédients seront supprimés avec elle. Cette action est définitive.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            const r = await supprimerRecette(id);
+            if (r.ok) router.back();
+            else setErreurSuppression(r.erreur ?? 'Impossible de supprimer cette recette.');
+          },
+        },
+      ],
+    );
+  };
 
   const rechargerAuFocus = useCallback(() => { recharger(); }, [recharger]);
   useFocusEffect(rechargerAuFocus);
@@ -117,6 +137,12 @@ export default function DetailRecette() {
               </View>
             );
           })}
+
+          {erreurSuppression && <Text style={s.erreur}>{erreurSuppression}</Text>}
+
+          <Pressable style={s.supprimer} onPress={() => demanderSuppression(recette.id)}>
+            <Text style={s.supprimerTexte}>Supprimer cette recette</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </View>
@@ -173,6 +199,11 @@ const s = StyleSheet.create({
   nonRattache: { fontSize: 11, color: colors.textMuted },
   quantite: { fontSize: 14, fontWeight: '700', color: colors.text },
   erreur: { color: colors.danger, fontSize: 14, textAlign: 'center' },
+  supprimer: {
+    marginTop: spacing.xxl, alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
+  supprimerTexte: { color: colors.danger, fontSize: 14, fontWeight: '600' },
   reessayer: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
     paddingVertical: spacing.sm, paddingHorizontal: spacing.lg,
