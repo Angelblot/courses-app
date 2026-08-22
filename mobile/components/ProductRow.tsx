@@ -1,5 +1,6 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 import type { Product } from '../stores/products';
+import { PastilleNutri } from './PastilleNutri';
 import { colors, radius, spacing } from '../lib/theme';
 
 /**
@@ -32,6 +33,7 @@ export function ProductRow({ produit }: { produit: Product }) {
         <Text style={s.nom} numberOfLines={2}>{produit.name}</Text>
         {detail.length > 0 && <Text style={s.detail}>{detail}</Text>}
       </View>
+      <PastilleNutri note={produit.nutriscore} />
       {produit.favorite && <View style={s.pastille} />}
     </View>
   );

@@ -5,6 +5,7 @@ import {
 import type { ResultatRecherche } from '../lib/openfoodfacts.ts';
 import { libelleRayon, type CleRayon } from '../lib/rayons.ts';
 import { SelecteurRayon } from './SelecteurRayon';
+import { PastilleNutri } from './PastilleNutri';
 import { colors, radius, spacing } from '../lib/theme';
 
 type Message = { texte: string; erreur: boolean };
@@ -62,7 +63,10 @@ export function FicheScannee({
               ? <Image source={{ uri: fiche.imageUrl }} style={s.image} />
               : <View style={[s.image, s.imageVide]} />}
             <View style={s.texte}>
-              <Text style={s.nom} numberOfLines={2}>{fiche.name}</Text>
+              <View style={s.ligneNom}>
+                <Text style={[s.nom, s.nomFlex]} numberOfLines={2}>{fiche.name}</Text>
+                <PastilleNutri note={fiche.nutriscore} />
+              </View>
               <Text style={s.detail}>
                 {[fiche.brand, contenance].filter(Boolean).join(' · ') || ean}
               </Text>
@@ -215,6 +219,8 @@ const s = StyleSheet.create({
   imageVide: { borderWidth: 1, borderColor: colors.border },
   texte: { flex: 1, gap: spacing.xs },
   nom: { fontSize: 17, fontWeight: '700', color: colors.text },
+  ligneNom: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  nomFlex: { flex: 1 },
   detail: { fontSize: 14, color: colors.textMuted },
   message: { fontSize: 13, color: colors.accent, fontWeight: '600' },
   // Un doublon ou un échec d'ajout ne doit jamais se lire comme un succès :
