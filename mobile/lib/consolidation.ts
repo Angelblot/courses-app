@@ -1,7 +1,8 @@
 /**
  * Consolidation de la liste de courses.
  *
- * Porté de frontend/src/stores/wizardStore.js. Ces fonctions ne touchent ni au
+ * Porté de frontend/src/stores/wizardStore.js (retiré le 22/08/2026, dans
+ * l'historique git). Ces fonctions ne touchent ni au
  * DOM ni au réseau : elles prennent les recettes retenues, les produits du
  * quotidien et les ajouts manuels, et rendent une liste dédoublonnée.
  */

@@ -1,7 +1,8 @@
 /**
  * Client Open Food Facts pour le scan.
  *
- * Le mapping est porté de backend/app/services/enrich_ean.py : détection des
+ * Le mapping est porté de backend/app/services/enrich_ean.py (retiré le
+ * 22/08/2026, dans l'historique git) : détection des
  * liquides et affectation de la quantité en grammes ou en millilitres.
  */
 import { normalizeProductType } from './typology.ts';

@@ -32,7 +32,8 @@ test('la quantité est arrondie au paquet supérieur, jamais en dessous', () => 
 test('les kilos et les litres sont ramenés avant division', () => {
   // Régression corrigée au portage : la version web divisait la quantité brute
   // par le grammage sans convertir. 1 kg de pommes de terre en sacs de 500 g
-  // rendait 1 sac au lieu de 2 — mesuré sur frontend/src/lib/unitConverter.js
+  // rendait 1 sac au lieu de 2 — mesuré sur frontend/src/lib/unitConverter.js,
+  // retiré depuis (historique git)
   // le 22/08. Le gratin dauphinois et le poulet rôti comptent en kilos.
   assert.equal(convertToProductQty(1, 'kg', { unit: 'unité', grammage_g: 500 }).qty, 2);
   assert.equal(convertToProductQty(1, 'L', { unit: 'unité', volume_ml: 250 }).qty, 4);

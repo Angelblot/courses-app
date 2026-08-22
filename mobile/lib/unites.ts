@@ -1,7 +1,8 @@
 /**
  * Unités normalisées pour le rapprochement recette ↔ produit.
  *
- * Porté de frontend/src/lib/unitConverter.js. Convertit une quantité
+ * Porté de frontend/src/lib/unitConverter.js (retiré le 22/08/2026, dans
+ * l'historique git). Convertit une quantité
  * d'ingrédient (g, ml, kg, L, unité, œuf, gousse…) en nombre d'articles à
  * mettre au panier, à partir du conditionnement du produit.
  */
