@@ -33,3 +33,24 @@ Il est déjà appliqué sur le projet en ligne (`qmymwicsgilhoihtfdjm`). **Ne
 pas le modifier ni le régénérer** : voir la note ci-dessus sur les UUID
 fixés — le regénérer créerait des doublons. Pour une nouvelle instance,
 regénérer un fichier équivalent avec le `user_id` de cette instance-là.
+
+## Ce qui reste dans `backend/app.db`
+
+Le dossier `backend/` n'est plus versionné depuis le 22 août 2026, mais
+`app.db` demeure sur le disque : git ne supprime pas les fichiers qu'il ne
+suivait pas, et cette base n'a jamais été versionnée.
+
+Vérification faite ce jour-là, les tables reprises concordent — 5 recettes,
+26 ingrédients, 65 lignes d'achat, 10 catégories. Les produits sont à 68 en
+ligne contre 65 en local : les trois de plus viennent du scan de codes-barres.
+
+Quatre tables n'ont **pas** été reprises, après examen de leur contenu :
+
+| Table | Lignes | Pourquoi |
+|---|---|---|
+| `product_drives` | 65 | Rattache chacun des 65 produits au même et unique drive. Ne dit rien de plus que « tout est chez Carrefour ». |
+| `foods` | 21 | Vocabulaire d'ingrédients — « Ail », « Beurre » — sans synonymes ni images. `lib/typology.ts` couvre le même besoin, avec 63 règles. |
+| `user_product_preferences` | 2 | Deux choix appris : lardons fumés, crème liquide. Voisin de `product_equivalents`, mais pas de même nature : celui-ci retient un produit **par drive**, avec son EAN. |
+| `drive_configs` | 1 | Carrefour, `credentials_encrypted` **vide** — aucun identifiant n'a jamais été stocké, conformément à la règle du projet. |
+
+Rien de tout cela n'est perdu : la base est là. Mais rien n'en dépend non plus.

@@ -27,13 +27,6 @@
       "128": "icon-128.png"
     }
   },
-  "externally_connectable": {
-    "matches": [
-      "http://localhost:5173/*",
-      "http://localhost:5174/*",
-      "https://*.vercel.app/*"
-    ]
-  },
   "icons": {
     "128": "icon-128.png"
   }

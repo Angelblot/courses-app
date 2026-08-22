@@ -1,3 +1,9 @@
+> **Document historique.** Il décrit le backend FastAPI et le front web React,
+> retirés le 22 août 2026 au profit de l'application Expo et de Supabase. Il est
+> conservé pour le raisonnement qu'il porte — stratégies de recherche, modèle de
+> données, choix d'architecture — dont une partie reste pertinente. Les
+> conceptions en vigueur sont dans `docs/superpowers/specs/`.
+
 # DESIGN — Courses App
 
 Document de design produit & UX. Deux parties :

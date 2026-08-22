@@ -550,18 +550,3 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     .catch((e) => sendResponse({ ok: false, error: String(e) }));
   return true; // réponse asynchrone
 });
-
-// --- Messages venant de l'application web (externally_connectable) ---
-chrome.runtime.onMessageExternal.addListener((msg, _sender, sendResponse) => {
-  if (msg?.type === 'ping') {
-    sendResponse({ ok: true, version: chrome.runtime.getManifest().version });
-    return false;
-  }
-  if (msg?.type === 'start') {
-    startJob(msg.payload)
-      .then((r) => sendResponse({ ok: true, data: r }))
-      .catch((e) => sendResponse({ ok: false, error: String(e) }));
-    return true;
-  }
-  return false;
-});
