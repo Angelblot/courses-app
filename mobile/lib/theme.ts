@@ -9,6 +9,8 @@ export const colors = {
   accentSoft: '#E6EFE9',
   accentContrast: '#FFFFFF',
   danger: '#B3261E',
+  // Fond d'alerte, assez pâle pour porter le texte sombre du thème.
+  dangerSoft: '#FBEAE9',
   // Voile sombre posé sur l'image caméra pour garder un texte de consigne
   // lisible, quelle que soit la scène filmée en dessous.
   voileCamera: 'rgba(0,0,0,0.45)',
