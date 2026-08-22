@@ -48,7 +48,13 @@
           "cameraPermission": "L'appareil photo sert à scanner le code-barres de tes produits."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choisis une photo pour illustrer ta recette."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
