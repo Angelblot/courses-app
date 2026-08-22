@@ -4,28 +4,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { CarteRecette } from '../../../components/CarteRecette';
 import { EtatVide } from '../../../components/EtatVide';
 import { useRecipes, type Recipe } from '../../../stores/recipes';
 import { colors, radius, spacing } from '../../../lib/theme';
-
-/**
- * Ligne non cliquable : il n'existe pas d'écran de détail, l'édition étant
- * hors périmètre de ce lot. Une ligne qui réagit au toucher sans rien ouvrir
- * est pire qu'une ligne inerte.
- */
-function LigneRecette({ recette }: { recette: Recipe }) {
-  const n = recette.ingredients.length;
-  return (
-    <View style={s.ligne}>
-      <View style={s.texte}>
-        <Text style={s.nom} numberOfLines={1}>{recette.name}</Text>
-        <Text style={s.detail}>
-          {`${recette.servings_default} parts · ${n} ingrédient${n > 1 ? 's' : ''}`}
-        </Text>
-      </View>
-    </View>
-  );
-}
 
 export default function Recettes() {
   const { recettes, chargement, erreur, recharger } = useRecipes();
@@ -64,9 +46,10 @@ export default function Recettes() {
         data={recettes}
         keyExtractor={(r) => r.id}
         renderItem={({ item }) => (
-          <LigneRecette recette={item} />
+          <CarteRecette recette={item} onOuvrir={() => router.push(`/recettes/${item.id}`)} />
         )}
-        ItemSeparatorComponent={() => <View style={s.separateur} />}
+        ItemSeparatorComponent={() => <View style={s.espace} />}
+        contentContainerStyle={recettes.length === 0 ? s.videConteneur : s.grille}
         refreshControl={
           <RefreshControl refreshing={chargement} onRefresh={recharger} tintColor={colors.accent} />
         }
@@ -77,7 +60,6 @@ export default function Recettes() {
             </EtatVide>
           )
         }
-        contentContainerStyle={recettes.length === 0 ? s.videConteneur : undefined}
       />
 
       <Pressable style={s.bouton} onPress={() => router.push('/recettes/nouvelle')}>
@@ -96,14 +78,8 @@ const s = StyleSheet.create({
   },
   titre: { fontSize: 26, fontWeight: '800', color: colors.text },
   compte: { fontSize: 15, color: colors.textMuted },
-  ligne: {
-    paddingVertical: spacing.lg, paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
-  },
-  texte: { gap: 2 },
-  nom: { fontSize: 15, fontWeight: '600', color: colors.text },
-  detail: { fontSize: 13, color: colors.textMuted },
-  separateur: { height: 1, backgroundColor: colors.border },
+  espace: { height: spacing.lg },
+  grille: { padding: spacing.lg },
   videConteneur: { flexGrow: 1, justifyContent: 'center' },
   erreur: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
   erreurTexte: { color: colors.danger, fontSize: 14 },

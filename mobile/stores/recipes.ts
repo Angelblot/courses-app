@@ -67,6 +67,48 @@ export function useRecipes() {
 }
 
 /**
+ * Lit une recette seule, avec ses ingrédients.
+ *
+ * Même garde-fou de génération que `useRecipes` : une réponse lente ne doit pas
+ * écraser une réponse plus récente.
+ */
+export function useRecette(id: string | undefined) {
+  const [recette, setRecette] = useState<Recipe | null>(null);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const generation = useRef(0);
+
+  const recharger = useCallback(async () => {
+    if (!id) { setChargement(false); return; }
+    const appel = ++generation.current;
+    setChargement(true);
+    const { data, error } = await supabase
+      .from('recipes').select(CHAMPS).eq('id', id).maybeSingle();
+    if (appel !== generation.current) return;
+    if (error) {
+      console.error('[recette]', error);
+      setErreur(ERREUR_CHARGEMENT);
+      setRecette(null);
+    } else {
+      setErreur(null);
+      setRecette(data ? {
+        id: (data as any).id,
+        name: (data as any).name,
+        description: (data as any).description,
+        servings_default: (data as any).servings_default,
+        image_url: (data as any).image_url,
+        ingredients: (data as any).recipe_ingredients ?? [],
+      } : null);
+    }
+    setChargement(false);
+  }, [id]);
+
+  useEffect(() => { recharger(); }, [recharger]);
+
+  return { recette, chargement, erreur, recharger };
+}
+
+/**
  * Enregistre une recette et ses ingrédients.
  *
  * Les deux insertions ne sont pas dans une transaction : PostgREST n'en expose
