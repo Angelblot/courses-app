@@ -14,14 +14,44 @@ cd "$CI_PRIMARY_REPOSITORY_PATH/mobile"
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 
-# Node n'est pas garanti sur l'image Xcode Cloud. On l'installe par Homebrew,
-# présent sur ces images, ce qui le place aussi sur le PATH des phases de build
-# ultérieures — `ios/.xcode.env` le résout par `command -v node`.
+# Node n'est pas garanti sur l'image Xcode Cloud, et sa présence VARIE d'une
+# exécution à l'autre : présent au build 5, absent au build 6. Quand il manque,
+# Homebrew est la voie documentée — mais elle dépend de ghcr.io, qui était
+# injoignable au build 6 et a fait perdre l'archivage entier.
+#
+# On tente donc Homebrew, puis, s'il échoue, l'archive officielle de nodejs.org.
+# Les deux hôtes sont indépendants : la panne de l'un ne dit rien de l'autre.
 if ! command -v node > /dev/null 2>&1; then
-  echo "Node absent, installation par Homebrew"
+  echo "Node absent, installation"
   export HOMEBREW_NO_AUTO_UPDATE=1
   export HOMEBREW_NO_INSTALL_CLEANUP=1
-  brew install node
+
+  if brew install node; then
+    echo "Node installé par Homebrew"
+  else
+    echo "Homebrew a échoué, repli sur l'archive officielle"
+    VERSION_NODE="v22.20.0"
+    case "$(uname -m)" in
+      arm64) ARCH_NODE="darwin-arm64" ;;
+      *)     ARCH_NODE="darwin-x64" ;;
+    esac
+    ARCHIVE="node-${VERSION_NODE}-${ARCH_NODE}"
+    mkdir -p "$HOME/outils"
+    curl -fsSL --retry 3 --retry-delay 5 \
+      "https://nodejs.org/dist/${VERSION_NODE}/${ARCHIVE}.tar.xz" \
+      -o "$HOME/outils/node.tar.xz"
+    tar -xJf "$HOME/outils/node.tar.xz" -C "$HOME/outils"
+    # Le PATH doit valoir aussi pour les phases de build suivantes :
+    # `ios/.xcode.env` résout Node par `command -v node`.
+    PATH="$HOME/outils/${ARCHIVE}/bin:$PATH"
+    export PATH
+    echo "export PATH=\"$HOME/outils/${ARCHIVE}/bin:\$PATH\"" >> "$HOME/.zshrc"
+  fi
+fi
+
+if ! command -v node > /dev/null 2>&1; then
+  echo "Node reste introuvable après les deux tentatives."
+  exit 1
 fi
 echo "Node $(node --version)"
 
