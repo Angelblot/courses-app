@@ -7,31 +7,16 @@
  * Lancer : node test-matching.mjs
  */
 
-// --- Copies conformes des implémentations (popup.js / page-agent.js) ---
+import { parseItems } from './lib/liste.js';
 
-function parseItems(raw) {
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const m = line.match(/^(.*?)\s*[x×]\s*(\d+)$/i);
-      let body = m ? m[1].trim() : line;
-      const quantity = m ? Number(m[2]) : 1;
-
-      let ean = null;
-      const tagged = body.match(/^\[(\d{13})\]\s*(.*)$/);
-      if (tagged) { ean = tagged[1]; body = tagged[2].trim(); }
-
-      if (/^https?:\/\//i.test(body)) {
-        const slug = body.split('/').filter(Boolean).pop() ?? body;
-        const eanFromSlug = slug.match(/(\d{13})/)?.[1] ?? null;
-        const name = slug.replace(/-?\d{13}.*$/, '').replace(/-/g, ' ').trim();
-        return { name: name || body, quantity, url: body, ean: ean ?? eanFromSlug };
-      }
-      return ean ? { name: body, quantity, ean } : { name: body, quantity };
-    });
-}
+// --- Copies des aides internes de page-agent.js ---
+//
+// `pageAgent` est passé à `chrome.scripting.executeScript({func})`, qui le
+// sérialise vers la page : il ne peut donc référencer aucun import, et ses
+// aides doivent rester dupliquées ici. La dernière vérification garde-fou de
+// ce fichier échoue si les copies divergent de l'original.
+//
+// `parseItems`, lui, vit dans un module ordinaire : il est importé, pas copié.
 
 function normalize(s) {
   return (s || '')
@@ -469,6 +454,89 @@ check(
 
 // --- Verdict ---
 
+
+// --- Garde-fou : les copies ne doivent pas diverger de l'original ---
+//
+// `pageAgent` est sérialisé vers la page par `chrome.scripting.executeScript` :
+// il ne peut référencer aucun import, et ses aides internes doivent donc être
+// dupliquées ici. Rien n'empêcherait alors les deux versions de diverger, et
+// les vérifications ci-dessus porteraient sur une fiction.
+//
+// Ces contrôles comparent le texte des copies à celui de l'original, en
+// ignorant commentaires et espaces. Ils échouent au premier écart de fond.
+//
+// `rank` et `decide` en sont exclus délibérément : la copie de `rank` travaille
+// sur des libellés là où l'original manipule des objets de candidat, et
+// `decide` n'existe que dans ce fichier pour modéliser la décision.
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const ICI = dirname(fileURLToPath(import.meta.url));
+
+function extraireBloc(source, motif) {
+  const m = source.match(motif);
+  if (!m) return null;
+  let profondeur = 0;
+  let commence = false;
+  for (let i = m.index; i < source.length; i += 1) {
+    if (source[i] === '{') { profondeur += 1; commence = true; }
+    else if (source[i] === '}') {
+      profondeur -= 1;
+      if (commence && profondeur === 0) return source.slice(m.index, i + 1);
+    }
+  }
+  return null;
+}
+
+function extraireLigne(source, motif) {
+  const m = source.match(motif);
+  return m ? m[0] : null;
+}
+
+const sansBruit = (t) => (t ?? '')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/\/\/.*/g, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const original = readFileSync(join(ICI, 'content', 'page-agent.js'), 'utf8');
+const copie = readFileSync(join(ICI, 'test-matching.mjs'), 'utf8');
+
+const BLOCS = [
+  ['normalize', /function normalize\(/],
+  ['score', /function score\(/],
+  ['extraTokens', /function extraTokens\(/],
+];
+
+for (const [nom, motif] of BLOCS) {
+  const a = sansBruit(extraireBloc(original, motif));
+  const b = sansBruit(extraireBloc(copie, motif));
+  checkTrue(
+    `copie de ${nom} conforme à page-agent.js`,
+    a !== null && b !== null && a === b,
+    a === b ? '' : `original : ${String(a).slice(0, 90)} | copie : ${String(b).slice(0, 90)}`,
+  );
+}
+
+const LIGNES = [
+  ['STOP_WORDS', /STOP_WORDS = new Set\(\[[^\]]*\]\)/],
+  ['MATCH_THRESHOLD', /MATCH_THRESHOLD = [\d.]+/],
+  ['AMBIGUITY_MARGIN', /AMBIGUITY_MARGIN = [\d.]+/],
+];
+
+for (const [nom, motif] of LIGNES) {
+  const a = sansBruit(extraireLigne(original, motif));
+  const b = sansBruit(extraireLigne(copie, motif));
+  checkTrue(
+    `copie de ${nom} conforme à page-agent.js`,
+    a !== null && b !== null && a === b,
+    a === b ? '' : `original : ${a} | copie : ${b}`,
+  );
+}
+
+// --- Récapitulatif ---
 console.log(`\n${passed} vérification(s) passée(s), ${failures.length} échec(s)\n`);
 for (const f of failures) console.log(`  ÉCHEC : ${f}\n`);
 process.exit(failures.length ? 1 : 0);

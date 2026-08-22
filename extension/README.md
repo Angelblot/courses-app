@@ -128,6 +128,16 @@ endroits où une erreur ferait entrer le mauvais produit dans le panier. Le seui
 d'acceptation est volontairement exigeant (0,75, pondéré par la longueur des
 mots) : mieux vaut signaler un produit manquant que d'en ajouter un faux.
 
+`parseItems` est **importé** de `lib/liste.js`, pas recopié : les tests portent
+donc sur le code qui s'exécute.
+
+Les aides de `page-agent.js`, elles, doivent rester dupliquées dans le fichier
+de test. `pageAgent` est sérialisé vers la page par
+`chrome.scripting.executeScript` : il ne peut référencer aucun import. Six
+vérifications comparent alors le texte des copies à celui de l'original et
+échouent au premier écart de fond — sans quoi les tests finiraient par porter
+sur une fiction.
+
 ## Architecture
 
 | Fichier | Rôle |
