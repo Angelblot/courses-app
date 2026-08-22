@@ -1995,10 +1995,15 @@ node asc.mjs "/v1/ciProducts/4ece9928-69b5-4a0a-a0cc-bdd408d09a57/buildRuns?limi
 En cas d'échec, récupérer les anomalies de l'action fautive puis son artefact de
 journal — c'est ainsi que la coupure réseau sur hermes-engine a été identifiée.
 
-- [ ] **Étape 6 : rattraper le Nutriscore**
+- [x] **Étape 6 : rattraper le Nutriscore**
 
-Une fois la version installée et la session ouverte, lancer une seule fois le
-script de la tâche 6, puis vérifier :
+Fait le 22/08 par accès SQL direct plutôt que par le script : celui-ci exige un
+jeton de session utilisateur, alors que l'outil Supabase de la session permet
+d'écrire sans en demander un à Angelo. Résultat : 18 produits notés, 50 sans
+note — droguerie, hygiène et produits non référencés par Open Food Facts.
+Le script reste au dépôt : il servira quand de nouveaux produits arriveront.
+
+Vérification :
 
 ```sql
 select nutriscore, count(*) from public.products group by nutriscore order by 1;
