@@ -61,3 +61,26 @@ a pas besoin.
 Attention si tu lances `pod install` à la main : CocoaPods plante en formatant
 ses propres erreurs quand la locale n'est pas UTF-8, ce qui masque le vrai
 message. Préfixe par `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`.
+
+## Suivre les builds par l'API
+
+L'accès se fait par une clé d'API App Store Connect, rangée hors du dépôt dans
+`~/.appstoreconnect/`. Le script `asc.mjs` signe un jeton ES256 valable vingt
+minutes ; la clé privée ne quitte jamais la machine.
+
+**Toujours trier côté serveur :**
+
+```
+/v1/ciProducts/{id}/buildRuns?limit=3&sort=-number
+```
+
+L'API ne rend pas les exécutions de la plus récente à la plus ancienne. Deux
+pièges s'y sont succédé le 22/08 :
+
+1. `limit=1` renvoie la **première** exécution, pas la dernière — quarante
+   minutes passées à surveiller le build n°1.
+2. Trier côté client sur `limit=10` marche… jusqu'à la onzième exécution : la
+   fenêtre demandée ne contient alors plus la plus récente. Le correctif ne
+   tenait que tant que le total restait sous la limite.
+
+`sort=-number` règle les deux d'un coup.
