@@ -62,7 +62,7 @@ Storage.
   - `indiceAplat(nom: string): number` — entier de 0 à 5, stable
   - `filtrerCatalogue<T extends { name: string; brand?: string | null }>(produits: T[], requete: string): T[]`
 
-- [ ] **Étape 1 : écrire le test qui échoue**
+- [x] **Étape 1 : écrire le test qui échoue**
 
 Créer `mobile/lib/recettes-affichage.test.mjs` :
 
@@ -139,7 +139,7 @@ test('une requête sans correspondance rend une liste vide, pas tout le catalogu
 });
 ```
 
-- [ ] **Étape 2 : lancer le test et vérifier qu'il échoue**
+- [x] **Étape 2 : lancer le test et vérifier qu'il échoue**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/recettes-affichage.test.mjs
@@ -147,7 +147,7 @@ test('une requête sans correspondance rend une liste vide, pas tout le catalogu
 
 Attendu : ÉCHEC, `ERR_MODULE_NOT_FOUND` sur `./recettes-affichage.ts`.
 
-- [ ] **Étape 3 : ajouter la palette au thème**
+- [x] **Étape 3 : ajouter la palette au thème**
 
 Dans `mobile/lib/theme.ts`, ajouter à l'objet `colors`, avant sa fermeture :
 
@@ -157,7 +157,7 @@ Dans `mobile/lib/theme.ts`, ajouter à l'objet `colors`, avant sa fermeture :
   aplats: ['#2D6A4F', '#52796F', '#B08968', '#6B705C', '#8A5A44', '#4A6FA5'],
 ```
 
-- [ ] **Étape 4 : écrire le module**
+- [x] **Étape 4 : écrire le module**
 
 Créer `mobile/lib/recettes-affichage.ts` :
 
@@ -230,7 +230,7 @@ export function filtrerCatalogue<T extends { name: string; brand?: string | null
 }
 ```
 
-- [ ] **Étape 5 : lancer les tests et vérifier qu'ils passent**
+- [x] **Étape 5 : lancer les tests et vérifier qu'ils passent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/*.test.mjs
@@ -239,7 +239,7 @@ npx tsc --noEmit
 
 Attendu : `# fail 0`, aucune erreur TypeScript.
 
-- [ ] **Étape 6 : commit**
+- [x] **Étape 6 : commit**
 
 ```bash
 git add mobile/lib/recettes-affichage.ts mobile/lib/recettes-affichage.test.mjs mobile/lib/theme.ts
@@ -261,7 +261,7 @@ git commit -m "feat: calculs d'affichage des recettes"
   - `rechercherParNom(requete: string): Promise<ResultatRechercheNom>`
   - `type ResultatRechercheNom = { etat: 'trouve'; fiches: FicheProduit[] } | { etat: 'vide' } | { etat: 'indisponible' }`
 
-- [ ] **Étape 1 : écrire les tests qui échouent**
+- [x] **Étape 1 : écrire les tests qui échouent**
 
 Ajouter à la fin de `mobile/lib/openfoodfacts.test.mjs` :
 
@@ -305,7 +305,7 @@ Ajouter `analyserRechercheNom` à l'import en tête du fichier :
 import { mapOffProduct, estLiquide, echappe, analyserRechercheNom } from './openfoodfacts.ts';
 ```
 
-- [ ] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
+- [x] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/openfoodfacts.test.mjs
@@ -313,7 +313,7 @@ import { mapOffProduct, estLiquide, echappe, analyserRechercheNom } from './open
 
 Attendu : ÉCHEC, `analyserRechercheNom is not a function`.
 
-- [ ] **Étape 3 : écrire l'implémentation**
+- [x] **Étape 3 : écrire l'implémentation**
 
 Ajouter à la fin de `mobile/lib/openfoodfacts.ts` :
 
@@ -377,7 +377,7 @@ export async function rechercherParNom(requete: string): Promise<ResultatRecherc
 }
 ```
 
-- [ ] **Étape 4 : lancer les tests et vérifier qu'ils passent**
+- [x] **Étape 4 : lancer les tests et vérifier qu'ils passent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/*.test.mjs
@@ -386,7 +386,7 @@ npx tsc --noEmit
 
 Attendu : `# fail 0`, aucune erreur TypeScript.
 
-- [ ] **Étape 5 : éprouver la vraie route, une fois**
+- [x] **Étape 5 : éprouver la vraie route, une fois**
 
 ```bash
 curl -s --max-time 25 "https://world.openfoodfacts.org/cgi/search.pl?search_terms=lardons+fumes&search_simple=1&action=process&json=1&page_size=3&fields=product_name,code" -H "User-Agent: courses-app/1.0 (essai)" | head -c 300
@@ -396,7 +396,7 @@ Attendu : du JSON contenant des produits. Si la route rend du HTML ou un `503`,
 **ne pas modifier le code** : `rechercherParNom` traite déjà ce cas comme
 `indisponible`, et c'est exactement le comportement voulu. Noter l'observation.
 
-- [ ] **Étape 6 : commit**
+- [x] **Étape 6 : commit**
 
 ```bash
 git add mobile/lib/openfoodfacts.ts mobile/lib/openfoodfacts.test.mjs
@@ -418,7 +418,7 @@ git commit -m "feat: recherche de produits par nom dans Open Food Facts"
   `Recipe` de `stores/recipes.ts`.
 - Produit : `<CarteRecette recette={r} onOuvrir={() => …} />`
 
-- [ ] **Étape 1 : écrire la carte**
+- [x] **Étape 1 : écrire la carte**
 
 `mobile/components/CarteRecette.tsx` affiche, dans une carte de la largeur de
 l'écran moins les marges :
@@ -432,7 +432,7 @@ l'écran moins les marges :
 
 Toute la carte est un `Pressable` menant à `onOuvrir`.
 
-- [ ] **Étape 2 : refondre la liste**
+- [x] **Étape 2 : refondre la liste**
 
 Dans `mobile/app/(tabs)/recettes/index.tsx`, remplacer `LigneRetenue` par
 `<CarteRecette>`, retirer le séparateur, et espacer les cartes de `spacing.lg`.
@@ -444,7 +444,7 @@ d'écran de détail ; le commentaire qui l'expliquait est à retirer.
 Les trois états restent : chargement, erreur avec « Réessayer », et vide avec
 le texte existant.
 
-- [ ] **Étape 3 : vérifier**
+- [x] **Étape 3 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -454,7 +454,7 @@ Attendu : une erreur sur la route `/recettes/[id]`, qui n'existe pas encore.
 Créer le fichier en coquille rendant `null` pour lever le blocage — la tâche 4
 le remplit.
 
-- [ ] **Étape 4 : commit**
+- [x] **Étape 4 : commit**
 
 ```bash
 git add mobile/components/CarteRecette.tsx "mobile/app/(tabs)/recettes"
@@ -474,13 +474,13 @@ git commit -m "feat: la liste des recettes passe en cartes photo"
   `formatIngredientQty` de `lib/unites.ts` ; `useProducts`.
 - Produit : `useRecette(id: string): { recette: Recipe | null; chargement: boolean; erreur: string | null; recharger: () => Promise<void> }`
 
-- [ ] **Étape 1 : lire une recette seule**
+- [x] **Étape 1 : lire une recette seule**
 
 Dans `mobile/stores/recipes.ts`, ajouter un hook `useRecette(id)` calqué sur
 `useRecipes` — mêmes champs, même compteur de génération, même message
 `ERREUR_CHARGEMENT` — mais avec `.eq('id', id).maybeSingle()`.
 
-- [ ] **Étape 2 : écrire l'écran**
+- [x] **Étape 2 : écrire l'écran**
 
 `mobile/app/(tabs)/recettes/[id].tsx` porte :
 
@@ -501,7 +501,7 @@ Dans `mobile/stores/recipes.ts`, ajouter un hook `useRecette(id)` calqué sur
 États : chargement, erreur avec « Réessayer », recette introuvable avec
 `<EtatVide titre="Recette introuvable">`.
 
-- [ ] **Étape 3 : vérifier**
+- [x] **Étape 3 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -510,7 +510,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 4 : commit**
+- [x] **Étape 4 : commit**
 
 ```bash
 git add "mobile/app/(tabs)/recettes/[id].tsx" mobile/stores/recipes.ts
