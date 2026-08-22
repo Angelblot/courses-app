@@ -428,7 +428,7 @@ git commit -m "feat: le suivi devient un écran autonome"
 **Interfaces :**
 - Consomme : `useTravailActif` ; `libelleDrive`, `resume` ; `estActif`, `estClos`.
 
-- [ ] **Étape 1 : écrire le bandeau**
+- [x] **Étape 1 : écrire le bandeau**
 
 Créer `mobile/components/BandeauSuivi.tsx`.
 
@@ -470,7 +470,7 @@ comme au changement d'état :
 par-dessus la brouillerait. Si `total` vaut zéro ou manque, aucune barre — pas
 une barre pleine, qui mentirait.
 
-- [ ] **Étape 2 : le poser au-dessus des onglets**
+- [x] **Étape 2 : le poser au-dessus des onglets**
 
 Dans `mobile/app/(tabs)/_layout.tsx`, envelopper `<Tabs>` :
 
@@ -491,7 +491,7 @@ Le bandeau se pose en `position: 'absolute'` juste au-dessus de la barre
 d'onglets — `bottom` valant la hauteur de celle-ci, obtenue par
 `useSafeAreaInsets().bottom + 49`, la hauteur standard d'une barre d'onglets iOS.
 
-- [ ] **Étape 3 : vérifier**
+- [x] **Étape 3 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -500,7 +500,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 4 : commit**
+- [x] **Étape 4 : commit**
 
 ```bash
 git add mobile/components/BandeauSuivi.tsx "mobile/app/(tabs)/_layout.tsx"
@@ -511,7 +511,7 @@ git commit -m "feat: bandeau de suivi visible depuis tous les écrans"
 
 ### Tâche 5 : livrer
 
-- [ ] **Étape 1 : vérification complète**
+- [x] **Étape 1 : vérification complète**
 
 ```bash
 npx tsc --noEmit
@@ -522,7 +522,7 @@ npx expo-doctor
 Attendu : aucune erreur TypeScript, `# fail 0`, expo-doctor sans échec autre que
 les deux connus — CocoaPods local et l'avertissement CNG.
 
-- [ ] **Étape 2 : vérifier le bundle, comme la CI**
+- [x] **Étape 2 : vérifier le bundle, comme la CI**
 
 ```bash
 EXPO_PUBLIC_SUPABASE_URL="https://qmymwicsgilhoihtfdjm.supabase.co" \
@@ -532,13 +532,13 @@ npx expo export --platform ios --output-dir /tmp/export-bandeau
 
 Attendu : `Exported:` sans erreur.
 
-- [ ] **Étape 3 : pousser**
+- [x] **Étape 3 : pousser**
 
 ```bash
 git push origin mobile/expo-scan
 ```
 
-- [ ] **Étape 4 : suivre le build**
+- [x] **Étape 4 : suivre le build**
 
 Avec `asc.mjs`, en **triant explicitement** : l'API ne rend pas les exécutions de
 la plus récente à la plus ancienne, et `limit=1` renvoie la première, pas la
