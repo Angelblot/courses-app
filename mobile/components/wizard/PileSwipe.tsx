@@ -118,6 +118,8 @@ export function PileSwipe<T>({
 }
 
 const s = StyleSheet.create({
-  zone: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 260 },
-  carte: { position: 'absolute', left: 0, right: 0, borderRadius: radius.lg },
+  // La pile occupe toute la hauteur offerte : une carte verticale a besoin de
+  // place, et l'image se recadrait quand la zone était bornée.
+  zone: { flex: 1, alignItems: 'stretch', justifyContent: 'center' },
+  carte: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, borderRadius: radius.lg },
 });

@@ -1,4 +1,7 @@
-import { ScrollView, StyleSheet, Text, View, Pressable, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
+import {
+  ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { PileSwipe } from './PileSwipe';
 import { EtatVide } from '../EtatVide';
@@ -6,15 +9,20 @@ import { useWizard } from '../../contexts/WizardContext';
 import { useRecipes, type Recipe } from '../../stores/recipes';
 import { colors, radius, spacing } from '../../lib/theme';
 
+/** Carte verticale : l'image occupe le haut, le titre et le détail le bas. */
 function CarteRecette({ recette }: { recette: Recipe }) {
   const n = recette.ingredients.length;
   return (
     <View style={s.carte}>
-      <Text style={s.carteTitre} numberOfLines={2}>{recette.name}</Text>
-      <Text style={s.carteDetail}>
-        {`${recette.servings_default} parts · ${n} ingrédient${n > 1 ? 's' : ''}`}
-      </Text>
-      <Text style={s.consigne}>Glisse à droite pour la retenir</Text>
+      {recette.image_url
+        ? <Image source={{ uri: recette.image_url }} style={s.image} resizeMode="cover" />
+        : <View style={[s.image, s.imageVide]} />}
+      <View style={s.carteTexte}>
+        <Text style={s.carteTitre} numberOfLines={2}>{recette.name}</Text>
+        <Text style={s.carteDetail}>
+          {`${recette.servings_default} parts · ${n} ingrédient${n > 1 ? 's' : ''}`}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -23,6 +31,7 @@ export function EtapeRecettes() {
   const { recettes, chargement } = useRecipes();
   const w = useWizard();
   const router = useRouter();
+  const [listeOuverte, setListeOuverte] = useState(false);
 
   if (chargement && recettes.length === 0) {
     return <View style={s.centre}><ActivityIndicator color={colors.accent} /></View>;
@@ -45,42 +54,63 @@ export function EtapeRecettes() {
 
   return (
     <View style={s.bloc}>
-      <View style={s.pile}>
-        <PileSwipe
-          items={recettes}
-          getId={(r) => r.id}
-          onAccepter={(r) => w.toggleRecette(r.id, r.servings_default)}
-          onRejeter={() => {}}
-          rendreCarte={(r) => <CarteRecette recette={r} />}
-          etatVide={<EtatVide titre="Tu as vu toutes tes recettes." />}
-        />
-      </View>
+      {!listeOuverte && (
+        <>
+          <View style={s.pile}>
+            <PileSwipe
+              items={recettes}
+              getId={(r) => r.id}
+              onAccepter={(r) => w.toggleRecette(r.id, r.servings_default)}
+              onRejeter={() => {}}
+              rendreCarte={(r) => <CarteRecette recette={r} />}
+              etatVide={<EtatVide titre="Tu as vu toutes tes recettes." />}
+            />
+          </View>
+          <Text style={s.consigne}>
+            Droite : je la retiens · Gauche : pas cette fois
+          </Text>
+        </>
+      )}
 
-      {retenues.length > 0 && (
+      <Pressable style={s.bascule} onPress={() => setListeOuverte((v) => !v)}>
+        <Text style={s.basculeTexte}>
+          {listeOuverte ? 'Revenir aux cartes' : `Voir mes recettes (${retenues.length})`}
+        </Text>
+      </Pressable>
+
+      {listeOuverte && (
         <ScrollView style={s.liste} contentContainerStyle={s.listeContenu}>
-          <Text style={s.sousTitre}>{`Retenues (${retenues.length})`}</Text>
-          {retenues.map((r) => (
-            <View key={r.id} style={s.ligne}>
-              <Text style={s.ligneNom} numberOfLines={1}>{r.name}</Text>
-              <View style={s.parts}>
-                <Pressable
-                  style={s.pas}
-                  onPress={() => w.setParts(r.id, w.selectedRecipes[r.id] - 1)}
-                  hitSlop={6}
-                >
-                  <Text style={s.pasTexte}>−</Text>
-                </Pressable>
-                <Text style={s.partsTexte}>{`${w.selectedRecipes[r.id]} parts`}</Text>
-                <Pressable
-                  style={s.pas}
-                  onPress={() => w.setParts(r.id, w.selectedRecipes[r.id] + 1)}
-                  hitSlop={6}
-                >
-                  <Text style={s.pasTexte}>+</Text>
-                </Pressable>
+          {retenues.length === 0 ? (
+            <EtatVide titre="Aucune recette retenue">
+              Fais glisser une carte vers la droite pour la retenir.
+            </EtatVide>
+          ) : (
+            retenues.map((r) => (
+              <View key={r.id} style={s.ligne}>
+                {r.image_url
+                  ? <Image source={{ uri: r.image_url }} style={s.vignette} resizeMode="cover" />
+                  : <View style={[s.vignette, s.imageVide]} />}
+                <Text style={s.ligneNom} numberOfLines={2}>{r.name}</Text>
+                <View style={s.compteur}>
+                  <Pressable
+                    style={s.pas}
+                    onPress={() => w.setParts(r.id, w.selectedRecipes[r.id] - 1)}
+                    hitSlop={6}
+                  >
+                    <Text style={s.pasTexte}>−</Text>
+                  </Pressable>
+                  <Text style={s.compteurTexte}>{`${w.selectedRecipes[r.id]} p.`}</Text>
+                  <Pressable
+                    style={s.pas}
+                    onPress={() => w.setParts(r.id, w.selectedRecipes[r.id] + 1)}
+                    hitSlop={6}
+                  >
+                    <Text style={s.pasTexte}>+</Text>
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          ))}
+            ))
+          )}
         </ScrollView>
       )}
     </View>
@@ -90,31 +120,43 @@ export function EtapeRecettes() {
 const s = StyleSheet.create({
   bloc: { flex: 1 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  pile: { height: 240, marginHorizontal: spacing.lg },
+  pile: { flex: 1, marginHorizontal: spacing.lg },
   carte: {
+    flex: 1,
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.lg, padding: spacing.xl, gap: spacing.sm, minHeight: 200,
-    justifyContent: 'center',
+    borderRadius: radius.lg, overflow: 'hidden',
   },
+  image: { flex: 1, width: '100%', backgroundColor: colors.bg },
+  imageVide: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  carteTexte: { padding: spacing.lg, gap: spacing.xs },
   carteTitre: { fontSize: 22, fontWeight: '800', color: colors.text },
   carteDetail: { fontSize: 15, color: colors.textMuted },
-  consigne: { fontSize: 12, color: colors.textMuted, marginTop: spacing.md },
-  liste: { flex: 1, marginTop: spacing.lg },
-  listeContenu: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingBottom: spacing.lg },
-  sousTitre: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
-  ligne: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.surface, borderRadius: radius.md,
-    paddingVertical: spacing.md, paddingHorizontal: spacing.lg, gap: spacing.md,
+  consigne: {
+    fontSize: 12, color: colors.textMuted, textAlign: 'center', marginTop: spacing.md,
   },
-  ligneNom: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text },
-  parts: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  bascule: {
+    alignSelf: 'center', marginTop: spacing.md,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill,
+    paddingVertical: spacing.sm, paddingHorizontal: spacing.xl,
+    backgroundColor: colors.surface,
+  },
+  basculeTexte: { fontSize: 13, fontWeight: '700', color: colors.accent },
+  liste: { flex: 1, marginTop: spacing.md },
+  listeContenu: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xl },
+  ligne: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.surface, borderRadius: radius.md,
+    paddingVertical: spacing.sm, paddingHorizontal: spacing.md,
+  },
+  vignette: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.bg },
+  ligneNom: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
+  compteur: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   pas: {
     width: 28, height: 28, borderRadius: radius.pill, borderWidth: 1,
     borderColor: colors.border, alignItems: 'center', justifyContent: 'center',
   },
   pasTexte: { fontSize: 16, fontWeight: '700', color: colors.text },
-  partsTexte: { fontSize: 13, color: colors.textMuted, minWidth: 56, textAlign: 'center' },
+  compteurTexte: { fontSize: 13, color: colors.text, minWidth: 34, textAlign: 'center' },
   lien: {
     borderWidth: 1, borderColor: colors.accent, borderRadius: radius.md,
     paddingVertical: spacing.md, paddingHorizontal: spacing.xl,
