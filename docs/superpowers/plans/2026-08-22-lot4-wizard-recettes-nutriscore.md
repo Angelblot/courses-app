@@ -63,7 +63,7 @@ mode tinder est réécrit pour React Native — c'est le seul vrai portage, les
 - Consomme : `CleRayon`, `RAYONS` de `lib/rayons.ts`.
 - Produit : `rayonDepuisLibelle(libelle: string | null | undefined): CleRayon`.
 
-- [ ] **Étape 1 : écrire le test qui échoue**
+- [x] **Étape 1 : écrire le test qui échoue**
 
 Ajouter à la fin de `mobile/lib/rayons.test.mjs` :
 
@@ -106,7 +106,7 @@ Ajouter `rayonDepuisLibelle` à l'import en tête du fichier :
 import { rayonDepuisCategories, rayonDepuisLibelle, libelleRayon, RAYONS } from './rayons.ts';
 ```
 
-- [ ] **Étape 2 : lancer le test et vérifier qu'il échoue**
+- [x] **Étape 2 : lancer le test et vérifier qu'il échoue**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/rayons.test.mjs
@@ -114,7 +114,7 @@ import { rayonDepuisCategories, rayonDepuisLibelle, libelleRayon, RAYONS } from 
 
 Attendu : ÉCHEC, `rayonDepuisLibelle is not a function`.
 
-- [ ] **Étape 3 : écrire l'implémentation**
+- [x] **Étape 3 : écrire l'implémentation**
 
 Ajouter à la fin de `mobile/lib/rayons.ts` :
 
@@ -169,7 +169,7 @@ export function rayonDepuisLibelle(libelle: string | null | undefined): CleRayon
 }
 ```
 
-- [ ] **Étape 4 : lancer le test et vérifier qu'il passe**
+- [x] **Étape 4 : lancer le test et vérifier qu'il passe**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/rayons.test.mjs
@@ -177,7 +177,7 @@ export function rayonDepuisLibelle(libelle: string | null | undefined): CleRayon
 
 Attendu : `# fail 0`, au moins 12 tests.
 
-- [ ] **Étape 5 : écrire la migration**
+- [x] **Étape 5 : écrire la migration**
 
 Créer `supabase/migrations/0006_rayons_ingredients.sql` :
 
@@ -210,7 +210,7 @@ where rayon is not null;
 update public.recipe_ingredients set rayon = 'autre' where rayon is null;
 ```
 
-- [ ] **Étape 6 : appliquer et vérifier**
+- [x] **Étape 6 : appliquer et vérifier**
 
 Appliquer par l'outil MCP Supabase `apply_migration`, projet
 `qmymwicsgilhoihtfdjm`, nom `rayons_ingredients`.
@@ -224,7 +224,7 @@ select rayon, count(*) from public.recipe_ingredients group by rayon order by 2 
 Attendu : uniquement `pls` (14), `fruits_legumes` (7), `epicerie` (4),
 `charcuterie` (1). Total 26, aucun `NULL`, aucun libellé en clair.
 
-- [ ] **Étape 7 : commit**
+- [x] **Étape 7 : commit**
 
 ```bash
 git add mobile/lib/rayons.ts mobile/lib/rayons.test.mjs supabase/migrations/0006_rayons_ingredients.sql
@@ -247,7 +247,7 @@ git commit -m "feat: un seul vocabulaire de rayons pour les ingrédients"
   - `formatIngredientQty(qty: number, unit: string): string`
   - `type ProduitMesure = { unit?: string | null; grammage_g?: number | null; volume_ml?: number | null }`
 
-- [ ] **Étape 1 : écrire le test qui échoue**
+- [x] **Étape 1 : écrire le test qui échoue**
 
 Créer `mobile/lib/unites.test.mjs` :
 
@@ -312,7 +312,7 @@ test('isConvertible distingue ce qui est mesurable de ce qui ne l\'est pas', () 
 });
 ```
 
-- [ ] **Étape 2 : lancer le test et vérifier qu'il échoue**
+- [x] **Étape 2 : lancer le test et vérifier qu'il échoue**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/unites.test.mjs
@@ -320,7 +320,7 @@ test('isConvertible distingue ce qui est mesurable de ce qui ne l\'est pas', () 
 
 Attendu : ÉCHEC, `ERR_MODULE_NOT_FOUND` sur `./unites.ts`.
 
-- [ ] **Étape 3 : porter le module**
+- [x] **Étape 3 : porter le module**
 
 Copier `frontend/src/lib/unitConverter.js` vers `mobile/lib/unites.ts`, en
 appliquant exactement ces transformations et **aucune autre** :
@@ -357,7 +357,7 @@ export function formatIngredientQty(qty: number, unit: string): string
 convertissent kg → g et L → ml avant la division, et l'arrondi `Math.ceil` : il
 garantit qu'on n'achète jamais moins que nécessaire.
 
-- [ ] **Étape 4 : lancer le test et vérifier qu'il passe**
+- [x] **Étape 4 : lancer le test et vérifier qu'il passe**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/*.test.mjs
@@ -366,7 +366,7 @@ npx tsc --noEmit
 
 Attendu : `# fail 0`, aucune erreur TypeScript.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add mobile/lib/unites.ts mobile/lib/unites.test.mjs
@@ -390,7 +390,7 @@ git commit -m "feat: conversion d'unités portée sur mobile"
   - `getRecipeIngredientMatches(options): GroupeIngredient[]`
   - `type LigneConsolidee = { key: string; name: string; unit: string; rayon: CleRayon; totalQuantity: number; ean13: string | null; sources: Array<{ type: string; label: string; qty: number }> }`
 
-- [ ] **Étape 1 : écrire le test qui échoue**
+- [x] **Étape 1 : écrire le test qui échoue**
 
 Créer `mobile/lib/consolidation.test.mjs` :
 
@@ -523,7 +523,7 @@ test('getRecipeIngredientMatches regroupe par type et propose les candidats', ()
 });
 ```
 
-- [ ] **Étape 2 : lancer le test et vérifier qu'il échoue**
+- [x] **Étape 2 : lancer le test et vérifier qu'il échoue**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/consolidation.test.mjs
@@ -531,7 +531,7 @@ test('getRecipeIngredientMatches regroupe par type et propose les candidats', ()
 
 Attendu : ÉCHEC, `ERR_MODULE_NOT_FOUND` sur `./consolidation.ts`.
 
-- [ ] **Étape 3 : porter le module**
+- [x] **Étape 3 : porter le module**
 
 Copier les lignes 130 à 413 de `frontend/src/stores/wizardStore.js` vers
 `mobile/lib/consolidation.ts` — les quatre fonctions exportées et l'aide
@@ -603,7 +603,7 @@ export function groupByRayon(
 8. Typer les paramètres et les retours conformément au bloc **Interfaces**
    ci-dessus.
 
-- [ ] **Étape 4 : lancer les tests et vérifier qu'ils passent**
+- [x] **Étape 4 : lancer les tests et vérifier qu'ils passent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/*.test.mjs
@@ -612,7 +612,7 @@ npx tsc --noEmit
 
 Attendu : `# fail 0`, aucune erreur TypeScript.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add mobile/lib/consolidation.ts mobile/lib/consolidation.test.mjs
