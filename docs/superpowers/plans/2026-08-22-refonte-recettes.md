@@ -532,7 +532,7 @@ git commit -m "feat: écran de détail d'une recette"
   avec
   `type ChoixIngredient = { name: string; product_id: string | null; unit: string; rayon: CleRayon }`
 
-- [ ] **Étape 1 : écrire le composant**
+- [x] **Étape 1 : écrire le composant**
 
 Une feuille montant du bas, avec un champ de recherche en haut.
 
@@ -563,7 +563,7 @@ Une feuille montant du bas, avec un champ de recherche en haut.
    Placé en dernier et sans emphase : c'est ce chemin qui produit les
    ingrédients non rattachés.
 
-- [ ] **Étape 2 : vérifier**
+- [x] **Étape 2 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -571,7 +571,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur.
 
-- [ ] **Étape 3 : commit**
+- [x] **Étape 3 : commit**
 
 ```bash
 git add mobile/components/SelecteurIngredient.tsx
@@ -588,7 +588,7 @@ git commit -m "feat: sélecteur d'ingrédient, catalogue puis Open Food Facts"
 **Interfaces :**
 - Consomme : `SelecteurIngredient`, `valideBrouillon`, `UNITES`, `creerRecette`.
 
-- [ ] **Étape 1 : réécrire l'écran**
+- [x] **Étape 1 : réécrire l'écran**
 
 Garder les champs **Nom** et **Nombre de parts**.
 
@@ -604,7 +604,7 @@ Chaque ligne se retire par une croix. L'ordre suit l'ajout.
 La validation et l'enregistrement ne changent pas : `valideBrouillon` d'abord,
 son message affiché tel quel, puis `creerRecette`, puis `router.back()`.
 
-- [ ] **Étape 2 : vérifier**
+- [x] **Étape 2 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -613,7 +613,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 3 : commit**
+- [x] **Étape 3 : commit**
 
 ```bash
 git add "mobile/app/(tabs)/recettes/nouvelle.tsx"
@@ -639,7 +639,7 @@ modification en `[id]/modifier.tsx`. Les adresses ne changent pas.
   - `modifierRecette(id: string, b: Brouillon): Promise<{ ok: boolean; erreur?: string }>`
   - `supprimerRecette(id: string): Promise<{ ok: boolean; erreur?: string }>`
 
-- [ ] **Étape 1 : écrire les deux opérations**
+- [x] **Étape 1 : écrire les deux opérations**
 
 Dans `mobile/stores/recipes.ts` :
 
@@ -709,7 +709,7 @@ export async function supprimerRecette(id: string): Promise<{ ok: boolean; erreu
 }
 ```
 
-- [ ] **Étape 2 : l'écran de modification**
+- [x] **Étape 2 : l'écran de modification**
 
 `[id]/modifier.tsx` reprend l'écran de création — mêmes champs, même
 `SelecteurIngredient`, même `valideBrouillon` — mais prérempli depuis la recette
@@ -717,7 +717,7 @@ et enregistrant par `modifierRecette`.
 
 Le titre est **« Modifier la recette »**, le bouton **« Enregistrer »**.
 
-- [ ] **Étape 3 : la suppression**
+- [x] **Étape 3 : la suppression**
 
 Sur le détail, un bouton **Supprimer** en `colors.danger`, discret, en bas de
 l'écran. Il ouvre un `Alert.alert` :
@@ -729,7 +729,7 @@ l'écran. Il ouvre un `Alert.alert` :
 
 En cas de succès, `router.back()`. En cas d'échec, afficher `r.erreur`.
 
-- [ ] **Étape 4 : vérifier**
+- [x] **Étape 4 : vérifier**
 
 ```bash
 npx tsc --noEmit
@@ -738,7 +738,7 @@ npx tsc --noEmit
 
 Attendu : aucune erreur, `# fail 0`.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add "mobile/app/(tabs)/recettes" mobile/stores/recipes.ts
@@ -751,7 +751,7 @@ git commit -m "feat: modification et suppression d'une recette"
 
 ### Tâche 8 : livraison de la première phase
 
-- [ ] **Étape 1 : vérification complète**
+- [x] **Étape 1 : vérification complète**
 
 ```bash
 npx tsc --noEmit
@@ -762,7 +762,7 @@ npx expo-doctor
 Attendu : aucune erreur TypeScript, `# fail 0`, expo-doctor sans échec autre que
 les deux connus — CocoaPods local et l'avertissement CNG.
 
-- [ ] **Étape 2 : vérifier le bundle, comme la CI**
+- [x] **Étape 2 : vérifier le bundle, comme la CI**
 
 ```bash
 EXPO_PUBLIC_SUPABASE_URL="https://qmymwicsgilhoihtfdjm.supabase.co" \
