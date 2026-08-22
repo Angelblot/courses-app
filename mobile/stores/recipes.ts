@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Brouillon } from '../lib/recette-brouillon.ts';
 import type { CleRayon } from '../lib/rayons.ts';
+import { extraireRecette, type RecetteImportee } from '../lib/import-recette.ts';
 
 const ERREUR_CHARGEMENT =
   'Impossible de charger tes recettes. Vérifie ta connexion et réessaie.';
@@ -230,4 +231,47 @@ export async function supprimerRecette(id: string): Promise<{ ok: boolean; erreu
     return { ok: false, erreur: 'Impossible de supprimer cette recette.' };
   }
   return { ok: true };
+}
+
+/**
+ * Récupère une recette depuis l'adresse d'une page de cuisine.
+ *
+ * La fonction Edge ne rend que les blocs bruts ; l'extraction se fait ici, par
+ * une fonction pure et testée. Rien n'est enregistré : l'écran d'import montre
+ * d'abord ce qui a été compris.
+ */
+export async function recupererRecette(
+  url: string,
+): Promise<{ ok: boolean; recette?: RecetteImportee; erreur?: string }> {
+  const { data, error } = await supabase.functions.invoke('importer-recette', {
+    body: { url: url.trim() },
+  });
+
+  // Un statut 4xx passe par `error`, mais le corps porte notre message en
+  // français : on le préfère à « Edge Function returned a non-2xx status ».
+  if (error) {
+    let message: string | undefined;
+    const contexte = (error as { context?: unknown }).context;
+    if (contexte instanceof Response) {
+      try {
+        message = (await contexte.json())?.erreur;
+      } catch {
+        message = undefined;
+      }
+    }
+    if (!message) console.error('[recupererRecette]', error);
+    return { ok: false, erreur: message ?? "La page n'a pas pu être récupérée." };
+  }
+
+  const r = data as { ok?: boolean; blocs?: string[]; erreur?: string } | null;
+  if (!r?.ok) return { ok: false, erreur: r?.erreur ?? "La recette n'a pas pu être lue." };
+
+  const recette = extraireRecette(r.blocs ?? []);
+  if (!recette?.nom) {
+    return { ok: false, erreur: 'Cette page ne publie pas sa recette dans un format lisible.' };
+  }
+  if (recette.ingredients.length === 0) {
+    return { ok: false, erreur: "Cette recette ne liste aucun ingrédient." };
+  }
+  return { ok: true, recette };
 }

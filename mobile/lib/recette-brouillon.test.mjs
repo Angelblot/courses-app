@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { valideBrouillon, rayonPropose } from './recette-brouillon.ts';
+import { valideBrouillon, rayonPropose, produitPropose } from './recette-brouillon.ts';
 
 const OK = {
   name: 'Carbonara',
@@ -53,4 +53,15 @@ test('le rayon proposé vient du produit du catalogue de même type', () => {
 test('sans produit correspondant, le rayon proposé est « autre »', () => {
   assert.equal(rayonPropose('Poudre de perlimpinpin', []), 'autre');
   assert.equal(rayonPropose('', []), 'autre');
+});
+
+test("le produit du catalogue est rendu, pas seulement son rayon", () => {
+  // L'import s'y rattache pour ne pas recréer un produit qui existe déjà.
+  const produits = [
+    { id: 'p1', product_type: 'lardon', category: 'CHARCUT.TRAITEUR' },
+    { id: 'p2', product_type: 'lait', category: 'CREMERIE' },
+  ];
+  assert.equal(produitPropose('Lardons fumés', produits).id, 'p1');
+  assert.equal(produitPropose('Poudre de perlimpinpin', produits), null);
+  assert.equal(produitPropose('', produits), null);
 });

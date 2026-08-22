@@ -62,9 +62,14 @@ export default function Recettes() {
         }
       />
 
-      <Pressable style={s.bouton} onPress={() => router.push('/recettes/nouvelle')}>
-        <Text style={s.boutonTexte}>Nouvelle recette</Text>
-      </Pressable>
+      <View style={s.actions}>
+        <Pressable style={s.secondaire} onPress={() => router.push('/recettes/importer')}>
+          <Text style={s.secondaireTexte}>Importer un lien</Text>
+        </Pressable>
+        <Pressable style={s.bouton} onPress={() => router.push('/recettes/nouvelle')}>
+          <Text style={s.boutonTexte}>Nouvelle recette</Text>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
@@ -88,9 +93,15 @@ const s = StyleSheet.create({
     borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg,
   },
   reessayerTexte: { color: colors.text, fontWeight: '600', fontSize: 14 },
+  actions: { flexDirection: 'row', gap: spacing.md, margin: spacing.lg },
+  secondaire: {
+    flex: 1, borderWidth: 1, borderColor: colors.accent, borderRadius: radius.md,
+    padding: spacing.lg, alignItems: 'center', justifyContent: 'center',
+  },
+  secondaireTexte: { color: colors.accent, fontWeight: '700', fontSize: 15 },
   bouton: {
-    margin: spacing.lg, backgroundColor: colors.accent, borderRadius: radius.md,
-    padding: spacing.lg, alignItems: 'center',
+    flex: 1, backgroundColor: colors.accent, borderRadius: radius.md,
+    padding: spacing.lg, alignItems: 'center', justifyContent: 'center',
   },
   boutonTexte: { color: colors.accentContrast, fontWeight: '700', fontSize: 16 },
 });

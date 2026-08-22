@@ -48,16 +48,30 @@ export function valideBrouillon(b: Brouillon): string | null {
 }
 
 /**
- * Propose un rayon pour un ingrédient : on cherche un produit du catalogue de
- * même typologie et on reprend son rayon. Sans correspondance, « autre » —
- * jamais un champ vide, qui obligerait à choisir avant de pouvoir avancer.
+ * Cherche dans le catalogue un produit de même typologie qu'un ingrédient.
+ *
+ * C'est ce qui évite de recréer « Lardons fumés » quand le produit existe
+ * déjà : l'import s'y rattache, et la recette hérite de sa vignette et de son
+ * rayon.
+ */
+export function produitPropose<T extends { product_type: string | null }>(
+  nom: string,
+  produits: T[],
+): T | null {
+  const type = normalizeProductType(nom);
+  if (!type) return null;
+  return produits.find((p) => p.product_type === type) ?? null;
+}
+
+/**
+ * Propose un rayon pour un ingrédient : on reprend celui du produit trouvé.
+ * Sans correspondance, « autre » — jamais un champ vide, qui obligerait à
+ * choisir avant de pouvoir avancer.
  */
 export function rayonPropose(
   nom: string,
   produits: Array<{ product_type: string | null; category: string | null }>,
 ): CleRayon {
-  const type = normalizeProductType(nom);
-  if (!type) return 'autre';
-  const trouve = produits.find((p) => p.product_type === type);
+  const trouve = produitPropose(nom, produits);
   return trouve ? rayonDepuisLibelle(trouve.category) : 'autre';
 }
