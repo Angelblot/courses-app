@@ -14,6 +14,61 @@
 
 import { SITES } from './content/sites.js';
 import { pageAgent } from './content/page-agent.js';
+import {
+  travauxEnAttente, travauxAbandonnes, revendiquer,
+  progresser, terminer, equivalencesDe, enregistrerEquivalence,
+} from './supabase.js';
+import { strategie, indexer } from './lib/equivalences.js';
+
+/**
+ * Période de sondage.
+ *
+ * Un service worker Manifest V3 est terminé après une trentaine de secondes
+ * d'inactivité : il ne peut pas tenir un abonnement temps réel. `chrome.alarms`
+ * est la voie native. Pour une commande mensuelle, une minute de latence ne se
+ * voit pas.
+ */
+const PERIODE_MINUTES = 1;
+
+function armerAlarme() {
+  chrome.alarms.create('travaux', { periodInMinutes: PERIODE_MINUTES });
+}
+chrome.runtime.onInstalled.addListener(armerAlarme);
+chrome.runtime.onStartup.addListener(armerAlarme);
+
+chrome.alarms.onAlarm.addListener((a) => {
+  if (a.name === 'travaux') rafraichirPastille();
+});
+
+/**
+ * Allume la pastille quand une liste attend.
+ *
+ * Ne démarre jamais rien : une extension qui piloterait un site marchand sans
+ * qu'on l'ait déclenchée serait une mauvaise surprise, et c'est contraire à ce
+ * que le README promet depuis le début.
+ */
+async function rafraichirPastille() {
+  const r = await travauxEnAttente();
+  if (!r.ok) {
+    await chrome.action.setBadgeText({ text: '' });
+    return;
+  }
+  const premier = r.data?.[0];
+  const n = premier ? (premier.items?.length ?? 0) : 0;
+  await chrome.action.setBadgeText({ text: n > 0 ? String(n) : '' });
+  await chrome.action.setBadgeBackgroundColor({ color: '#2D6A4F' });
+}
+
+/** Travaux relevables : en attente, plus ceux abandonnés en cours de route. */
+async function travauxRelevables() {
+  const attente = await travauxEnAttente();
+  if (!attente.ok) return { ok: false, deconnecte: attente.deconnecte === true };
+  const abandonnes = await travauxAbandonnes();
+  // Un travail revendiqué puis abandonné redevient disponible : sinon une
+  // extension fermée en plein remplissage bloquerait la liste pour toujours.
+  const liste = [...(attente.data ?? []), ...(abandonnes.ok ? abandonnes.data ?? [] : [])];
+  return { ok: true, data: { enAttente: liste, total: liste.length } };
+}
 
 const STATE_KEY = 'courses_job';
 
@@ -134,13 +189,37 @@ const RETRYABLE_VIA_SEARCH = new Set([
  * @param {object} item Ligne de courses.
  * @returns {Promise<object>} Compte rendu, enrichi de la voie empruntée.
  */
-async function attempt(tabId, cfg, item, baseOrigin) {
+async function attempt(tabId, cfg, item, baseOrigin, equivalences = {}) {
   // Un chemin relatif prime quand on connaît l'origine réelle : les drives
   // Leclerc vivent chacun sur le sous-domaine de leur magasin.
   const searchUrl =
     cfg.searchPath && baseOrigin
       ? baseOrigin + cfg.searchPath.replace('{q}', encodeURIComponent(item.name))
       : cfg.searchUrl.replace('{q}', encodeURIComponent(item.name));
+
+  // Ce qui a été tranché lors d'une commande précédente prime sur toute
+  // recherche : c'est ce qui rend les commandes suivantes déterministes.
+  const voie = strategie(item.product_id ? equivalences[item.product_id] : null);
+
+  if (voie.voie === 'absent') {
+    // Inutile de chercher ce qu'on sait absent de cette enseigne.
+    return { ok: false, reason: 'product_unavailable', memorise: true };
+  }
+  if (voie.voie === 'url') {
+    await chrome.tabs.update(tabId, { url: voie.valeur });
+    await waitForTab(tabId);
+    const r = await runAgent(tabId, cfg, item, 'run');
+    if (r.ok) return { ...r, via: 'equivalence_url' };
+    // La fiche mémorisée ne répond plus : on retombe sur la voie normale.
+  }
+  if (voie.voie === 'label') {
+    // Seule voie déterministe chez Leclerc, dont les liens produit n'ont pas
+    // d'adresse lisible.
+    await chrome.tabs.update(tabId, { url: searchUrl });
+    await waitForTab(tabId);
+    const r = await runAgent(tabId, cfg, { ...item, exactLabel: voie.valeur }, 'run');
+    if (r.ok) return { ...r, searchUrl, via: 'equivalence_label' };
+  }
 
   const directUrl =
     item.url ||
@@ -180,23 +259,69 @@ async function processJob() {
 
     const index = state.cursor;
     if (index >= state.items.length) {
-      await setState({ status: 'done', finishedAt: Date.now() });
+      const parDrive = { ...(state.resultatsParDrive ?? {}), [state.site]: state.results };
+      const restants = state.drivesRestants ?? [];
+
+      if (restants.length > 0) {
+        const suivant = restants[0];
+        const cfgSuivant = SITES[suivant];
+        // On repart de l'origine de l'enseigne suivante. Si la session n'y est
+        // pas ouverte ou le magasin pas choisi, l'agent le signalera dès le
+        // premier produit et on s'arrêtera proprement en `needs_action`.
+        await chrome.tabs.update(tabId, { url: cfgSuivant.origin });
+        await waitForTab(tabId);
+        const onglet = await chrome.tabs.get(tabId);
+        let origineSuivante = null;
+        try {
+          const u = new URL(onglet.url);
+          const segment = cfgSuivant.storePathPattern
+            ? (u.pathname.match(cfgSuivant.storePathPattern)?.[0] ?? '')
+            : '';
+          origineSuivante = u.origin + segment;
+        } catch {
+          origineSuivante = null;
+        }
+        await setState({
+          site: suivant,
+          baseOrigin: origineSuivante,
+          drivesRestants: restants.slice(1),
+          resultatsParDrive: parDrive,
+          equivalences: await chargerEquivalences(suivant),
+          results: [],
+          cursor: 0,
+        });
+        continue;
+      }
+
+      await setState({ status: 'done', finishedAt: Date.now(), resultatsParDrive: parDrive });
+      if (state.jobId) await terminer(state.jobId, 'done', parDrive);
       chrome.notifications.create({
         type: 'basic',
         iconUrl: 'icon-128.png',
         title: 'Panier rempli',
         message: `${state.results.filter((r) => r.ok).length} produit(s) ajouté(s) sur ${cfg.label}.`,
       });
+      await chrome.action.setBadgeText({ text: '' });
       return;
     }
 
     const item = state.items[index];
-    let result = await attempt(tabId, cfg, item, state.baseOrigin);
+    let result = await attempt(tabId, cfg, item, state.baseOrigin, state.equivalences ?? {});
     const entry = { item: item.name, quantity: item.quantity, ...result };
 
     // Un challenge n'est pas un échec de produit : c'est une main à rendre.
     if (!result.ok && result.reason === 'challenge') {
       await setState({ status: 'paused', pauseReason: 'challenge' });
+      if (state.jobId) {
+        // `needs_action` et non `failed` : rien n'est cassé, il manque un geste
+        // humain. Le téléphone peut alors le dire en clair, et ce qui a déjà
+        // été mis au panier n'est pas perdu.
+        await terminer(
+          state.jobId, 'needs_action',
+          { ...(state.resultatsParDrive ?? {}), [state.site]: state.results },
+          `Vérification demandée sur ${cfg.label}.`,
+        );
+      }
       chrome.notifications.create({
         type: 'basic',
         iconUrl: 'icon-128.png',
@@ -206,8 +331,29 @@ async function processJob() {
       return;
     }
 
+    if (!result.ok && !result.memorise && state.jobId && item.product_id
+        && ['no_match', 'product_unavailable'].includes(result.reason)) {
+      // Enregistrer l'absence évite de la redécouvrir à chaque commande, et
+      // alimentera le comparatif « produits manquants » prévu au brief.
+      await enregistrerEquivalence({
+        product_id: item.product_id,
+        drive: state.site,
+        search_query: item.name,
+        unavailable: true,
+      });
+    }
+
     const results = [...(state.results ?? []), entry];
     await setState({ results, cursor: index + 1 });
+    if (state.jobId) {
+      // Le compte porte sur l'enseigne en cours, pas sur le total des deux :
+      // une progression cumulée serait trompeuse une fois la première finie.
+      await progresser(state.jobId, {
+        drive: state.site,
+        fait: index + 1,
+        total: state.items.length,
+      });
+    }
     await sleep(DELAY_BETWEEN_ITEMS_MS);
   }
 }
@@ -240,11 +386,32 @@ async function chooseCandidate(index, label) {
   const results = [...state.results];
   results[index] = { ...entry, ...result, chosen: true, candidates: null };
   await setState({ results });
+
+  const ligne = state.items?.[index];
+  if (result.ok && state.jobId && ligne?.product_id) {
+    // Une ambiguïté tranchée une fois ne se repose plus : c'est tout l'intérêt
+    // du mécanisme d'équivalences.
+    await enregistrerEquivalence({
+      product_id: ligne.product_id,
+      drive: state.site,
+      search_query: ligne.name,
+      matched_label: label,
+      // Surtout pas l'adresse rendue par l'agent : après une recherche, c'est
+      // la page de RÉSULTATS, pas la fiche. L'enregistrer comme fiche ferait
+      // revenir l'extension sur une page de recherche à chaque commande, en
+      // croyant aller droit au produit. Le libellé exact suffit, et c'est de
+      // toute façon la seule voie chez Leclerc.
+      product_url: null,
+      ean13: ligne.ean ?? null,
+      unavailable: false,
+    });
+  }
+
   return result;
 }
 
 /** Démarre un travail de remplissage. */
-async function startJob({ site, items }) {
+async function startJob({ site, items }, supplement = {}) {
   const cfg = SITES[site];
   if (!cfg) throw new Error(`Enseigne inconnue : ${site}`);
   if (!Array.isArray(items) || !items.length) throw new Error('Liste vide');
@@ -292,10 +459,57 @@ async function startJob({ site, items }) {
     pauseReason: null,
     startedAt: Date.now(),
     finishedAt: null,
+    // Champs du pont Supabase : absents lors d'une saisie manuelle.
+    jobId: null,
+    drivesRestants: [],
+    resultatsParDrive: {},
+    equivalences: {},
+    ...supplement,
   });
 
   processJob();
   return { ok: true, count: items.length };
+}
+
+/**
+ * Démarre le remplissage à partir d'un travail relevé dans `cart_jobs`.
+ *
+ * Les articles y sont écrits par le wizard sous la forme `{name, quantity,
+ * unit, ean13, category, product_id}` ; l'orchestrateur attend `ean` et non
+ * `ean13`. La conversion est faite ici, en un seul endroit.
+ */
+async function demarrerTravail(jobId) {
+  const relevables = await travauxRelevables();
+  if (!relevables.ok) throw new Error('Session expirée, reconnecte-toi');
+  const travail = relevables.data.enAttente.find((t) => t.id === jobId);
+  if (!travail) throw new Error('Ce travail n\'est plus disponible');
+
+  const drives = travail.drives ?? [];
+  if (!drives.length) throw new Error('Aucune enseigne indiquée');
+
+  const items = (travail.items ?? []).map((i) => ({
+    name: i.name,
+    quantity: i.quantity,
+    ean: i.ean13 ?? null,
+    product_id: i.product_id ?? null,
+  }));
+
+  await revendiquer(jobId);
+  const equivalences = await chargerEquivalences(drives[0]);
+
+  return startJob({ site: drives[0], items }, {
+    jobId,
+    drivesRestants: drives.slice(1),
+    resultatsParDrive: {},
+    equivalences,
+  });
+}
+
+/** Charge et indexe les équivalences mémorisées pour une enseigne. */
+async function chargerEquivalences(drive) {
+  const eq = await equivalencesDe(drive);
+  // `chrome.storage` ne sait pas sérialiser une Map : on range un objet.
+  return Object.fromEntries(indexer(eq.ok ? eq.data : []));
 }
 
 async function resumeJob() {
@@ -326,6 +540,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     getState,
     choose: () => chooseCandidate(msg.index, msg.label),
     diagnose: () => diagnose(msg.site),
+    travaux: travauxRelevables,
+    demarrerTravail: () => demarrerTravail(msg.jobId),
   };
   const handler = handlers[msg.type];
   if (!handler) return false;
