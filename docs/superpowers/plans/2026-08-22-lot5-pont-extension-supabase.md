@@ -58,7 +58,7 @@ Expo SDK 57, `@supabase/supabase-js` 2.112 côté mobile, `node:test`.
 - Produit : une politique RLS permettant au propriétaire de faire avancer son
   travail sans pouvoir en altérer le contenu.
 
-- [ ] **Étape 1 : constater le blocage actuel**
+- [x] **Étape 1 : constater le blocage actuel**
 
 Par l'outil MCP Supabase, projet `qmymwicsgilhoihtfdjm` :
 
@@ -72,7 +72,7 @@ Attendu : une seule politique `UPDATE`, `cancel own pending jobs`, dont le
 `progress`, ni `results`, ni un statut d'avancement. **Copier ce résultat dans
 le message de commit.**
 
-- [ ] **Étape 2 : écrire la migration**
+- [x] **Étape 2 : écrire la migration**
 
 Créer `supabase/migrations/0008_cart_jobs_avancement.sql` :
 
@@ -121,12 +121,12 @@ comment on policy "advance own jobs" on public.cart_jobs is
   'Permet à l''extension de faire avancer un travail. L''immuabilité de items est assurée par le déclencheur cart_jobs_contenu_intact.';
 ```
 
-- [ ] **Étape 3 : appliquer**
+- [x] **Étape 3 : appliquer**
 
 Par l'outil MCP Supabase `apply_migration`, projet `qmymwicsgilhoihtfdjm`, nom
 `cart_jobs_avancement`.
 
-- [ ] **Étape 4 : vérifier que l'immuabilité tient**
+- [x] **Étape 4 : vérifier que l'immuabilité tient**
 
 ```sql
 select policyname, cmd from pg_policies
@@ -155,7 +155,7 @@ réussit, le déclencheur n'est pas actif — ne pas poursuivre.
 S'il n'existe aucune ligne, noter que la vérification est reportée à la
 tâche 9, étape 6.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add supabase/migrations/0008_cart_jobs_avancement.sql
@@ -173,7 +173,7 @@ git commit -m "feat: l'extension peut faire avancer un travail sans altérer sa 
 **Interfaces :**
 - Produit : `LigneConsolidee` et `ItemPanier` gagnent `product_id: string | null`.
 
-- [ ] **Étape 1 : écrire les tests qui échouent**
+- [x] **Étape 1 : écrire les tests qui échouent**
 
 Ajouter à la fin de `mobile/lib/consolidation.test.mjs` :
 
@@ -221,7 +221,7 @@ test("l'article de panier transporte l'identifiant du produit", () => {
 });
 ```
 
-- [ ] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
+- [x] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
 
 Depuis `mobile/` :
 
@@ -231,7 +231,7 @@ Depuis `mobile/` :
 
 Attendu : ÉCHEC, `undefined !== 'p1'`.
 
-- [ ] **Étape 3 : écrire l'implémentation**
+- [x] **Étape 3 : écrire l'implémentation**
 
 Dans `mobile/lib/consolidation.ts` :
 
@@ -341,7 +341,7 @@ export function construireItems(lignes: LigneConsolidee[]): ItemPanier[] {
 }
 ```
 
-- [ ] **Étape 4 : lancer les tests et vérifier qu'ils passent**
+- [x] **Étape 4 : lancer les tests et vérifier qu'ils passent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib/*.test.mjs
@@ -350,7 +350,7 @@ npx tsc --noEmit
 
 Attendu : `# fail 0`, aucune erreur TypeScript.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add mobile/lib/consolidation.ts mobile/lib/consolidation.test.mjs
@@ -381,7 +381,7 @@ git commit -m "feat: la liste envoyée porte l'identifiant du produit"
   - `travauxEnAttente()`, `revendiquer(id)`, `progresser(id, avancement)`, `terminer(id, statut, resultats, erreur)`
   - `equivalencesDe(drive)`, `enregistrerEquivalence(entree)`
 
-- [ ] **Étape 1 : écrire les tests qui échouent**
+- [x] **Étape 1 : écrire les tests qui échouent**
 
 Créer `extension/lib.test.mjs` :
 
@@ -459,7 +459,7 @@ test('indexer tolère une liste vide ou absente', () => {
 });
 ```
 
-- [ ] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
+- [x] **Étape 2 : lancer les tests et vérifier qu'ils échouent**
 
 Depuis `extension/` :
 
@@ -469,7 +469,7 @@ Depuis `extension/` :
 
 Attendu : ÉCHEC, `ERR_MODULE_NOT_FOUND` sur `./lib/session.js`.
 
-- [ ] **Étape 3 : écrire les deux modules purs**
+- [x] **Étape 3 : écrire les deux modules purs**
 
 Créer `extension/lib/session.js` :
 
@@ -540,7 +540,7 @@ export function indexer(lignes) {
 }
 ```
 
-- [ ] **Étape 4 : lancer les tests et vérifier qu'ils passent**
+- [x] **Étape 4 : lancer les tests et vérifier qu'ils passent**
 
 ```bash
 /Users/angel-assistant/.nvm/versions/node/v22.23.2/bin/node --test lib.test.mjs
@@ -548,7 +548,7 @@ export function indexer(lignes) {
 
 Attendu : `# pass 10`, `# fail 0`.
 
-- [ ] **Étape 5 : écrire le client réseau**
+- [x] **Étape 5 : écrire le client réseau**
 
 Créer `extension/supabase.js`. Il importe les deux modules purs et n'ajoute que
 les appels.
@@ -712,7 +712,7 @@ export async function enregistrerEquivalence(entree) {
 }
 ```
 
-- [ ] **Étape 6 : déclarer le domaine dans le manifeste**
+- [x] **Étape 6 : déclarer le domaine dans le manifeste**
 
 Dans `extension/manifest.json`, ajouter à `host_permissions` :
 
@@ -726,7 +726,7 @@ et à `permissions` :
     "alarms"
 ```
 
-- [ ] **Étape 7 : commit**
+- [x] **Étape 7 : commit**
 
 ```bash
 git add extension/lib extension/supabase.js extension/lib.test.mjs extension/manifest.json
