@@ -86,7 +86,14 @@ export function EtapeQuotidien() {
 
   return (
     <View style={s.bloc}>
-      {!listeOuverte && (
+      {/*
+        La pile reste montée quand la liste s'ouvre : `display: 'none'` la
+        masque sans la détruire. La démonter remettait son index à zéro, et
+        toutes les cartes déjà passées revenaient — les décisions, elles,
+        survivaient, puisqu'elles vivent dans le contexte. La position dans la
+        pile est un état du wizard, pas de l'affichage.
+      */}
+      <View style={[s.masquable, listeOuverte && s.masquee]}>
         <>
           <View style={s.pile}>
             <PileSwipe
@@ -102,7 +109,7 @@ export function EtapeQuotidien() {
             Droite : il m&apos;en faut · Gauche : j&apos;en ai déjà
           </Text>
         </>
-      )}
+      </View>
 
       <Pressable style={s.bascule} onPress={() => setListeOuverte((v) => !v)}>
         <Text style={s.basculeTexte}>
@@ -137,6 +144,8 @@ export function EtapeQuotidien() {
 
 const s = StyleSheet.create({
   bloc: { flex: 1 },
+  masquable: { flex: 1 },
+  masquee: { display: 'none' },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pile: { flex: 1, marginHorizontal: spacing.lg },
   carte: {

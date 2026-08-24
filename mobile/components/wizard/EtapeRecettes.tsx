@@ -54,7 +54,9 @@ export function EtapeRecettes() {
 
   return (
     <View style={s.bloc}>
-      {!listeOuverte && (
+      {/* Même raison qu'à l'étape du quotidien : démonter la pile remettait
+          son index à zéro et ramenait les recettes déjà passées. */}
+      <View style={[s.masquable, listeOuverte && s.masquee]}>
         <>
           <View style={s.pile}>
             <PileSwipe
@@ -70,7 +72,7 @@ export function EtapeRecettes() {
             Droite : je la retiens · Gauche : pas cette fois
           </Text>
         </>
-      )}
+      </View>
 
       <Pressable style={s.bascule} onPress={() => setListeOuverte((v) => !v)}>
         <Text style={s.basculeTexte}>
@@ -119,6 +121,8 @@ export function EtapeRecettes() {
 
 const s = StyleSheet.create({
   bloc: { flex: 1 },
+  masquable: { flex: 1 },
+  masquee: { display: 'none' },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   pile: { flex: 1, marginHorizontal: spacing.lg },
   carte: {
