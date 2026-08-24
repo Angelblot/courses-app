@@ -20,7 +20,7 @@ const LARGEUR_BALAYAGE = 120;
  * un mouvement par-dessus la brouillerait.
  */
 export function BandeauSuivi() {
-  const { travail, acquitte } = useTravailActif();
+  const { travail, ecarter } = useTravailActif();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -95,6 +95,11 @@ export function BandeauSuivi() {
       <View style={s.contenu}>
         <Text style={[s.texte, alerte && s.texteAlerte]} numberOfLines={1}>{texte}</Text>
         <Text style={[s.action, alerte && s.texteAlerte]}>Voir</Text>
+        {/* Écarter le bandeau doit toujours être possible : c'est
+            l'utilisateur qui sait si un remplissage l'intéresse encore. */}
+        <Pressable onPress={ecarter} hitSlop={12} accessibilityLabel="Masquer le suivi">
+          <Text style={[s.fermer, alerte && s.texteAlerte]}>✕</Text>
+        </Pressable>
       </View>
 
       {/* Aucune barre quand le total manque : une barre pleine mentirait. */}
@@ -126,6 +131,7 @@ const s = StyleSheet.create({
   texte: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.accent },
   texteAlerte: { color: colors.danger },
   action: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+  fermer: { fontSize: 15, fontWeight: '600', color: colors.textMuted, paddingLeft: spacing.xs },
   piste: { height: 3, backgroundColor: colors.border },
   progression: { height: 3, backgroundColor: colors.accent },
 });

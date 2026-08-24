@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { doitAfficher, ETATS_ACTIFS } from '../lib/suivi-bandeau.ts';
+import { cleEcart, doitAfficher, ETATS_ACTIFS } from '../lib/suivi-bandeau.ts';
 import { lireAcquittement, ecrireAcquittement } from './acquittement';
 
 export type Travail = {
   id: string;
   status: string;
+  /** Sert à oublier un travail que l'extension n'a jamais pris en charge. */
+  created_at?: string;
   progress: { drive?: string; fait?: number; total?: number } | null;
   results: Record<string, Array<{ item: string; ok: boolean; message?: string }>> | null;
   error: string | null;
@@ -33,7 +35,7 @@ export function useSuiviTravail(jobId: string | null) {
     (async () => {
       const { data, error } = await supabase
         .from('cart_jobs')
-        .select('id, status, progress, results, error')
+        .select('id, status, progress, results, error, created_at')
         .eq('id', jobId)
         .maybeSingle();
       if (!vivant) return;
@@ -78,7 +80,7 @@ export function useTravailActif() {
   const relire = useCallback(async () => {
     const { data, error } = await supabase
       .from('cart_jobs')
-      .select('id, status, progress, results, error')
+      .select('id, status, progress, results, error, created_at')
       .in('status', [...ETATS_ACTIFS, 'done', 'failed'])
       .order('created_at', { ascending: false })
       .limit(1)
@@ -118,6 +120,14 @@ export function useTravailActif() {
     setDernierAcquitte(id);
   }, []);
 
+  /** Écarte le bandeau pour l'état courant, sans toucher au travail lui-même. */
+  const ecarter = useCallback(async () => {
+    if (!travail) return;
+    const cle = cleEcart(travail);
+    await ecrireAcquittement(cle);
+    setDernierAcquitte(cle);
+  }, [travail]);
+
   const aMontrer = doitAfficher(travail, dernierAcquitte) ? travail : null;
-  return { travail: aMontrer, acquitte };
+  return { travail: aMontrer, acquitte, ecarter };
 }
