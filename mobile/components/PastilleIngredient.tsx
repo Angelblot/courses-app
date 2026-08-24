@@ -1,20 +1,23 @@
 import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
-import { colors, ombre, radius, spacing } from '../lib/theme';
+import { colors, radius, spacing, texte } from '../lib/theme';
 
-/** Diamètre de la pastille. Trois par rangée sur un téléphone courant. */
-const TAILLE = 96;
+/** Diamètre mesuré chez Jow : 80, avec une image de 78 à l'intérieur. */
+const TAILLE = 80;
+/** L'image remplit presque tout le cercle — c'est ce qui le rend lisible. */
+const IMAGE = 78;
 
 /**
  * Un ingrédient présenté en pastille ronde : l'image du produit, la quantité,
  * puis le nom.
  *
- * C'est la signature de Jow, et elle vaut mieux qu'une liste : on reconnaît
- * un ingrédient à sa photo bien avant de lire son nom.
+ * On reconnaît un ingrédient à sa photo bien avant de lire son nom, et c'est
+ * pourquoi l'image occupe 78 points sur 80 : une vignette plus petite laisse
+ * un cercle vide qui ne dit rien.
  *
- * Un ingrédient non rattaché au catalogue n'a pas d'image, et le dit — c'est
- * lui que l'extension devra chercher par son nom, donc celui qui risque de
- * manquer dans le panier.
+ * Quantité et nom sont rigoureusement identiques — même taille, même graisse,
+ * même couleur. Mettre la quantité en gras, comme je l'avais fait, hiérarchise
+ * là où Jow laisse lire d'un trait.
  */
 export function PastilleIngredient({
   nom, quantite, image, rattache,
@@ -24,16 +27,14 @@ export function PastilleIngredient({
   image: string | null;
   rattache: boolean;
 }) {
-  // Une image qui n'arrive pas laissait un cercle vide : son fond opaque
-  // masquait l'initiale posée dessous. On la retire plutôt que de la couvrir.
+  // Une image qui n'arrive pas laisserait un cercle vide : on retire l'image
+  // plutôt que de couvrir l'initiale posée dessous.
   const [imageCassee, setImageCassee] = useState(false);
   const montrerImage = Boolean(image) && !imageCassee;
 
   return (
     <View style={s.bloc}>
       <View style={s.cercle}>
-        {/* L'initiale est toujours dessous : si l'image ne charge pas, le
-            cercle porte encore quelque chose plutôt que de rester vide. */}
         <Text style={s.initiale}>{(nom.trim()[0] ?? '?').toUpperCase()}</Text>
         {montrerImage && (
           <Image
@@ -49,37 +50,32 @@ export function PastilleIngredient({
           </View>
         )}
       </View>
-      <Text style={s.quantite} numberOfLines={1}>{quantite}</Text>
-      <Text style={s.nom} numberOfLines={2}>{nom}</Text>
+      <Text style={s.ligne} numberOfLines={1}>{quantite}</Text>
+      <Text style={s.ligne} numberOfLines={2}>{nom}</Text>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  bloc: { width: TAILLE, alignItems: 'center', gap: 2 },
+  bloc: { width: '100%', alignItems: 'center' },
   cercle: {
     width: TAILLE, height: TAILLE, borderRadius: TAILLE / 2,
     backgroundColor: colors.surface,
+    // Un trait d'un point, jamais d'ombre : Jow n'en pose aucune.
+    borderWidth: 1, borderColor: colors.traitPastille,
     alignItems: 'center', justifyContent: 'center',
-    ...ombre,
-    // La pastille « à chercher » déborde volontairement du cercle.
-    overflow: 'visible',
+    marginBottom: spacing.sm,
   },
   image: {
-    position: 'absolute', width: TAILLE * 0.66, height: TAILLE * 0.66,
+    position: 'absolute', width: IMAGE, height: IMAGE, borderRadius: IMAGE / 2,
     backgroundColor: colors.surface,
   },
-  initiale: { fontSize: 30, fontWeight: '700', color: colors.textMuted },
-  // Une réserve, pas une alerte : le badge informe sans crier.
+  initiale: { fontSize: 26, fontWeight: '400', color: colors.textMuted },
   badge: {
-    position: 'absolute', bottom: -4,
-    backgroundColor: colors.bg, borderRadius: radius.pill,
+    position: 'absolute', bottom: -6,
+    backgroundColor: colors.accent, borderRadius: radius.pill,
     paddingVertical: 2, paddingHorizontal: spacing.sm,
   },
-  badgeTexte: { fontSize: 10, fontWeight: '700', color: colors.textMuted },
-  quantite: {
-    fontSize: 14, fontWeight: '700', color: colors.text,
-    marginTop: spacing.sm, textAlign: 'center',
-  },
-  nom: { fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 17 },
+  badgeTexte: { fontSize: 10, fontWeight: '700', color: colors.accentContrast },
+  ligne: { ...texte.pastille, color: colors.text, textAlign: 'center' },
 });

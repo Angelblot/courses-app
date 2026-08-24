@@ -8,10 +8,12 @@
 export const colors = {
   bg: '#FDF4E7',
   surface: '#FFFFFF',
-  // Trait chaud, pour le peu d'endroits où il en faut encore un : un gris
-  // neutre tire au violet sur du crème.
+  // Trait chaud pour les champs et séparateurs.
   border: '#EDE3D2',
-  text: '#1C1C1A',
+  // Trait des pastilles d'ingrédients : gris neutre, mesuré chez Jow, qui
+  // disparaît sous l'image au lieu de l'encadrer.
+  traitPastille: '#E9E9E9',
+  text: '#1E1E1E',
   textMuted: '#6B6B6B',
   // Vert profond : le nôtre, plus clair, manquait d'assise sur le crème.
   accent: '#075526',
@@ -30,25 +32,33 @@ export const colors = {
   nutriC: '#F5B700',
   nutriD: '#E67E22',
   nutriE: '#C62828',
-  // Aplats des recettes sans photo. Six teintes sourdes, assez contrastées
-  // pour porter du texte blanc, assez proches pour ne pas jurer entre elles.
-  aplats: ['#2D6A4F', '#52796F', '#B08968', '#6B705C', '#8A5A44', '#4A6FA5'],
+  // Aplats des recettes sans photo : six teintes très pâles, portant leur
+  // initiale dans la couleur pleine correspondante.
+  //
+  // La version saturée écrasait la grille — chez Jow chaque recette a sa
+  // photo, donc ce cas n'existe pas et rien ne vient concurrencer les plats.
+  // Une absence de photo ne doit pas crier plus fort qu'une photo.
+  aplats: ['#E4EDE7', '#E8EEEC', '#F5EBE2', '#EBEDE7', '#F1E6DF', '#E5EAF2'],
+  aplatsEncre: ['#2D6A4F', '#52796F', '#B08968', '#6B705C', '#8A5A44', '#4A6FA5'],
 } as const;
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
-export const radius = { sm: 8, md: 14, lg: 24, xl: 32, pill: 999 } as const;
+// `card: 16` est la valeur mesurée sur les cartes de Jow — 24 alourdissait.
+export const radius = { sm: 8, md: 14, card: 16, lg: 24, xl: 32, pill: 999 } as const;
 
 /**
- * Ombre douce et large, à la place d'un trait de 1 px.
+ * Échelle typographique mesurée sur jow.fr le 24/08.
  *
- * Un trait fait « formulaire » ; une ombre diffuse fait « objet posé sur la
- * table ». C'est ce qui sépare une carte encadrée d'une carte qui flotte.
+ * La leçon principale n'est pas dans les tailles mais dans les graisses :
+ * Jow écrit presque tout en 400, y compris ses titres de section. Notre 700
+ * généralisé donnait un rendu d'application utilitaire là où le leur respire.
  */
-export const ombre = {
-  shadowColor: '#090E15',
-  shadowOpacity: 0.1,
-  shadowRadius: 18,
-  shadowOffset: { width: 0, height: 5 },
-  // Android n'a pas d'ombre paramétrable : `elevation` en est l'équivalent.
-  elevation: 3,
+export const texte = {
+  /** Titre de section — « Ingrédients », centré. */
+  section: { fontSize: 18, fontWeight: '400', lineHeight: 22 },
+  /** Nom d'une recette sur sa carte. */
+  carte: { fontSize: 15, fontWeight: '400', lineHeight: 20 },
+  /** Quantité et nom sous une pastille : rigoureusement identiques chez Jow. */
+  pastille: { fontSize: 12, fontWeight: '400', lineHeight: 16 },
 } as const;
+

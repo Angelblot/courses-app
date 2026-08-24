@@ -11,7 +11,7 @@ import { useRecette, supprimerRecette } from '../../../../stores/recipes';
 import { useProducts } from '../../../../stores/products';
 import { quantitePourParts, initiale, indiceAplat } from '../../../../lib/recettes-affichage.ts';
 import { formatIngredientQty } from '../../../../lib/unites.ts';
-import { colors, radius, spacing } from '../../../../lib/theme';
+import { colors, radius, spacing, texte } from '../../../../lib/theme';
 
 export default function DetailRecette() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -80,7 +80,9 @@ export default function DetailRecette() {
             <Image source={{ uri: recette.image_url }} style={s.bandeau} resizeMode="cover" />
           ) : (
             <View style={[s.bandeau, s.aplat, { backgroundColor: colors.aplats[indiceAplat(recette.name)] }]}>
-              <Text style={s.initiale}>{initiale(recette.name)}</Text>
+              <Text style={[s.initiale, { color: colors.aplatsEncre[indiceAplat(recette.name)] }]}>
+            {initiale(recette.name)}
+          </Text>
             </View>
           )}
           <SafeAreaView style={s.barre} edges={['top']}>
@@ -101,6 +103,7 @@ export default function DetailRecette() {
           <Text style={s.titre}>{recette.name}</Text>
           {recette.description && <Text style={s.description}>{recette.description}</Text>}
 
+          <View style={s.blocIngredients}>
           <View style={s.enteteIngredients}>
             <Text style={s.section}>{`Ingrédients pour ${n} part${n > 1 ? 's' : ''}`}</Text>
             {/* Le réglage jouxte le titre, comme chez Jow : c'est là qu'on
@@ -123,17 +126,19 @@ export default function DetailRecette() {
                 ? produits.find((p) => p.id === ing.product_id)
                 : null;
               return (
-                <PastilleIngredient
-                  key={ing.id}
-                  nom={ing.name}
-                  quantite={formatIngredientQty(
-                    quantitePourParts(ing.quantity_per_serving, n), ing.unit,
-                  )}
-                  image={produit?.image_url ?? null}
-                  rattache={Boolean(ing.product_id)}
-                />
+                <View key={ing.id} style={s.cellule}>
+                  <PastilleIngredient
+                    nom={ing.name}
+                    quantite={formatIngredientQty(
+                      quantitePourParts(ing.quantity_per_serving, n), ing.unit,
+                    )}
+                    image={produit?.image_url ?? null}
+                    rattache={Boolean(ing.product_id)}
+                  />
+                </View>
               );
             })}
+          </View>
           </View>
 
           {erreurSuppression && <Text style={s.erreur}>{erreurSuppression}</Text>}
@@ -156,7 +161,7 @@ const s = StyleSheet.create({
   corps: { paddingBottom: spacing.xxl },
   bandeau: { height: 220, width: '100%', backgroundColor: colors.bg },
   aplat: { alignItems: 'center', justifyContent: 'center' },
-  initiale: { fontSize: 64, fontWeight: '800', color: '#FFFFFF' },
+  initiale: { fontSize: 64, fontWeight: '400' },
   barre: {
     position: 'absolute', top: 0, left: 0, right: 0,
     flexDirection: 'row', justifyContent: 'space-between',
@@ -168,12 +173,19 @@ const s = StyleSheet.create({
     marginTop: spacing.sm,
   },
   texte: { padding: spacing.lg, gap: spacing.sm },
-  titre: { fontSize: 26, fontWeight: '800', color: colors.text },
-  description: { fontSize: 15, color: colors.textMuted, lineHeight: 21 },
-  enteteIngredients: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: spacing.xl, gap: spacing.md,
+  titre: { fontSize: 30, fontWeight: '700', color: colors.text, textAlign: 'center', lineHeight: 36 },
+  description: { fontSize: 15, color: colors.textMuted, lineHeight: 22, textAlign: 'center' },
+  // Fond blanc : c'est le contraste avec le crème de la page qui détache le
+  // bloc chez Jow, sans le moindre trait ni la moindre ombre.
+  blocIngredients: {
+    backgroundColor: colors.surface, borderRadius: radius.card,
+    padding: spacing.xl, marginTop: spacing.xl,
   },
+  enteteIngredients: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing.md,
+  },
+  cellule: { width: '48%', alignItems: 'center' },
   compteur: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     backgroundColor: colors.surface, borderRadius: radius.pill,
@@ -186,10 +198,10 @@ const s = StyleSheet.create({
   },
   pasTexte: { fontSize: 18, fontWeight: '700', color: colors.accent },
   compteurTexte: { fontSize: 15, fontWeight: '700', color: colors.text, minWidth: 18, textAlign: 'center' },
-  section: { fontSize: 17, fontWeight: '700', color: colors.text, flex: 1 },
+  section: { ...texte.section, color: colors.text, textAlign: 'center' },
   pastilles: {
     flexDirection: 'row', flexWrap: 'wrap',
-    justifyContent: 'space-between', rowGap: spacing.xl, marginTop: spacing.lg,
+    justifyContent: 'space-between', rowGap: spacing.xl, marginTop: spacing.xl,
   },
   erreur: { color: colors.danger, fontSize: 14, textAlign: 'center' },
   supprimer: {

@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { CarteRecette } from '../../../components/CarteRecette';
+import { CarteRecette, ECART_GRILLE, MARGE_GRILLE } from '../../../components/CarteRecette';
 import { EtatVide } from '../../../components/EtatVide';
 import { useRecipes, type Recipe } from '../../../stores/recipes';
 import { colors, radius, spacing } from '../../../lib/theme';
@@ -85,9 +85,9 @@ const s = StyleSheet.create({
   },
   titre: { fontSize: 26, fontWeight: '800', color: colors.text },
   compte: { fontSize: 15, color: colors.textMuted },
-  espace: { height: spacing.lg },
-  rangee: { gap: spacing.md },
-  grille: { padding: spacing.lg },
+  espace: { height: ECART_GRILLE },
+  rangee: { gap: ECART_GRILLE },
+  grille: { paddingHorizontal: MARGE_GRILLE, paddingVertical: spacing.md },
   videConteneur: { flexGrow: 1, justifyContent: 'center' },
   erreur: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
   erreurTexte: { color: colors.danger, fontSize: 14 },
