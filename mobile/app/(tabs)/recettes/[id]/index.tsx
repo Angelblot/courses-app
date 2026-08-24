@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { EtatVide } from '../../../../components/EtatVide';
+import { PastilleIngredient } from '../../../../components/PastilleIngredient';
 import { useRecette, supprimerRecette } from '../../../../stores/recipes';
 import { useProducts } from '../../../../stores/products';
 import { quantitePourParts, initiale, indiceAplat } from '../../../../lib/recettes-affichage.ts';
@@ -100,43 +101,40 @@ export default function DetailRecette() {
           <Text style={s.titre}>{recette.name}</Text>
           {recette.description && <Text style={s.description}>{recette.description}</Text>}
 
-          <View style={s.reglage}>
-            <Text style={s.reglageLabel}>Pour</Text>
+          <View style={s.enteteIngredients}>
+            <Text style={s.section}>{`Ingrédients pour ${n} part${n > 1 ? 's' : ''}`}</Text>
+            {/* Le réglage jouxte le titre, comme chez Jow : c'est là qu'on
+                pense au nombre de convives, pas plus haut. Il n'est qu'une
+                aide à la lecture et ne modifie jamais la recette. */}
             <View style={s.compteur}>
-              <Pressable style={s.pas} onPress={() => setParts(Math.max(1, n - 1))} hitSlop={6}>
+              <Pressable style={s.pas} onPress={() => setParts(Math.max(1, n - 1))} hitSlop={8}>
                 <Text style={s.pasTexte}>−</Text>
               </Pressable>
-              <Text style={s.compteurTexte}>{`${n} parts`}</Text>
-              <Pressable style={s.pas} onPress={() => setParts(n + 1)} hitSlop={6}>
+              <Text style={s.compteurTexte}>{n}</Text>
+              <Pressable style={s.pas} onPress={() => setParts(n + 1)} hitSlop={8}>
                 <Text style={s.pasTexte}>+</Text>
               </Pressable>
             </View>
           </View>
 
-          <Text style={s.section}>Ingrédients</Text>
-          {recette.ingredients.map((ing) => {
-            const produit = ing.product_id
-              ? produits.find((p) => p.id === ing.product_id)
-              : null;
-            return (
-              <View key={ing.id} style={s.ligne}>
-                {produit?.image_url
-                  ? <Image source={{ uri: produit.image_url }} style={s.vignette} resizeMode="contain" />
-                  : <View style={[s.vignette, s.vignetteVide]} />}
-                <View style={s.ligneTexte}>
-                  <Text style={s.ligneNom} numberOfLines={2}>{ing.name}</Text>
-                  {!ing.product_id && (
-                    <Text style={s.nonRattache}>
-                      Non rattaché · l&apos;extension devra le chercher par son nom.
-                    </Text>
+          <View style={s.pastilles}>
+            {recette.ingredients.map((ing) => {
+              const produit = ing.product_id
+                ? produits.find((p) => p.id === ing.product_id)
+                : null;
+              return (
+                <PastilleIngredient
+                  key={ing.id}
+                  nom={ing.name}
+                  quantite={formatIngredientQty(
+                    quantitePourParts(ing.quantity_per_serving, n), ing.unit,
                   )}
-                </View>
-                <Text style={s.quantite}>
-                  {formatIngredientQty(quantitePourParts(ing.quantity_per_serving, n), ing.unit)}
-                </Text>
-              </View>
-            );
-          })}
+                  image={produit?.image_url ?? null}
+                  rattache={Boolean(ing.product_id)}
+                />
+              );
+            })}
+          </View>
 
           {erreurSuppression && <Text style={s.erreur}>{erreurSuppression}</Text>}
 
@@ -172,32 +170,27 @@ const s = StyleSheet.create({
   texte: { padding: spacing.lg, gap: spacing.sm },
   titre: { fontSize: 26, fontWeight: '800', color: colors.text },
   description: { fontSize: 15, color: colors.textMuted, lineHeight: 21 },
-  reglage: {
+  enteteIngredients: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: spacing.md, backgroundColor: colors.surface,
-    borderRadius: radius.md, padding: spacing.md,
+    marginTop: spacing.xl, gap: spacing.md,
+  },
+  compteur: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.surface, borderRadius: radius.pill,
     borderWidth: 1, borderColor: colors.border,
+    paddingVertical: 4, paddingHorizontal: spacing.sm,
   },
-  reglageLabel: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
-  compteur: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   pas: {
-    width: 30, height: 30, borderRadius: radius.pill, borderWidth: 1,
-    borderColor: colors.border, alignItems: 'center', justifyContent: 'center',
+    width: 26, height: 26, borderRadius: radius.pill,
+    alignItems: 'center', justifyContent: 'center',
   },
-  pasTexte: { fontSize: 17, fontWeight: '700', color: colors.text },
-  compteurTexte: { fontSize: 15, fontWeight: '600', color: colors.text, minWidth: 62, textAlign: 'center' },
-  section: { fontSize: 17, fontWeight: '700', color: colors.text, marginTop: spacing.lg },
-  ligne: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.surface, borderRadius: radius.md,
-    paddingVertical: spacing.md, paddingHorizontal: spacing.md,
+  pasTexte: { fontSize: 18, fontWeight: '700', color: colors.accent },
+  compteurTexte: { fontSize: 15, fontWeight: '700', color: colors.text, minWidth: 18, textAlign: 'center' },
+  section: { fontSize: 17, fontWeight: '700', color: colors.text, flex: 1 },
+  pastilles: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    justifyContent: 'space-between', rowGap: spacing.xl, marginTop: spacing.lg,
   },
-  vignette: { width: 40, height: 40, borderRadius: radius.sm, backgroundColor: colors.bg },
-  vignetteVide: { borderWidth: 1, borderColor: colors.border },
-  ligneTexte: { flex: 1, gap: 2 },
-  ligneNom: { fontSize: 15, fontWeight: '600', color: colors.text },
-  nonRattache: { fontSize: 11, color: colors.textMuted },
-  quantite: { fontSize: 14, fontWeight: '700', color: colors.text },
   erreur: { color: colors.danger, fontSize: 14, textAlign: 'center' },
   supprimer: {
     marginTop: spacing.xxl, alignItems: 'center',

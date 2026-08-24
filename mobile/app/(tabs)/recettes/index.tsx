@@ -48,6 +48,8 @@ export default function Recettes() {
         renderItem={({ item }) => (
           <CarteRecette recette={item} onOuvrir={() => router.push(`/recettes/${item.id}`)} />
         )}
+        numColumns={2}
+        columnWrapperStyle={s.rangee}
         ItemSeparatorComponent={() => <View style={s.espace} />}
         contentContainerStyle={recettes.length === 0 ? s.videConteneur : s.grille}
         refreshControl={
@@ -84,6 +86,7 @@ const s = StyleSheet.create({
   titre: { fontSize: 26, fontWeight: '800', color: colors.text },
   compte: { fontSize: 15, color: colors.textMuted },
   espace: { height: spacing.lg },
+  rangee: { gap: spacing.md },
   grille: { padding: spacing.lg },
   videConteneur: { flexGrow: 1, justifyContent: 'center' },
   erreur: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
