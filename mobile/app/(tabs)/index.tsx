@@ -1,33 +1,42 @@
-import { useCallback } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator, Pressable, RefreshControl, SectionList,
+  StyleSheet, Text, TextInput, View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { ProductRow } from '../../components/ProductRow';
+import { DetailProduit } from '../../components/DetailProduit';
 import { EtatVide } from '../../components/EtatVide';
-import { useProducts } from '../../stores/products';
-import { colors, spacing } from '../../lib/theme';
+import { useProducts, type Product } from '../../stores/products';
+import { organiserCatalogue, TRIS, type CleTri } from '../../lib/catalogue.ts';
+import { colors, radius, spacing, texte } from '../../lib/theme';
 
 export default function Produits() {
   const { produits, chargement, erreur, recharger } = useProducts();
+  const [requete, setRequete] = useState('');
+  const [tri, setTri] = useState<CleTri>('rayon');
+  const [ouvert, setOuvert] = useState<Product | null>(null);
 
-  // Recharge le catalogue à chaque prise de focus de l'écran, pas seulement
-  // au montage : `app/(tabs)/_layout.tsx` utilise `<Tabs>` d'expo-router,
-  // qui garde les écrans montés d'un onglet à l'autre. Sans ceci, un produit
-  // ajouté depuis Scan n'apparaîtrait ici qu'après un tirer-pour-rafraîchir
-  // manuel. `recharger` a une identité stable (compteur de génération dans
-  // `useProducts`, voir `stores/products.ts`) : le rappel ci-dessous l'est
-  // donc aussi, et ne provoque pas de rechargement en boucle.
-  const rechargerAuFocus = useCallback(() => {
-    recharger();
-  }, [recharger]);
+  // Recharge le catalogue à chaque prise de focus, pas seulement au montage :
+  // `<Tabs>` garde les écrans montés d'un onglet à l'autre, si bien qu'un
+  // produit ajouté depuis Scan n'apparaîtrait qu'après un tirer-pour-
+  // rafraîchir. `recharger` a une identité stable, donc pas de boucle.
+  const rechargerAuFocus = useCallback(() => { recharger(); }, [recharger]);
   useFocusEffect(rechargerAuFocus);
 
+  const sections = useMemo(
+    () => organiserCatalogue(produits, requete, tri),
+    [produits, requete, tri],
+  );
+
+  // La fiche ouverte doit refléter le produit rechargé, pas celui capturé à
+  // l'ouverture : sans quoi l'étoile ne changerait pas après une bascule.
+  const ouvertFrais = ouvert ? produits.find((p) => p.id === ouvert.id) ?? ouvert : null;
+
   if (chargement && produits.length === 0) {
-    return (
-      <SafeAreaView style={s.centre}>
-        <ActivityIndicator color={colors.accent} />
-      </SafeAreaView>
-    );
+    return <SafeAreaView style={s.centre}><ActivityIndicator color={colors.accent} /></SafeAreaView>;
   }
 
   return (
@@ -37,31 +46,72 @@ export default function Produits() {
         <Text style={s.compte}>{produits.length}</Text>
       </View>
 
+      <View style={s.recherche}>
+        <Feather name="search" size={16} color={colors.textMuted} />
+        <TextInput
+          style={s.champ}
+          value={requete}
+          onChangeText={setRequete}
+          placeholder="Chercher un produit"
+          placeholderTextColor={colors.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+        />
+      </View>
+
+      <View style={s.tris}>
+        {TRIS.map((t) => (
+          <Pressable
+            key={t.cle}
+            style={[s.tri, tri === t.cle && s.triActif]}
+            onPress={() => setTri(t.cle)}
+          >
+            <Text style={[s.triTexte, tri === t.cle && s.triTexteActif]}>{t.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
       {erreur && (
         <View style={s.erreur}>
-          {/* `erreur` est déjà une phrase française destinée à l'utilisateur
-              (voir `stores/products.ts`) : le détail technique brut n'est
-              jamais affiché ici, seulement journalisé côté développeur. */}
+          {/* `erreur` est déjà une phrase française destinée à l'utilisateur. */}
           <Text style={s.erreurTexte}>{erreur}</Text>
           <Pressable onPress={recharger}><Text style={s.reessayer}>Réessayer</Text></Pressable>
         </View>
       )}
 
-      <FlatList
-        data={produits}
+      <SectionList
+        sections={sections.map((x) => ({ titre: x.titre, data: x.produits }))}
         keyExtractor={(p) => p.id}
-        renderItem={({ item }) => <ProductRow produit={item} />}
+        renderItem={({ item }) => (
+          <Pressable onPress={() => setOuvert(item)}>
+            <ProductRow produit={item} />
+          </Pressable>
+        )}
+        renderSectionHeader={({ section }) =>
+          section.titre ? <Text style={s.rayon}>{section.titre}</Text> : null}
+        stickySectionHeadersEnabled={false}
         ItemSeparatorComponent={() => <View style={s.separateur} />}
+        contentContainerStyle={sections.length === 0 ? s.videConteneur : s.liste}
         refreshControl={
           <RefreshControl refreshing={chargement} onRefresh={recharger} tintColor={colors.accent} />
         }
         ListEmptyComponent={
           erreur ? null : (
-            <EtatVide titre="Aucun produit">
-              Scanne un code-barres pour ajouter ton premier produit.
+            <EtatVide titre={requete ? 'Aucun résultat' : 'Aucun produit'}>
+              {requete
+                ? 'Aucun produit ne porte ce nom. Essaie avec moins de mots.'
+                : 'Scanne un code-barres : les produits arriveront ici.'}
             </EtatVide>
           )
         }
+      />
+
+      <DetailProduit
+        produit={ouvertFrais}
+        onFermer={() => setOuvert(null)}
+        onChange={recharger}
       />
     </SafeAreaView>
   );
@@ -72,15 +122,36 @@ const s = StyleSheet.create({
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   entete: {
     flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between',
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md,
   },
-  titre: { fontSize: 26, fontWeight: '800', color: colors.text },
+  titre: { fontSize: 26, fontWeight: '700', color: colors.text },
   compte: { fontSize: 15, color: colors.textMuted },
-  separateur: { height: 1, backgroundColor: colors.border, marginLeft: 76 },
-  erreur: {
-    margin: spacing.lg, padding: spacing.lg, borderRadius: 10,
-    borderWidth: 1, borderColor: colors.danger, gap: spacing.xs,
+
+  recherche: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    marginHorizontal: spacing.lg, paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface, borderRadius: radius.pill, height: 40,
   },
-  erreurTexte: { color: colors.text, fontWeight: '600' },
-  reessayer: { color: colors.accent, fontWeight: '700', marginTop: spacing.sm },
+  champ: { flex: 1, fontSize: 15, color: colors.text, padding: 0 },
+
+  tris: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  tri: {
+    borderRadius: radius.pill, paddingVertical: 6, paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+  },
+  triActif: { backgroundColor: colors.accent },
+  triTexte: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  triTexteActif: { color: colors.accentContrast },
+
+  liste: { paddingBottom: spacing.xxl },
+  videConteneur: { flexGrow: 1, justifyContent: 'center' },
+  rayon: {
+    ...texte.section, fontSize: 13, fontWeight: '700', color: colors.textMuted,
+    textTransform: 'uppercase', letterSpacing: 0.6,
+    paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm,
+  },
+  separateur: { height: 1, backgroundColor: colors.bg },
+  erreur: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
+  erreurTexte: { color: colors.danger, fontSize: 14 },
+  reessayer: { color: colors.accent, fontWeight: '700', fontSize: 14 },
 });

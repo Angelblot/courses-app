@@ -283,3 +283,29 @@ export async function recupererRecette(
   }
   return { ok: true, recette };
 }
+
+/**
+ * Rattache un ingrédient de recette à un produit du catalogue.
+ *
+ * Le nom de l'ingrédient n'est pas touché : une recette dit « Feta », et doit
+ * continuer à le dire même si le produit choisi s'appelle « Féta cubes AOP
+ * CARREFOUR ». C'est le rattachement qui porte le lien, pas le libellé.
+ *
+ * Le rayon suit le produit, puisque c'est lui qui décide où l'article se range
+ * dans la liste de courses.
+ */
+export async function rattacherIngredient(
+  ingredientId: string,
+  productId: string | null,
+  rayon: CleRayon,
+): Promise<{ ok: boolean; erreur?: string }> {
+  const { error } = await supabase
+    .from('recipe_ingredients')
+    .update({ product_id: productId, rayon })
+    .eq('id', ingredientId);
+  if (error) {
+    console.error('[rattacherIngredient]', error);
+    return { ok: false, erreur: "Impossible de rattacher cet ingrédient pour le moment." };
+  }
+  return { ok: true };
+}

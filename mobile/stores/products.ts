@@ -156,3 +156,22 @@ export async function ajouterProduit(
     erreur: "Impossible d'ajouter ce produit pour le moment. Réessaie dans un instant.",
   };
 }
+
+/**
+ * Marque ou démarque un produit comme favori.
+ *
+ * Ce n'est pas décoratif : l'étape « quotidien » du wizard ne présente que
+ * les favoris. Un produit qu'on rachète tous les mois doit pouvoir y entrer
+ * depuis sa fiche, sans repasser par le scanner.
+ */
+export async function basculerFavori(
+  id: string,
+  favori: boolean,
+): Promise<{ ok: boolean; erreur?: string }> {
+  const { error } = await supabase.from('products').update({ favorite: favori }).eq('id', id);
+  if (error) {
+    console.error('[basculerFavori]', error);
+    return { ok: false, erreur: "Impossible de modifier ce produit pour le moment." };
+  }
+  return { ok: true };
+}

@@ -1,13 +1,14 @@
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { EtatVide } from '../../../../components/EtatVide';
 import { PastilleIngredient } from '../../../../components/PastilleIngredient';
-import { useRecette, supprimerRecette } from '../../../../stores/recipes';
+import { SelecteurIngredient, type ChoixIngredient } from '../../../../components/SelecteurIngredient';
+import { useRecette, supprimerRecette, rattacherIngredient } from '../../../../stores/recipes';
 import { useProducts } from '../../../../stores/products';
 import {
   quantitePourParts, initiale, indiceAplat, formatDuree,
@@ -24,6 +25,17 @@ export default function DetailRecette() {
   // enregistrée à chaque ouverture et ne modifie jamais la recette.
   const [parts, setParts] = useState<number | null>(null);
   const [erreurSuppression, setErreurSuppression] = useState<string | null>(null);
+  /** Ingrédient dont on cherche le produit, ou `null` si le sélecteur est fermé. */
+  const [aRattacher, setARattacher] = useState<{ id: string; nom: string } | null>(null);
+
+  const choisirProduit = async (choix: ChoixIngredient) => {
+    const cible = aRattacher;
+    setARattacher(null);
+    if (!cible) return;
+    const r = await rattacherIngredient(cible.id, choix.product_id, choix.rayon);
+    if (r.ok) recharger();
+    else setErreurSuppression(r.erreur ?? 'Impossible de rattacher cet ingrédient.');
+  };
 
   const demanderSuppression = (id: string) => {
     Alert.alert(
@@ -153,7 +165,11 @@ export default function DetailRecette() {
                 ? produits.find((p) => p.id === ing.product_id)
                 : null;
               return (
-                <View key={ing.id} style={s.cellule}>
+                <Pressable
+                  key={ing.id}
+                  style={s.cellule}
+                  onPress={() => setARattacher({ id: ing.id, nom: ing.name })}
+                >
                   <PastilleIngredient
                     nom={ing.name}
                     quantite={formatIngredientQty(
@@ -162,7 +178,7 @@ export default function DetailRecette() {
                     image={produit?.image_url ?? null}
                     rattache={Boolean(ing.product_id)}
                   />
-                </View>
+                </Pressable>
               );
             })}
           </View>
@@ -170,11 +186,24 @@ export default function DetailRecette() {
 
           {erreurSuppression && <Text style={s.erreur}>{erreurSuppression}</Text>}
 
+          <Text style={s.aideRattachement}>
+            Touche un ingrédient pour lui choisir un produit du catalogue.
+          </Text>
+
           <Pressable style={s.supprimer} onPress={() => demanderSuppression(recette.id)}>
             <Text style={s.supprimerTexte}>Supprimer cette recette</Text>
           </Pressable>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={aRattacher !== null}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setARattacher(null)}
+      >
+        <SelecteurIngredient onChoisir={choisirProduit} onFermer={() => setARattacher(null)} />
+      </Modal>
     </View>
   );
 }
@@ -226,6 +255,10 @@ const s = StyleSheet.create({
     gap: spacing.md,
   },
   cellule: { width: '48%', alignItems: 'center' },
+  aideRattachement: {
+    fontSize: 12, color: colors.textMuted, textAlign: 'center',
+    marginTop: spacing.lg, lineHeight: 17,
+  },
   compteur: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     backgroundColor: colors.surface, borderRadius: radius.pill,
