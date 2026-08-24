@@ -46,11 +46,32 @@ const PRIORITE: ReadonlyArray<readonly [CleRayon, readonly string[]]> = [
   ['fruits_legumes', ['fresh-vegetables', 'fresh-fruits']],
 ];
 
+/**
+ * Étiquettes parapluies, écartées avant toute comparaison.
+ *
+ * `en:plant-based-foods-and-beverages` coiffe la quasi-totalité de
+ * l'alimentaire végétal, et son suffixe « beverages » correspondait à la règle
+ * des boissons : chapelure, croûtons, thym et pain s'y retrouvaient tous.
+ * Constaté le 24/08 en créant des produits depuis Open Food Facts.
+ *
+ * Ces étiquettes ne disent rien d'un emplacement en magasin. Les écarter vaut
+ * mieux que d'affiner la comparaison : le `includes` partiel est délibéré —
+ * c'est lui qui fait correspondre `en:mint-syrups` à `syrups`.
+ */
+const PARAPLUIES: ReadonlySet<string> = new Set([
+  'en:plant-based-foods-and-beverages',
+  'en:plant-based-foods',
+  'en:foods',
+  'en:groceries',
+  'en:fresh-foods',
+]);
+
 /** Déduit le rayon d'un produit depuis ses catégories Open Food Facts. */
 export function rayonDepuisCategories(tags: string[] | null | undefined): CleRayon {
   if (!tags?.length) return 'autre';
+  const utiles = tags.filter((t) => !PARAPLUIES.has(t));
   for (const [rayon, fragments] of PRIORITE) {
-    if (tags.some((t) => fragments.some((f) => t.includes(f)))) return rayon;
+    if (utiles.some((t) => fragments.some((f) => t.includes(f)))) return rayon;
   }
   // Des étiquettes existent mais aucune ne correspond. Open Food Facts ne
   // référence que l'alimentaire : c'est donc de l'épicerie, pas « autre ».

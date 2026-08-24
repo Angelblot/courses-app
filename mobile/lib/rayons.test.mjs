@@ -93,3 +93,38 @@ test('une clé canonique passée par mégarde est rendue telle quelle', () => {
   assert.equal(rayonDepuisLibelle('pls'), 'pls');
   assert.equal(rayonDepuisLibelle('fruits_legumes'), 'fruits_legumes');
 });
+
+// --- Étiquettes parapluies d'Open Food Facts ---
+
+test("« plant-based-foods-and-beverages » n'envoie pas tout aux boissons", () => {
+  // Constaté le 24/08 : cette étiquette coiffe la quasi-totalité de
+  // l'alimentaire végétal, et son suffixe « beverages » correspondait à la
+  // règle des boissons. Chapelure, croûtons, thym et pain s'y retrouvaient.
+  // Étiquettes réelles d'une chapelure.
+  assert.equal(rayonDepuisCategories([
+    'en:plant-based-foods-and-beverages', 'en:plant-based-foods',
+    'en:cereals-and-potatoes', 'en:cereals-and-their-products',
+    'en:breads', 'en:bread-crumbs', 'en:groceries',
+  ]), 'epicerie');
+});
+
+test('une vraie boisson reste aux boissons', () => {
+  assert.equal(rayonDepuisCategories([
+    'en:plant-based-foods-and-beverages', 'en:beverages', 'en:waters',
+  ]), 'boissons');
+  assert.equal(rayonDepuisCategories(['en:mint-syrups']), 'boissons');
+});
+
+test("les étiquettes parapluies seules ne classent rien de précis", () => {
+  // Il en reste une information : Open Food Facts ne référence que
+  // l'alimentaire, donc c'est de l'épicerie.
+  assert.equal(rayonDepuisCategories(['en:plant-based-foods-and-beverages']), 'epicerie');
+  assert.equal(rayonDepuisCategories(['en:groceries', 'en:foods']), 'epicerie');
+});
+
+test('un légume frais garde son rayon malgré le parapluie', () => {
+  assert.equal(rayonDepuisCategories([
+    'en:plant-based-foods-and-beverages', 'en:plant-based-foods',
+    'en:vegetables-based-foods', 'en:fresh-vegetables',
+  ]), 'fruits_legumes');
+});
