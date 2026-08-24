@@ -14,6 +14,12 @@ toutes leurs données reprises dans Supabase. L'application mobile et l'extensio
 parlent directement à Supabase. Leur code reste consultable dans l'historique
 git ; `DESIGN.md` en décrit l'architecture.
 
+Le projet Vercel « courses » est **en pause depuis le 24/08/2026**. Il construisait
+le front web par `cd frontend && npm install`, et échouait donc à chaque push
+depuis son retrait. La pause est réversible : rien n'est supprimé, ni
+l'historique ni les adresses `frontend-*.vercel.app`. Il n'y a aujourd'hui aucun
+livrable web — l'application est distribuée par TestFlight.
+
 ## Workflow agents (RESPECTER CET ORDRE)
 
 ### 1. PM Agent — avant tout développement
