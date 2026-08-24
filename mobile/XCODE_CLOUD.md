@@ -84,3 +84,28 @@ pièges s'y sont succédé le 22/08 :
    tenait que tant que le total restait sous la limite.
 
 `sort=-number` règle les deux d'un coup.
+
+## Quand le déclencheur automatique reste muet
+
+Constaté le 24/08/2026 : deux pushs sur `mobile/expo-scan` n'ont lancé aucune
+compilation, alors que le workflow était actif, surveillait bien cette branche,
+et que les fichiers modifiés étaient tous sous `mobile/` — la condition
+`START_IF_ANY_FILE_MATCHES` du workflow. Aucune erreur nulle part. Attendu une
+heure, sans rien.
+
+La cause reste inconnue, probablement un webhook perdu côté Apple. Le remède
+est de lancer la compilation soi-même :
+
+```bash
+node asc.mjs "/v1/ciBuildRuns" '{"data":{"type":"ciBuildRuns","relationships":{"workflow":{"data":{"type":"ciWorkflows","id":"DE20A812-6D9E-4789-903C-8F067C2B13EF"}}}}}'
+```
+
+L'identifiant du workflow se retrouve par :
+
+```bash
+node asc.mjs "/v1/ciProducts/4ece9928-69b5-4a0a-a0cc-bdd408d09a57/workflows?limit=5"
+```
+
+Avant d'en arriver là, vérifier que le commit touche bien `mobile/` : un commit
+qui ne modifie que la racine — `CLAUDE.md`, par exemple — ne déclenche rien, et
+c'est voulu.
