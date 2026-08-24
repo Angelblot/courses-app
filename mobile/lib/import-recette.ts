@@ -30,6 +30,23 @@ export type RecetteImportee = {
 const UNITES_CONNUES: ReadonlyArray<readonly [RegExp, string]> = [
   [/^cuill[eè]res?\s+[àa]\s+soupe\b/i, 'cuillère à soupe'],
   [/^cuill[eè]res?\s+[àa]\s+caf[ée]\b/i, 'cuillère à café'],
+
+  // Abréviations françaises, relevées sur des recettes Jow le 24/08. Elles ne
+  // sont jamais suivies de « de », donc la règle générale plus bas les
+  // laissait filer dans le nom : « 2 unités de càs Sauce soja ».
+  //
+  // La sentinelle `(?=[\s(]|$)` remplace `\b`, sans effet après un point. Elle
+  // exige la fin du mot, ce qui empêche « bou. » de mordre sur « bouteille ».
+  [/^c\.?\s*[àa]\.?\s*s\.?(?=[\s(]|$)/i, 'cuillère à soupe'],
+  [/^c\.?\s*[àa]\.?\s*c\.?(?=[\s(]|$)/i, 'cuillère à café'],
+  [/^tran\.(?=[\s(]|$)/i, 'tranche'],
+  [/^gou\.(?=[\s(]|$)/i, 'gousse'],
+  [/^pinc\.(?=[\s(]|$)/i, 'pincée'],
+  [/^bou\.(?=[\s(]|$)/i, 'bouquet'],
+  [/^brins?(?=[\s(]|$)/i, 'brin'],
+  [/^poign[ée]es?(?=[\s(]|$)/i, 'poignée'],
+  [/^quartiers?(?=[\s(]|$)/i, 'quartier'],
+  [/^feuilles?(?=[\s(]|$)/i, 'feuille'],
   [/^kilogrammes?\b/i, 'kg'], [/^kg\b/i, 'kg'],
   [/^grammes?\b/i, 'g'], [/^gr?\b/i, 'g'],
   [/^millilitres?\b/i, 'ml'], [/^ml\b/i, 'ml'],

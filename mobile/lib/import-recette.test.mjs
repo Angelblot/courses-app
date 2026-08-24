@@ -118,3 +118,38 @@ test("l'image peut être un objet ou un tableau", () => {
   })]);
   assert.equal(avecTableau.image, 'https://exemple.test/t.jpg');
 });
+
+// --- Abréviations françaises, relevées sur des recettes Jow le 24/08 ---
+// Elles ne sont pas suivies de « de » : sans règle propre, elles finissaient
+// dans le nom de l'ingrédient — « 2 unités de càs Sauce soja » ne veut rien
+// dire et serait remonté tel quel au panier.
+
+test('les abréviations de cuillères sont reconnues', () => {
+  assert.deepEqual(analyserLigne('2 càs Sauce soja salée'),
+    { quantite: 2, unite: 'cuillère à soupe', nom: 'Sauce soja salée', aVerifier: false });
+  assert.deepEqual(analyserLigne('1 càc Miel (liquide)'),
+    { quantite: 1, unite: 'cuillère à café', nom: 'Miel (liquide)', aVerifier: false });
+  assert.equal(analyserLigne('2 c. à s. de farine').unite, 'cuillère à soupe');
+});
+
+test('les abréviations pointées sont reconnues', () => {
+  assert.deepEqual(analyserLigne('0.25 gou. Ail'),
+    { quantite: 0.25, unite: 'gousse', nom: 'Ail', aVerifier: false });
+  assert.equal(analyserLigne('2 tran. Pain de campagne').unite, 'tranche');
+  assert.equal(analyserLigne("0.5 pinc. Piment d'Espelette").unite, 'pincée');
+  assert.equal(analyserLigne('0.1 bou. Persil (frais)').unite, 'bouquet');
+});
+
+test('les unités de cuisine sans abréviation sont reconnues', () => {
+  assert.equal(analyserLigne('4 brins Ciboulette').unite, 'brin');
+  assert.equal(analyserLigne('1 poignée Salade').unite, 'poignée');
+  assert.equal(analyserLigne('1 quartiers Citron jaune').unite, 'quartier');
+});
+
+test("une abréviation ne mange pas un nom qui lui ressemble", () => {
+  // « bou. » vaut bouquet, mais « bouteille » reste un mot entier — et sans
+  // « de » derrière, il appartient au nom.
+  assert.equal(analyserLigne('1 bouteille de vin rouge').unite, 'bouteille');
+  assert.equal(analyserLigne('3 boules de mozzarella').unite, 'boules');
+  assert.equal(analyserLigne('2 gousses Ail').unite, 'gousse');
+});
