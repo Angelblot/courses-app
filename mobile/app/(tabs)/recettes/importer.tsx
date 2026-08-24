@@ -66,7 +66,9 @@ export default function ImporterRecette() {
           // Le site donne des quantités totales ; la base les veut par part.
           quantity_per_serving: arrondi(a.quantite / nbParts),
           unit: a.unite,
-          rayon: produit ? rayonPropose(a.nom, produits) : 'autre',
+          // Le rayon est proposé même sans produit rattaché : sa typologie
+          // suffit à ranger l'ingrédient au bon endroit de la liste.
+          rayon: rayonPropose(a.nom, produits),
           product_id: produit?.id ?? null,
           origine,
           aVerifier: a.aVerifier,

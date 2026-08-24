@@ -55,13 +55,74 @@ test('sans produit correspondant, le rayon proposé est « autre »', () => {
   assert.equal(rayonPropose('', []), 'autre');
 });
 
-test("le produit du catalogue est rendu, pas seulement son rayon", () => {
-  // L'import s'y rattache pour ne pas recréer un produit qui existe déjà.
-  const produits = [
-    { id: 'p1', product_type: 'lardon', category: 'CHARCUT.TRAITEUR' },
-    { id: 'p2', product_type: 'lait', category: 'CREMERIE' },
-  ];
-  assert.equal(produitPropose('Lardons fumés', produits).id, 'p1');
-  assert.equal(produitPropose('Poudre de perlimpinpin', produits), null);
-  assert.equal(produitPropose('', produits), null);
+// --- Rattachement au catalogue ---
+//
+// Éprouvé le 24/08 sur 74 ingrédients réels importés de Jow. La typologie
+// seule regroupait bien trop large : « fromage » couvre le gorgonzola comme
+// la feta, et la feta se rattachait au gorgonzola. Un rattachement faux est
+// pire qu'absent — l'extension achèterait le mauvais produit sans rien dire,
+// là où un ingrédient libre se voit et se cherche par son nom.
+
+const CATALOGUE = [
+  { id: 'feta', name: 'Féta cubes AOP CARREFOUR', product_type: 'féta', category: 'pls' },
+  { id: 'gorgo', name: 'Gorgonzola AOP CARREFOUR', product_type: 'fromage', category: 'pls' },
+  { id: 'savon', name: 'Savon Liquide Mains Lait Et Miel', product_type: 'lait', category: 'parfumerie' },
+  { id: 'lait', name: 'Lait Demi-Ecrémé UHT Bio', product_type: 'lait', category: 'pls' },
+  { id: 'oignon', name: 'Oignons jaunes vrac', product_type: 'oignon', category: 'fruits_legumes' },
+  { id: 'spag', name: 'Pâtes spaghetti n°5', product_type: 'pate', category: 'epicerie' },
+  { id: 'gnoc', name: 'Pâtes Fraîches Gnocchi À Poêler', product_type: 'pate', category: 'pls' },
+  { id: 'boursin', name: 'Boursin Onctueux Ail & Fines Herbes', product_type: 'ail', category: 'pls' },
+];
+
+test('un nom qui se retrouve tel quel dans le produit le rattache', () => {
+  assert.equal(produitPropose('Gorgonzola', CATALOGUE).id, 'gorgo');
+  assert.equal(produitPropose('Oignon jaune', CATALOGUE).id, 'oignon');
+});
+
+test("l'accent et le pluriel ne font pas manquer un produit", () => {
+  // « Feta » sans accent doit retrouver « Féta », et « Oignon jaune » au
+  // singulier doit retrouver « Oignons jaunes vrac ».
+  assert.equal(produitPropose('Feta', CATALOGUE).id, 'feta');
+  assert.equal(produitPropose('Oignons jaunes', CATALOGUE).id, 'oignon');
+});
+
+test('la parenthèse est retentée à part quand le nom entier échoue', () => {
+  // « Pâtes (spaghetti) » trouve les spaghettis par son nom entier, pas par
+  // le mot « pâtes » — qui désigne aussi les gnocchis.
+  assert.equal(produitPropose('Pâtes (spaghetti)', CATALOGUE).id, 'spag');
+  assert.equal(produitPropose('Gnocchi (à poêler)', CATALOGUE).id, 'gnoc');
+});
+
+test("un ingrédient ne se rattache jamais à un non-alimentaire", () => {
+  // « Miel » se rattachait au « Savon Liquide Mains Lait Et Miel ».
+  assert.equal(produitPropose('Miel', CATALOGUE), null);
+  assert.equal(produitPropose('Lait', CATALOGUE).id, 'lait');
+});
+
+test('rien plutôt que le mauvais quand plusieurs produits conviennent', () => {
+  // « Pâtes » désigne aussi bien les spaghettis que les gnocchis : choisir au
+  // hasard mettrait le mauvais produit dans le panier sans le signaler.
+  assert.equal(produitPropose('Pâtes', CATALOGUE), null);
+});
+
+test('un nom trop court ne discrimine rien', () => {
+  // « Ail » se retrouve dans « Boursin Ail & Fines Herbes », qui n'est pas
+  // de l'ail.
+  assert.equal(produitPropose('Ail', CATALOGUE), null);
+  assert.equal(produitPropose('', CATALOGUE), null);
+});
+
+test("un ingrédient absent du catalogue reste libre", () => {
+  assert.equal(produitPropose('Poudre de perlimpinpin', CATALOGUE), null);
+  assert.equal(produitPropose('Reblochon', CATALOGUE), null);
+});
+
+test('le rayon reste proposé par la typologie, plus large que le produit', () => {
+  // Un rayon faux range mal un article ; un produit faux le met dans le
+  // panier. Le premier peut se permettre d'être approximatif.
+  // « Fromage » ne se retrouve dans le nom d'aucun produit, donc aucun
+  // rattachement — mais sa typologie suffit à le ranger en crémerie.
+  assert.equal(produitPropose('Fromage', CATALOGUE), null);
+  assert.equal(rayonPropose('Fromage', CATALOGUE), 'pls');
+  assert.equal(rayonPropose('Poudre de perlimpinpin', CATALOGUE), 'autre');
 });
