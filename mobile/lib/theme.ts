@@ -32,14 +32,17 @@ export const colors = {
   nutriC: '#F5B700',
   nutriD: '#E67E22',
   nutriE: '#C62828',
-  // Aplats des recettes sans photo : six teintes très pâles, portant leur
-  // initiale dans la couleur pleine correspondante.
+  // Aplats des recettes sans photo : la couleur pleine mêlée au crème à 45 %,
+  // portant son initiale dans la teinte pleine correspondante.
   //
-  // La version saturée écrasait la grille — chez Jow chaque recette a sa
-  // photo, donc ce cas n'existe pas et rien ne vient concurrencer les plats.
-  // Une absence de photo ne doit pas crier plus fort qu'une photo.
-  aplats: ['#E4EDE7', '#E8EEEC', '#F5EBE2', '#EBEDE7', '#F1E6DF', '#E5EAF2'],
-  aplatsEncre: ['#2D6A4F', '#52796F', '#B08968', '#6B705C', '#8A5A44', '#4A6FA5'],
+  // Deux essais avant celui-ci. En couleur pleine, ces disques écrasaient la
+  // grille et criaient plus fort que les photos. Passés très pâles, ils
+  // s'effaçaient au point de ne plus rien distinguer. 45 % tient les deux
+  // bouts : la recette se reconnaît à sa teinte sans voler la vedette.
+  aplats: ['#9FB6A3', '#B0BDB1', '#DAC4AE', '#BBB9A8', '#C9AF9E', '#ACB8C9'],
+  // Assombries de 40 % : l'initiale en couleur pleine sur une teinte de la
+  // même couleur manquait de contraste, surtout sur les beiges.
+  aplatsEncre: ['#1B402F', '#314943', '#6A523E', '#404337', '#533629', '#2C4363'],
 } as const;
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;

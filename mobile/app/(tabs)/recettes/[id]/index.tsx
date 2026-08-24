@@ -9,7 +9,9 @@ import { EtatVide } from '../../../../components/EtatVide';
 import { PastilleIngredient } from '../../../../components/PastilleIngredient';
 import { useRecette, supprimerRecette } from '../../../../stores/recipes';
 import { useProducts } from '../../../../stores/products';
-import { quantitePourParts, initiale, indiceAplat } from '../../../../lib/recettes-affichage.ts';
+import {
+  quantitePourParts, initiale, indiceAplat, formatDuree,
+} from '../../../../lib/recettes-affichage.ts';
 import { formatIngredientQty } from '../../../../lib/unites.ts';
 import { colors, radius, spacing, texte } from '../../../../lib/theme';
 
@@ -72,6 +74,19 @@ export default function DetailRecette() {
 
   const n = parts ?? recette.servings_default;
 
+  // Trois informations, montrées seulement si la recette les porte : une
+  // colonne vide vaudrait mieux qu'un « 0 min » inventé, et une absence de
+  // colonne vaut mieux qu'une colonne vide.
+  const stats = [
+    { cle: 'prep', icone: 'clock' as const, valeur: formatDuree(recette.prep_minutes), libelle: 'Préparation' },
+    { cle: 'cuisson', icone: 'thermometer' as const, valeur: formatDuree(recette.cook_minutes), libelle: 'Cuisson' },
+    {
+      cle: 'kcal', icone: 'activity' as const,
+      valeur: recette.kcal_per_serving ? `${recette.kcal_per_serving} kcal` : null,
+      libelle: 'Par portion',
+    },
+  ].filter((x) => x.valeur);
+
   return (
     <View style={s.ecran}>
       <ScrollView contentContainerStyle={s.corps}>
@@ -102,6 +117,18 @@ export default function DetailRecette() {
         <View style={s.texte}>
           <Text style={s.titre}>{recette.name}</Text>
           {recette.description && <Text style={s.description}>{recette.description}</Text>}
+
+          {stats.length > 0 && (
+            <View style={s.stats}>
+              {stats.map((x) => (
+                <View key={x.cle} style={s.stat}>
+                  <Feather name={x.icone} size={16} color={colors.accentContrast} />
+                  <Text style={s.statValeur}>{x.valeur}</Text>
+                  <Text style={s.statLibelle}>{x.libelle}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={s.blocIngredients}>
           <View style={s.enteteIngredients}>
@@ -175,6 +202,19 @@ const s = StyleSheet.create({
   texte: { padding: spacing.lg, gap: spacing.sm },
   titre: { fontSize: 30, fontWeight: '700', color: colors.text, textAlign: 'center', lineHeight: 36 },
   description: { fontSize: 15, color: colors.textMuted, lineHeight: 22, textAlign: 'center' },
+  // Bandeau de statistiques : un bloc de couleur pleine, comme chez Jow, qui
+  // sépare le titre de la liste des ingrédients. Leur bandeau est rouge
+  // sombre ; on garde notre vert, il n'y a pas de raison d'emprunter aussi
+  // leur couleur.
+  stats: {
+    flexDirection: 'row', backgroundColor: colors.accent,
+    borderRadius: radius.card, paddingVertical: spacing.lg,
+    marginTop: spacing.lg,
+  },
+  stat: { flex: 1, alignItems: 'center', gap: 2 },
+  statValeur: { fontSize: 16, fontWeight: '600', color: colors.accentContrast, marginTop: 2 },
+  statLibelle: { fontSize: 12, fontWeight: '400', color: colors.accentContrast, opacity: 0.85 },
+
   // Fond blanc : c'est le contraste avec le crème de la page qui détache le
   // bloc chez Jow, sans le moindre trait ni la moindre ombre.
   blocIngredients: {

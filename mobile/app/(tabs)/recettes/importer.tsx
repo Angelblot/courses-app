@@ -38,6 +38,10 @@ export default function ImporterRecette() {
   const [nom, setNom] = useState('');
   const [parts, setParts] = useState('4');
   const [image, setImage] = useState<string | null>(null);
+  // Repris tels quels de la page : ni saisis, ni devinés.
+  const [temps, setTemps] = useState<{
+    prep_minutes: number | null; cook_minutes: number | null; kcal_per_serving: number | null;
+  }>({ prep_minutes: null, cook_minutes: null, kcal_per_serving: null });
   const [lignes, setLignes] = useState<LigneApercu[] | null>(null);
   const [enCours, setEnCours] = useState(false);
 
@@ -57,6 +61,11 @@ export default function ImporterRecette() {
     setNom(r.recette.nom);
     setParts(String(nbParts));
     setImage(r.recette.image);
+    setTemps({
+      prep_minutes: r.recette.preparationMin,
+      cook_minutes: r.recette.cuissonMin,
+      kcal_per_serving: r.recette.kcalParPart,
+    });
     setLignes(
       r.recette.ingredients.map((origine) => {
         const a = analyserLigne(origine);
@@ -87,6 +96,7 @@ export default function ImporterRecette() {
       servings_default: Number.parseInt(parts, 10),
       ingredients: lignes.map(({ origine: _o, aVerifier: _v, ...ing }) => ing),
       image_url: image,
+      ...temps,
     };
     const probleme = valideBrouillon(brouillon);
     if (probleme) { setErreur(probleme); return; }

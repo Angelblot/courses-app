@@ -19,6 +19,10 @@ export type RecetteImportee = {
   parts: number;
   image: string | null;
   ingredients: string[];
+  /** Minutes, ou `null` si la page ne le publie pas. */
+  preparationMin: number | null;
+  cuissonMin: number | null;
+  kcalParPart: number | null;
 };
 
 /**
@@ -130,6 +134,34 @@ export function lireParts(brut: unknown): number {
   return parts > 0 ? parts : 4;
 }
 
+/**
+ * Durée ISO 8601 en minutes : « PT18M » vaut 18, « PT1H30M » vaut 90.
+ *
+ * Zéro est une donnée et non une absence — « PT0M » en cuisson signifie qu'il
+ * n'y a pas de cuisson, ce que l'écran choisira de taire. Le confondre avec
+ * l'inconnu effacerait une information.
+ */
+export function lireDuree(brut: unknown): number | null {
+  const m = String(brut ?? '').match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/i);
+  if (!m || (!m[1] && !m[2])) return null;
+  return Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0);
+}
+
+/**
+ * Calories par portion. Jow écrit « 754 kcal », Marmiton « 667 calories ».
+ *
+ * Zéro est rejeté ici, à l'inverse des durées : une recette sans aucune
+ * calorie n'existe pas, c'est donc une valeur manquante mal encodée.
+ */
+export function lireCalories(nutrition: unknown): number | null {
+  const brut = (nutrition as { calories?: unknown } | null)?.calories;
+  if (typeof brut === 'number') return Number.isFinite(brut) && brut > 0 ? Math.round(brut) : null;
+  const m = String(brut ?? '').match(/(\d+(?:[.,]\d+)?)/);
+  if (!m) return null;
+  const n = Math.round(Number(m[1].replace(',', '.')));
+  return n > 0 ? n : null;
+}
+
 /** Première adresse d'image, que le site la rende en chaîne, objet ou tableau. */
 function lireImage(brut: unknown): string | null {
   const valeur = Array.isArray(brut) ? brut[0] : brut;
@@ -174,6 +206,9 @@ export function extraireRecette(blocs: string[]): RecetteImportee | null {
         parts: lireParts(r.recipeYield),
         image: lireImage(r.image),
         ingredients: ingredients.map((x) => String(x)).filter((x) => x.trim()),
+        preparationMin: lireDuree(r.prepTime),
+        cuissonMin: lireDuree(r.cookTime),
+        kcalParPart: lireCalories(r.nutrition),
       };
     }
   }

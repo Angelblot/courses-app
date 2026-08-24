@@ -4,7 +4,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { analyserLigne, lireParts, extraireRecette } from './import-recette.ts';
+import {
+  analyserLigne, lireParts, lireDuree, lireCalories, extraireRecette,
+} from './import-recette.ts';
 
 // Lignes réellement rendues par Marmiton, mesurées le 22/08.
 test('une quantité, une unité connue, un nom', () => {
@@ -152,4 +154,57 @@ test("une abréviation ne mange pas un nom qui lui ressemble", () => {
   assert.equal(analyserLigne('1 bouteille de vin rouge').unite, 'bouteille');
   assert.equal(analyserLigne('3 boules de mozzarella').unite, 'boules');
   assert.equal(analyserLigne('2 gousses Ail').unite, 'gousse');
+});
+
+// --- Durées et calories, relevées le 24/08 sur Jow et Marmiton ---
+
+test('les durées ISO se lisent en minutes', () => {
+  assert.equal(lireDuree('PT18M'), 18);
+  assert.equal(lireDuree('PT1H'), 60);
+  assert.equal(lireDuree('PT1H30M'), 90);
+  assert.equal(lireDuree('PT5H'), 300);
+});
+
+test('une durée nulle est une donnée, pas une absence', () => {
+  // « PT0M » en cuisson veut dire « aucune cuisson » — c'est un fait, et
+  // l'écran choisira de ne pas l'afficher. Le confondre avec l'inconnu
+  // reviendrait à effacer une information.
+  assert.equal(lireDuree('PT0M'), 0);
+  assert.equal(lireDuree(null), null);
+  assert.equal(lireDuree('quelques minutes'), null);
+  assert.equal(lireDuree(''), null);
+});
+
+test('les calories se lisent quel que soit le libellé', () => {
+  // Jow écrit « 754 kcal », Marmiton « 667 calories ».
+  assert.equal(lireCalories({ calories: '754 kcal' }), 754);
+  assert.equal(lireCalories({ calories: '667 calories' }), 667);
+  assert.equal(lireCalories({ calories: 512 }), 512);
+});
+
+test("une valeur nutritionnelle absente ne s'invente pas", () => {
+  assert.equal(lireCalories(null), null);
+  assert.equal(lireCalories({}), null);
+  assert.equal(lireCalories({ calories: 'beaucoup' }), null);
+  assert.equal(lireCalories({ calories: '0 kcal' }), null);
+});
+
+test('la recette extraite porte ses durées et ses calories', () => {
+  const r = extraireRecette([JSON.stringify({
+    '@type': 'Recipe', name: 'X', recipeIngredient: ['sel'],
+    prepTime: 'PT10M', cookTime: 'PT1H7M',
+    nutrition: { calories: '337 kcal' },
+  })]);
+  assert.equal(r.preparationMin, 10);
+  assert.equal(r.cuissonMin, 67);
+  assert.equal(r.kcalParPart, 337);
+});
+
+test("une recette sans ces informations les rend nulles", () => {
+  const r = extraireRecette([JSON.stringify({
+    '@type': 'Recipe', name: 'X', recipeIngredient: ['sel'],
+  })]);
+  assert.equal(r.preparationMin, null);
+  assert.equal(r.cuissonMin, null);
+  assert.equal(r.kcalParPart, null);
 });

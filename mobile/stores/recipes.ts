@@ -17,6 +17,10 @@ export type Ingredient = {
 };
 
 export type Recipe = {
+  /** Minutes. `null` quand la recette ne le publie pas — jamais inventé. */
+  prep_minutes?: number | null;
+  cook_minutes?: number | null;
+  kcal_per_serving?: number | null;
   id: string;
   name: string;
   description: string | null;
@@ -27,6 +31,7 @@ export type Recipe = {
 
 const CHAMPS =
   'id, name, description, servings_default, image_url, '
+  + 'prep_minutes, cook_minutes, kcal_per_serving, '
   + 'recipe_ingredients(id, name, quantity_per_serving, unit, rayon, product_id)';
 
 export function useRecipes() {
@@ -130,6 +135,9 @@ export async function creerRecette(
       name: b.name.trim(),
       servings_default: b.servings_default,
       image_url: b.image_url ?? null,
+      prep_minutes: b.prep_minutes ?? null,
+      cook_minutes: b.cook_minutes ?? null,
+      kcal_per_serving: b.kcal_per_serving ?? null,
       user_id: userId,
     })
     .select('id')

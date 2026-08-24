@@ -4,9 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  quantitePourParts, initiale, indiceAplat, filtrerCatalogue,
-} from './recettes-affichage.ts';
+import { quantitePourParts, initiale, indiceAplat, filtrerCatalogue, formatDuree } from './recettes-affichage.ts';
 
 test('la quantité suit le nombre de parts', () => {
   assert.equal(quantitePourParts(50, 4), 200);
@@ -67,4 +65,28 @@ test('une requête vide ou trop courte ne filtre rien', () => {
 test('une requête sans correspondance rend une liste vide, pas tout le catalogue', () => {
   const produits = [{ name: 'Lait', brand: null }];
   assert.equal(filtrerCatalogue(produits, 'perlimpinpin').length, 0);
+});
+
+// --- Durées lisibles ---
+
+test('les minutes se lisent telles quelles sous une heure', () => {
+  assert.equal(formatDuree(9), '9 min');
+  assert.equal(formatDuree(45), '45 min');
+  assert.equal(formatDuree(59), '59 min');
+});
+
+test("au-delà d'une heure, on passe aux heures", () => {
+  assert.equal(formatDuree(60), '1 h');
+  assert.equal(formatDuree(67), '1 h 07');
+  assert.equal(formatDuree(90), '1 h 30');
+  assert.equal(formatDuree(300), '5 h');
+});
+
+test("une durée absente ou nulle ne s'affiche pas", () => {
+  // Zéro minute de cuisson est une donnée vraie, mais « 0 min » à l'écran
+  // n'apprend rien : c'est à l'appelant de ne rien montrer.
+  assert.equal(formatDuree(null), null);
+  assert.equal(formatDuree(undefined), null);
+  assert.equal(formatDuree(0), null);
+  assert.equal(formatDuree(-5), null);
 });

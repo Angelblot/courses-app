@@ -64,3 +64,19 @@ export function filtrerCatalogue<T extends { name: string; brand?: string | null
     return mots.every((m) => foin.includes(m));
   });
 }
+
+/**
+ * Durée lisible : « 9 min », « 1 h », « 1 h 07 ».
+ *
+ * Rend `null` pour une durée absente ou nulle. Zéro minute de cuisson est une
+ * donnée vraie — la recette n'en demande pas — mais « 0 min » à l'écran
+ * n'apprend rien : c'est à l'appelant de ne rien montrer.
+ */
+export function formatDuree(minutes: number | null | undefined): string | null {
+  if (minutes == null || !Number.isFinite(minutes) || minutes <= 0) return null;
+  const m = Math.round(minutes);
+  if (m < 60) return `${m} min`;
+  const heures = Math.floor(m / 60);
+  const reste = m % 60;
+  return reste === 0 ? `${heures} h` : `${heures} h ${String(reste).padStart(2, '0')}`;
+}

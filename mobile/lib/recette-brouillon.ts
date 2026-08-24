@@ -15,6 +15,10 @@ export type Brouillon = {
   ingredients: IngredientBrouillon[];
   /** Adresse de la photo déposée, ou `null` : la recette prend alors un aplat. */
   image_url?: string | null;
+  /** Repris de la page importée. Absent d'une saisie manuelle. */
+  prep_minutes?: number | null;
+  cook_minutes?: number | null;
+  kcal_per_serving?: number | null;
 };
 
 /** Unités proposées, reprises du formulaire web. */

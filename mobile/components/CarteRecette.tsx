@@ -1,7 +1,7 @@
 import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { Recipe } from '../stores/recipes';
-import { initiale, indiceAplat } from '../lib/recettes-affichage.ts';
+import { initiale, indiceAplat, formatDuree } from '../lib/recettes-affichage.ts';
 import { colors, radius, spacing, texte } from '../lib/theme';
 
 /**
@@ -33,6 +33,9 @@ export function CarteRecette({ recette, onOuvrir }: { recette: Recipe; onOuvrir:
   const { width } = useWindowDimensions();
   const cote = largeurCarte(width);
   const n = recette.ingredients.length;
+  // Le temps total prime : c'est ce qu'on regarde d'abord en choisissant un
+  // plat. À défaut, le nombre d'ingrédients, qui en dit un peu.
+  const duree = formatDuree((recette.prep_minutes ?? 0) + (recette.cook_minutes ?? 0));
 
   return (
     <Pressable style={[s.enveloppe, { width: cote, paddingTop: DEBORDEMENT }]} onPress={onOuvrir}>
@@ -44,8 +47,8 @@ export function CarteRecette({ recette, onOuvrir }: { recette: Recipe; onOuvrir:
             <Text style={s.pastilleTexte}>{recette.servings_default}</Text>
           </View>
           <View style={s.pastille}>
-            <Feather name="list" size={12} color={colors.text} />
-            <Text style={s.pastilleTexte}>{n}</Text>
+            <Feather name={duree ? 'clock' : 'list'} size={12} color={colors.text} />
+            <Text style={s.pastilleTexte}>{duree ?? n}</Text>
           </View>
         </View>
       </View>
