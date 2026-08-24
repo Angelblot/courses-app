@@ -2,7 +2,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { Recipe } from '../stores/recipes';
 import { initiale, indiceAplat } from '../lib/recettes-affichage.ts';
-import { colors, radius, spacing } from '../lib/theme';
+import { colors, ombre, radius, spacing } from '../lib/theme';
 
 /** Diamètre de la photo ronde, et de combien elle déborde de la carte. */
 const PHOTO = 96;
@@ -55,7 +55,7 @@ const s = StyleSheet.create({
     // lui, un nom sur une ligne donnait une carte plus courte que sa voisine.
     flex: 1,
     width: '100%', backgroundColor: colors.surface, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border,
+    ...ombre,
     paddingTop: PHOTO - DEBORDEMENT + spacing.md,
     paddingHorizontal: spacing.md, paddingBottom: spacing.lg,
     alignItems: 'center', gap: spacing.sm,
@@ -64,7 +64,6 @@ const s = StyleSheet.create({
     position: 'absolute', top: 0,
     width: PHOTO, height: PHOTO, borderRadius: PHOTO / 2,
     backgroundColor: colors.bg,
-    borderWidth: 3, borderColor: colors.surface,
   },
   aplat: { alignItems: 'center', justifyContent: 'center' },
   initiale: { fontSize: 34, fontWeight: '800', color: '#FFFFFF' },

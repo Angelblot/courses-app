@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing } from '../lib/theme';
+import { colors, ombre, radius, spacing } from '../lib/theme';
 
 /** Diamètre de la pastille. Trois par rangée sur un téléphone courant. */
 const TAILLE = 96;
@@ -59,8 +59,9 @@ const s = StyleSheet.create({
   bloc: { width: TAILLE, alignItems: 'center', gap: 2 },
   cercle: {
     width: TAILLE, height: TAILLE, borderRadius: TAILLE / 2,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: 'center', justifyContent: 'center',
+    ...ombre,
     // La pastille « à chercher » déborde volontairement du cercle.
     overflow: 'visible',
   },
@@ -72,7 +73,7 @@ const s = StyleSheet.create({
   // Une réserve, pas une alerte : le badge informe sans crier.
   badge: {
     position: 'absolute', bottom: -4,
-    backgroundColor: colors.border, borderRadius: radius.pill,
+    backgroundColor: colors.bg, borderRadius: radius.pill,
     paddingVertical: 2, paddingHorizontal: spacing.sm,
   },
   badgeTexte: { fontSize: 10, fontWeight: '700', color: colors.textMuted },

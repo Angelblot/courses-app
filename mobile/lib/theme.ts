@@ -1,12 +1,21 @@
-/** Reprend les variables du front web, pour que les deux se ressemblent. */
+/**
+ * Jetons visuels. Mesurés sur jow.fr le 24/08 et adaptés, pas copiés : leurs
+ * polices — Surt et Viksjow — sont propriétaires et ne sont pas reprises.
+ *
+ * Le fond crème est le choix qui porte tout le reste : sur un blanc froid,
+ * les mêmes cartes blanches disparaissent au lieu de se détacher.
+ */
 export const colors = {
-  bg: '#FAFAF8',
+  bg: '#FDF4E7',
   surface: '#FFFFFF',
-  border: '#E6E4DF',
+  // Trait chaud, pour le peu d'endroits où il en faut encore un : un gris
+  // neutre tire au violet sur du crème.
+  border: '#EDE3D2',
   text: '#1C1C1A',
   textMuted: '#6B6B6B',
-  accent: '#2D6A4F',
-  accentSoft: '#E6EFE9',
+  // Vert profond : le nôtre, plus clair, manquait d'assise sur le crème.
+  accent: '#075526',
+  accentSoft: '#E3EDE6',
   accentContrast: '#FFFFFF',
   danger: '#B3261E',
   // Fond d'alerte, assez pâle pour porter le texte sombre du thème.
@@ -27,4 +36,19 @@ export const colors = {
 } as const;
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
-export const radius = { sm: 6, md: 10, lg: 14, pill: 999 } as const;
+export const radius = { sm: 8, md: 14, lg: 24, xl: 32, pill: 999 } as const;
+
+/**
+ * Ombre douce et large, à la place d'un trait de 1 px.
+ *
+ * Un trait fait « formulaire » ; une ombre diffuse fait « objet posé sur la
+ * table ». C'est ce qui sépare une carte encadrée d'une carte qui flotte.
+ */
+export const ombre = {
+  shadowColor: '#090E15',
+  shadowOpacity: 0.1,
+  shadowRadius: 18,
+  shadowOffset: { width: 0, height: 5 },
+  // Android n'a pas d'ombre paramétrable : `elevation` en est l'équivalent.
+  elevation: 3,
+} as const;
