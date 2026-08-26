@@ -13,7 +13,7 @@
  *   node scripts/asc.mjs "/v1/ciBuildRuns" '{"data":{...}}'   -> POST
  *
  * Variables requises :
- *   ASC_KEY_ID     identifiant de la clé, ex. AYC86383MB
+ *   ASC_KEY_ID     identifiant de la clé, dix caractères
  *   ASC_ISSUER_ID  identifiant de l'émetteur, visible dans App Store Connect
  *   ASC_KEY_PATH   chemin du fichier .p8
  */
