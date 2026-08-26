@@ -87,6 +87,8 @@ pièges s'y sont succédé le 22/08 :
 
 ## Quand le déclencheur automatique reste muet
 
+Les commandes ci-dessous se lancent depuis la racine du dépôt.
+
 Constaté le 24/08/2026 : deux pushs sur `mobile/expo-scan` n'ont lancé aucune
 compilation, alors que le workflow était actif, surveillait bien cette branche,
 et que les fichiers modifiés étaient tous sous `mobile/` — la condition
@@ -97,13 +99,13 @@ La cause reste inconnue, probablement un webhook perdu côté Apple. Le remède
 est de lancer la compilation soi-même :
 
 ```bash
-node asc.mjs "/v1/ciBuildRuns" '{"data":{"type":"ciBuildRuns","relationships":{"workflow":{"data":{"type":"ciWorkflows","id":"DE20A812-6D9E-4789-903C-8F067C2B13EF"}}}}}'
+node scripts/asc.mjs "/v1/ciBuildRuns" '{"data":{"type":"ciBuildRuns","relationships":{"workflow":{"data":{"type":"ciWorkflows","id":"DE20A812-6D9E-4789-903C-8F067C2B13EF"}}}}}'
 ```
 
 L'identifiant du workflow se retrouve par :
 
 ```bash
-node asc.mjs "/v1/ciProducts/4ece9928-69b5-4a0a-a0cc-bdd408d09a57/workflows?limit=5"
+node scripts/asc.mjs "/v1/ciProducts/4ece9928-69b5-4a0a-a0cc-bdd408d09a57/workflows?limit=5"
 ```
 
 Avant d'en arriver là, vérifier que le commit touche bien `mobile/` : un commit
