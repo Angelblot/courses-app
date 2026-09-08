@@ -59,6 +59,7 @@ export function useRecipes() {
           name: r.name,
           description: r.description,
           servings_default: r.servings_default,
+          prep_minutes: r.prep_minutes, cook_minutes: r.cook_minutes, kcal_per_serving: r.kcal_per_serving,
           image_url: r.image_url,
           ingredients: r.recipe_ingredients ?? [],
         })),

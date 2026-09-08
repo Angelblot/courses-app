@@ -1,3 +1,4 @@
+import { Photo } from '../../../../components/MaisonUI';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View,
@@ -103,15 +104,7 @@ export default function DetailRecette() {
     <View style={s.ecran}>
       <ScrollView contentContainerStyle={s.corps}>
         <View>
-          {recette.image_url ? (
-            <Image source={{ uri: recette.image_url }} style={s.bandeau} resizeMode="cover" />
-          ) : (
-            <View style={[s.bandeau, s.aplat, { backgroundColor: colors.aplats[indiceAplat(recette.name)] }]}>
-              <Text style={[s.initiale, { color: colors.aplatsEncre[indiceAplat(recette.name)] }]}>
-            {initiale(recette.name)}
-          </Text>
-            </View>
-          )}
+          <Photo recipe name={recette.name} url={recette.image_url} style={s.bandeau}/>
           <SafeAreaView style={s.barre} edges={['top']}>
             <Pressable style={s.rond} onPress={() => router.back()} hitSlop={8}>
               <Feather name="arrow-left" size={20} color={colors.text} />

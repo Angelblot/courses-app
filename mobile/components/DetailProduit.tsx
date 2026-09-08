@@ -1,3 +1,4 @@
+import { Photo } from './MaisonUI';
 import { useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -74,9 +75,7 @@ export function DetailProduit({
 
         <ScrollView contentContainerStyle={s.corps}>
           <View style={s.cadreImage}>
-            {produit.image_url
-              ? <Image source={{ uri: produit.image_url }} style={s.image} resizeMode="contain" />
-              : <Feather name="shopping-bag" size={48} color={colors.traitPastille} />}
+            <Photo name={produit.name} url={produit.image_url} style={s.image}/>
           </View>
 
           <Text style={s.nom}>{produit.name}</Text>

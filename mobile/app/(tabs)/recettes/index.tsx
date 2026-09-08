@@ -1,110 +1,20 @@
-import { useCallback } from 'react';
-import {
-  ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View,
-} from 'react-native';
+import { useState, useCallback } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { CarteRecette, ECART_GRILLE, MARGE_GRILLE } from '../../../components/CarteRecette';
-import { EtatVide } from '../../../components/EtatVide';
-import { useRecipes, type Recipe } from '../../../stores/recipes';
-import { colors, radius, spacing } from '../../../lib/theme';
-
-export default function Recettes() {
-  const { recettes, chargement, erreur, recharger } = useRecipes();
-  const router = useRouter();
-
-  // Même raison que pour le catalogue : `<Tabs>` garde les écrans montés, donc
-  // une recette créée n'apparaîtrait pas au retour sans ce rechargement.
-  const rechargerAuFocus = useCallback(() => { recharger(); }, [recharger]);
-  useFocusEffect(rechargerAuFocus);
-
-  if (chargement && recettes.length === 0) {
-    return (
-      <SafeAreaView style={s.centre}>
-        <ActivityIndicator color={colors.accent} />
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={s.ecran}>
-      <View style={s.entete}>
-        <Text style={s.titre}>Recettes</Text>
-        <Text style={s.compte}>{recettes.length}</Text>
-      </View>
-
-      {erreur && (
-        <View style={s.erreur}>
-          <Text style={s.erreurTexte}>{erreur}</Text>
-          <Pressable style={s.reessayer} onPress={recharger}>
-            <Text style={s.reessayerTexte}>Réessayer</Text>
-          </Pressable>
-        </View>
-      )}
-
-      <FlatList
-        data={recettes}
-        keyExtractor={(r) => r.id}
-        renderItem={({ item }) => (
-          <CarteRecette recette={item} onOuvrir={() => router.push(`/recettes/${item.id}`)} />
-        )}
-        numColumns={2}
-        columnWrapperStyle={s.rangee}
-        ItemSeparatorComponent={() => <View style={s.espace} />}
-        contentContainerStyle={recettes.length === 0 ? s.videConteneur : s.grille}
-        refreshControl={
-          <RefreshControl refreshing={chargement} onRefresh={recharger} tintColor={colors.accent} />
-        }
-        ListEmptyComponent={
-          erreur ? null : (
-            <EtatVide titre="Aucune recette">
-              Crée ta première recette : le wizard s&apos;en servira pour composer ta liste.
-            </EtatVide>
-          )
-        }
-      />
-
-      <View style={s.actions}>
-        <Pressable style={s.secondaire} onPress={() => router.push('/recettes/importer')}>
-          <Text style={s.secondaireTexte}>Importer un lien</Text>
-        </Pressable>
-        <Pressable style={s.bouton} onPress={() => router.push('/recettes/nouvelle')}>
-          <Text style={s.boutonTexte}>Nouvelle recette</Text>
-        </Pressable>
-      </View>
-    </SafeAreaView>
-  );
+import { router, useFocusEffect } from 'expo-router';
+import { useRecipes } from '../../../stores/recipes';
+import { useWizard } from '../../../contexts/WizardContext';
+import { Photo, Action, Head, ui } from '../../../components/MaisonUI';
+import { colors } from '../../../lib/theme';
+export default function Recettes(){
+ const r=useRecipes(),w=useWizard();const [query,setQuery]=useState('');
+ useFocusEffect(useCallback(()=>{r.recharger();},[r.recharger]));
+ const recettes=r.recettes.filter(r=>r.name.toLowerCase().includes(query.toLowerCase()));
+ return <SafeAreaView edges={['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}><Head title="Mes recettes"/><Text style={ui.subtitle}>Choisis tes repas, ta liste suit.</Text>
+ <TextInput value={query} onChangeText={setQuery} style={ui.input} placeholder="Chercher une recette…" accessibilityLabel="Chercher une recette"/>
+ {r.chargement&&<ActivityIndicator color={colors.accent}/>}{r.erreur&&<><Text style={ui.error}>{r.erreur}</Text><Action secondary onPress={r.recharger}>Réessayer</Action></>}
+ {recettes.map(rec=>{const parts=w.selectedRecipes[rec.id],temps=(rec.prep_minutes??0)+(rec.cook_minutes??0);return <View key={rec.id} style={{backgroundColor:'white',borderRadius:14,overflow:'hidden'}}><Pressable accessibilityRole="button" accessibilityLabel={`Ouvrir ${rec.name}`} onPress={()=>router.push(`/recettes/${rec.id}`)}><Photo recipe name={rec.name} url={rec.image_url} style={{width:'100%',height:180,borderRadius:0}}/></Pressable><View style={{padding:14,gap:10}}><Text style={ui.section}>{rec.name}</Text><Text style={ui.detail}>{temps?`${temps} min · `:''}{rec.servings_default} personnes</Text>{parts?<><View style={ui.sectionRow}><Text style={ui.link}>Au menu</Text><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel={`Moins de portions pour ${rec.name}`} style={ui.iconButton} onPress={()=>w.setParts(rec.id,parts-1)}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{parts}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Plus de portions pour ${rec.name}`} style={ui.iconButton} onPress={()=>w.setParts(rec.id,parts+1)}><Text style={ui.title}>+</Text></Pressable></View></View><Action secondary onPress={()=>w.toggleRecette(rec.id,rec.servings_default)}>Retirer du menu</Action></>:<Action secondary onPress={()=>w.toggleRecette(rec.id,rec.servings_default)}>Ajouter aux repas</Action>}</View></View>})}
+ {!r.chargement&&!r.erreur&&!recettes.length&&<Text style={ui.subtitle}>Aucune recette trouvée. Crée une recette ou importe un lien.</Text>}
+ <View style={ui.row}><View style={{flex:1}}><Action secondary onPress={()=>router.push('/recettes/importer')}>Importer un lien</Action></View><View style={{flex:1}}><Action secondary onPress={()=>router.push('/recettes/nouvelle')}>Créer une recette</Action></View></View>
+ </ScrollView><View style={ui.footer}><Action onPress={()=>router.push('/liste')}>Voir ma liste · {Object.keys(w.selectedRecipes).length} repas</Action></View></SafeAreaView>
 }
-
-const s = StyleSheet.create({
-  ecran: { flex: 1, backgroundColor: colors.bg },
-  centre: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-  entete: {
-    flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md,
-  },
-  titre: { fontSize: 26, fontWeight: '800', color: colors.text },
-  compte: { fontSize: 15, color: colors.textMuted },
-  espace: { height: ECART_GRILLE },
-  rangee: { gap: ECART_GRILLE },
-  grille: { paddingHorizontal: MARGE_GRILLE, paddingVertical: spacing.md },
-  videConteneur: { flexGrow: 1, justifyContent: 'center' },
-  erreur: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
-  erreurTexte: { color: colors.danger, fontSize: 14 },
-  reessayer: {
-    alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg,
-  },
-  reessayerTexte: { color: colors.text, fontWeight: '600', fontSize: 14 },
-  actions: { flexDirection: 'row', gap: spacing.md, margin: spacing.lg },
-  secondaire: {
-    flex: 1, borderWidth: 1, borderColor: colors.accent, borderRadius: radius.md,
-    padding: spacing.lg, alignItems: 'center', justifyContent: 'center',
-  },
-  secondaireTexte: { color: colors.accent, fontWeight: '700', fontSize: 15 },
-  bouton: {
-    flex: 1, backgroundColor: colors.accent, borderRadius: radius.md,
-    padding: spacing.lg, alignItems: 'center', justifyContent: 'center',
-  },
-  boutonTexte: { color: colors.accentContrast, fontWeight: '700', fontSize: 16 },
-});

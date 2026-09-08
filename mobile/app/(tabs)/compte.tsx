@@ -1,9 +1,10 @@
+import { Action } from '../../components/MaisonUI';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import {
   useFoyer, inviter, retirerMembre, renommerFoyer, type Membre,
@@ -76,7 +77,9 @@ export default function Compte() {
   return (
     <SafeAreaView style={s.ecran}>
       <ScrollView contentContainerStyle={s.corps}>
-        <Text style={s.titre}>Compte</Text>
+        <Text style={s.titre}>Réglages</Text>
+        <Action secondary onPress={() => router.push('/favoris')}>Mes favoris et produits</Action>
+        <Action secondary onPress={() => router.push('/wizard/generation')}>Mes drives et Chrome</Action>
 
         {erreur && (
           <View style={s.bloc}>

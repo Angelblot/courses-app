@@ -1,4 +1,5 @@
 import 'react-native-url-polyfill/auto';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
@@ -13,18 +14,20 @@ if (!url || !key) {
   );
 }
 
+const renduServeurWeb = Platform.OS === 'web' && typeof window === 'undefined';
+
 export const supabase = createClient(url, key, {
   auth: {
     // AsyncStorage est indispensable en React Native : sans lui la session
     // est perdue à chaque redémarrage de l'application.
-    storage: AsyncStorage,
+    storage: renduServeurWeb ? undefined : AsyncStorage,
     // PKCE et non le flux implicite (défaut de supabase-js 2.112) : sur mobile,
     // le lien de récupération revient par un lien profond, et un fragment `#`
     // survit mal au passage par le système. PKCE fait porter au lien un
     // paramètre de requête `code`, qui arrive intact.
     flowType: 'pkce',
-    autoRefreshToken: true,
-    persistSession: true,
+    autoRefreshToken: !renduServeurWeb,
+    persistSession: !renduServeurWeb,
     detectSessionInUrl: false,
   },
 });

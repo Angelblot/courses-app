@@ -4,9 +4,8 @@ import type { ItemPanier } from './consolidation.ts';
 /**
  * Dépose la liste dans `cart_jobs`, à l'état `pending`.
  *
- * Rien ne lit cette table aujourd'hui : l'extension ne saura la relever qu'au
- * lot 5. C'est un choix assumé — voir la spécification du 22/08, « L'angle
- * mort assumé ».
+ * L'extension Chrome connectée au même compte relève ces travaux.
+ * Le remplissage ne démarre qu'après confirmation dans son popup.
  */
 export async function envoyerListe(
   items: ItemPanier[],

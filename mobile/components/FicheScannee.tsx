@@ -1,3 +1,4 @@
+import { Photo } from './MaisonUI';
 import { useState } from 'react';
 import {
   ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View,
@@ -59,9 +60,7 @@ export function FicheScannee({
       ) : fiche ? (
         <>
           <View style={s.entete}>
-            {fiche.imageUrl
-              ? <Image source={{ uri: fiche.imageUrl }} style={s.image} />
-              : <View style={[s.image, s.imageVide]} />}
+            <Photo name={fiche.name} url={fiche.imageUrl} style={s.image}/>
             <View style={s.texte}>
               <View style={s.ligneNom}>
                 <Text style={[s.nom, s.nomFlex]} numberOfLines={2}>{fiche.name}</Text>

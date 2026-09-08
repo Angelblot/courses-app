@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -9,12 +9,18 @@ import { lookupEan, type FicheProduit, type ResultatRecherche } from '../../lib/
 import { normalizeProductType } from '../../lib/typology.ts';
 import type { CleRayon } from '../../lib/rayons.ts';
 import { fileScan } from '../../stores/queue.ts';
-import { ajouterProduit } from '../../stores/products';
+import { ajouterProduit, basculerFavori } from '../../stores/products';
+import { enregistrerScanFavori } from '../../lib/scan-favori.ts';
 import { colors, radius, spacing } from '../../lib/theme';
 
 type Message = { texte: string; erreur: boolean };
 
+const ajouterAuxFavoris = (fiche: FicheProduit) =>
+  enregistrerScanFavori(fiche, ajouterProduit, basculerFavori);
+
 export default function Scan() {
+  const [cameraActive, setCameraActive] = useState(false);
+  useFocusEffect(useCallback(() => { setCameraActive(true); return () => setCameraActive(false); }, []));
   const [permission, demanderPermission] = useCameraPermissions();
   const [ean, setEan] = useState<string | null>(null);
   const [resultat, setResultat] = useState<ResultatRecherche | null>(null);
@@ -89,12 +95,10 @@ export default function Scan() {
    */
   const enregistrer = useCallback(
     async (aEnregistrer: FicheProduit) => {
-      const r = await ajouterProduit(aEnregistrer);
+      const r = await ajouterAuxFavoris(aEnregistrer);
       if (r.ok) {
         setMessage({ texte: 'Ajouté à tes favoris', erreur: false });
         setTimeout(reprendre, 1200);
-      } else if (r.doublon) {
-        setMessage({ texte: `Déjà dans ton catalogue : ${r.doublon.name}`, erreur: true });
       } else if (r.reseau) {
         // Échec probablement réseau (voir `estErreurReseau` dans
         // `lib/postgrest.ts`) : on met de côté plutôt que de perdre le
@@ -185,8 +189,8 @@ export default function Scan() {
           // distinction réseau / non réseau et pourquoi un échec non réseau
           // n'est pas retenté indéfiniment. Seul un échec probablement
           // réseau y reste, dans l'espoir d'une prochaine reprise.
-          const r = await ajouterProduit(aInserer);
-          if (r.ok || r.doublon) envoyes += 1;
+          const r = await ajouterAuxFavoris(aInserer);
+          if (r.ok) envoyes += 1;
           else if (r.reseau) restants.push(f);
           else abandonnes += 1;
         }
@@ -264,8 +268,9 @@ export default function Scan() {
         <Text style={s.corps}>
           Le scan a besoin de la caméra pour lire les codes-barres de tes produits.
         </Text>
-        <Pressable style={s.bouton} onPress={demanderPermission}>
-          <Text style={s.boutonTexte}>Autoriser</Text>
+        <Pressable accessibilityRole="button" style={s.bouton}
+          onPress={permission.canAskAgain ? demanderPermission : () => Linking.openSettings()}>
+          <Text style={s.boutonTexte}>{permission.canAskAgain ? 'Autoriser' : 'Ouvrir les réglages'}</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -273,12 +278,12 @@ export default function Scan() {
 
   return (
     <View style={s.ecran}>
-      <CameraView
+      {cameraActive && <CameraView
         style={StyleSheet.absoluteFill}
         facing="back"
         barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8'] }}
         onBarcodeScanned={ean ? undefined : surLecture}
-      />
+      />}
       <SafeAreaView style={s.consigne} pointerEvents="none">
         <Text style={s.consigneTexte}>Vise le code-barres du produit</Text>
         {(enAttenteCount > 0 || avisFile) && (

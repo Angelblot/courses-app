@@ -6,18 +6,18 @@
  * les mêmes cartes blanches disparaissent au lieu de se détacher.
  */
 export const colors = {
-  bg: '#FDF4E7',
+  bg: '#F5F7F2',
   surface: '#FFFFFF',
   // Trait chaud pour les champs et séparateurs.
-  border: '#EDE3D2',
+  border: '#DCE1D6',
   // Trait des pastilles d'ingrédients : gris neutre, mesuré chez Jow, qui
   // disparaît sous l'image au lieu de l'encadrer.
   traitPastille: '#E9E9E9',
-  text: '#1E1E1E',
-  textMuted: '#6B6B6B',
+  text: '#263320',
+  textMuted: '#656D60',
   // Vert profond : le nôtre, plus clair, manquait d'assise sur le crème.
-  accent: '#075526',
-  accentSoft: '#E3EDE6',
+  accent: '#48613A',
+  accentSoft: '#E4EBDC',
   accentContrast: '#FFFFFF',
   danger: '#B3261E',
   // Fond d'alerte, assez pâle pour porter le texte sombre du thème.

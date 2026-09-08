@@ -167,11 +167,11 @@ export async function ajouterProduit(
 export async function basculerFavori(
   id: string,
   favori: boolean,
-): Promise<{ ok: boolean; erreur?: string }> {
+): Promise<{ ok: boolean; erreur?: string; reseau?: boolean }> {
   const { error } = await supabase.from('products').update({ favorite: favori }).eq('id', id);
   if (error) {
     console.error('[basculerFavori]', error);
-    return { ok: false, erreur: "Impossible de modifier ce produit pour le moment." };
+    return { ok: false, reseau: estErreurReseau(error), erreur: "Impossible de modifier ce produit pour le moment." };
   }
   return { ok: true };
 }

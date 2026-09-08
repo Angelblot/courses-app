@@ -1,3 +1,4 @@
+import { WizardProvider } from '../contexts/WizardContext';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import type { ErrorBoundaryProps } from 'expo-router';
@@ -46,7 +47,7 @@ export default function RootLayout() {
     );
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return <WizardProvider key={session?.user.id ?? "anonyme"} userId={session?.user.id ?? null}><Stack screenOptions={{ headerShown: false }} /></WizardProvider>;
 }
 
 /**
