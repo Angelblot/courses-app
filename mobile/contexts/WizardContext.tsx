@@ -1,5 +1,7 @@
+import { nativeInbox } from '../lib/native-inbox';
+import { nouveauxAjouts } from '../lib/ajouts-quotidiens';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ActivityIndicator, View, Text } from 'react-native';
+import { ActivityIndicator, AppState, View, Text } from 'react-native';
 import {
   createContext, useCallback, useContext, useMemo, useState, useEffect, useRef, type ReactNode,
 } from 'react';
@@ -24,6 +26,8 @@ export type LigneExtra = {
 };
 
 export type Etat = {
+  importsExternes?: string[];
+  habitudesVues?: Record<string, boolean>;
   ligneQuantites: Record<string, number>;
   lignePossedees: Record<string, boolean>;
   selectedRecipes: Record<string, number>;
@@ -49,7 +53,9 @@ type Contexte = Etat & {
   pret: boolean; sauvegardeErreur: string | null;
   modifierLigne: (key: string, n: number) => void;
   possederLigne: (key: string, owned: boolean) => void;
-  ajouterProduitListe: (id: string) => void;
+  ajouterProduitListe: (id: string, quantite?: number) => void;
+  deciderHabituel: (id: string, quantite: number, acheter: boolean) => void;
+  revoirHabitudes: (ids: string[]) => void;
   toggleRecette: (id: string, partsParDefaut: number) => void;
   setParts: (id: string, n: number) => void;
   marquerProduit: (id: string, statut: 'needed' | 'have' | null) => void;
@@ -89,17 +95,53 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
     if (!pret || !stockagePret || !userId) return;
     const contenu = JSON.stringify(etat);
     ecritures.current = ecritures.current.then(() => AsyncStorage.setItem(cle, contenu))
-      .then(() => setSauvegardeErreur(null))
+      .then(async () => {
+        setSauvegardeErreur(null);
+        // Acknowledge only IDs committed to durable account storage.
+        if (nativeInbox) {
+          try { await nativeInbox.acknowledge(userId, etat.importsExternes ?? []); }
+          catch { setSauvegardeErreur('Ta liste est enregistrée. La synchronisation des ajouts Siri sera retentée à la prochaine ouverture.'); }
+        }
+      })
       .catch(() => setSauvegardeErreur('Le brouillon n’a pas pu être enregistré sur cet appareil.'));
   }, [etat, pret, stockagePret, cle, userId]);
+  useEffect(() => {
+    let actif = true;
+    if (!nativeInbox) return;
+    async function importer() {
+      try {
+        await nativeInbox!.setSession(userId);
+        if (!actif || !userId || !stockagePret) return;
+        const pending = await nativeInbox!.read(userId);
+        if (!actif) return;
+        setEtat(e => {
+          const nouveaux = nouveauxAjouts(pending, e.importsExternes ?? []);
+          if (!nouveaux.length) return e;
+          return { ...e, importsExternes: [...(e.importsExternes ?? []), ...nouveaux.map(x => x.id)],
+            extras: [...e.extras, ...nouveaux.map(x => ({ id: `siri-${x.id}`, name: x.name, quantity: x.quantity, unit: 'unité', rayon: 'autre' as const }))] };
+        });
+      } catch { if (actif) setSauvegardeErreur('Les ajouts Siri ne sont pas accessibles. Ouvre les réglages pour vérifier la configuration iPhone.'); }
+    }
+    void importer();
+    const listener = AppState.addEventListener('change', state => { if (state === 'active') void importer(); });
+    return () => { actif = false; listener.remove(); };
+  }, [userId, stockagePret]);
   const modifierLigne = useCallback((key: string, n: number) => setEtat(e => ({ ...e, ligneQuantites: { ...e.ligneQuantites, [key]: Math.max(0, Math.ceil(n)) } })), []);
   const possederLigne = useCallback((key: string, owned: boolean) => setEtat(e => ({ ...e, lignePossedees: { ...e.lignePossedees, [key]: owned } })), []);
-  const ajouterProduitListe = useCallback((id: string) => setEtat(e => ({ ...e,
+  const ajouterProduitListe = useCallback((id: string, quantite = 1) => setEtat(e => ({ ...e,
     quotidien: { ...e.quotidien, [id]: 'needed' },
-    quotidienQty: { ...e.quotidienQty, [id]: (e.quotidien[id] === 'needed' ? e.quotidienQty[id] ?? 1 : 0) + 1 },
+    quotidienQty: { ...e.quotidienQty, [id]: (e.quotidien[id] === 'needed' ? e.quotidienQty[id] ?? 1 : 0) + Math.max(1, Math.round(quantite)) },
     lignePossedees: { ...e.lignePossedees, [`produit:${id}`]: false },
     ligneQuantites: Object.fromEntries(Object.entries(e.ligneQuantites).filter(([k]) => k !== `produit:${id}`)),
   })), []);
+  const deciderHabituel = useCallback((id: string, quantite: number, acheter: boolean) => setEtat(e => ({ ...e,
+    habitudesVues: { ...e.habitudesVues, [id]: true },
+    quotidien: { ...e.quotidien, [id]: acheter ? 'needed' : 'have' },
+    quotidienQty: { ...e.quotidienQty, [id]: Math.max(1, Math.round(quantite)) },
+    ligneQuantites: { ...e.ligneQuantites, [`produit:${id}`]: Math.max(1, Math.round(quantite)) },
+    lignePossedees: { ...e.lignePossedees, [`produit:${id}`]: !acheter },
+  })), []);
+  const revoirHabitudes = useCallback((ids: string[]) => setEtat(e=>({...e, habitudesVues: Object.fromEntries(Object.entries(e.habitudesVues??{}).filter(([id])=>!ids.includes(id)))})), []);
   // Compteur monotone pour les identifiants d'ajouts manuels : `Date.now()`
   // seul peut se répéter si deux ajouts tombent dans la même milliseconde.
   const [compteur, setCompteur] = useState(0);
@@ -159,14 +201,14 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
     }));
   }, []);
 
-  const reinitialiser = useCallback(() => setEtat(INITIAL), []);
+  const reinitialiser = useCallback(() => setEtat(e => ({ ...INITIAL, importsExternes: e.importsExternes })), []);
 
   const valeur = useMemo<Contexte>(() => ({
-    ...etat, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe,
+    ...etat, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, deciderHabituel, revoirHabitudes,
     toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
   }), [
-    etat, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, toggleRecette, setParts, marquerProduit, setQuantite,
+    etat, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, deciderHabituel, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
   ]);
 

@@ -104,6 +104,9 @@ export function useRecette(id: string | undefined) {
         description: (data as any).description,
         servings_default: (data as any).servings_default,
         image_url: (data as any).image_url,
+        prep_minutes: (data as any).prep_minutes,
+        cook_minutes: (data as any).cook_minutes,
+        kcal_per_serving: (data as any).kcal_per_serving,
         ingredients: (data as any).recipe_ingredients ?? [],
       } : null);
     }

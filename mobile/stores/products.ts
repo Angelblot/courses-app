@@ -79,7 +79,7 @@ export function useProducts() {
  * existant pour que l'écran le signale au lieu d'afficher une erreur brute.
  */
 export async function ajouterProduit(
-  fiche: FicheProduit,
+  fiche: FicheProduit, favori = true,
 ): Promise<{ ok: boolean; produit?: Product; doublon?: Product; reseau?: boolean; erreur?: string }> {
   const { data: existant } = await supabase
     .from('products')
@@ -105,7 +105,7 @@ export async function ajouterProduit(
     // produit sans rayon est exactement le défaut que ce correctif supprime.
     category: fiche.categoryKey ?? 'autre',
     nutriscore: fiche.nutriscore ?? null,
-    favorite: true, // un produit qu'on scanne chez soi est un produit qu'on aime
+    favorite: favori, // un produit qu'on scanne chez soi est un produit qu'on aime
     // Les 65 produits existants du catalogue utilisent tous unit = 'unité',
     // y compris les liquides (vin 750 ml, bière 200 ml) : la contenance vit
     // dans grammage_g / volume_ml, pas dans l'unité. Déduire 'l' de volumeMl
@@ -125,7 +125,7 @@ export async function ajouterProduit(
   // passer avant que l'un des deux insère. Le second échoue alors ici — c'est
   // fonctionnellement le même doublon que celui détecté plus haut, pas une
   // erreur à annoncer différemment.
-  if (error.code === '23505') {
+  if (error?.code === '23505') {
     const { data: doublon } = await supabase
       .from('products')
       .select(CHAMPS)

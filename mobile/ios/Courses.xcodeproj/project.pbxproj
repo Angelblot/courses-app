@@ -7,26 +7,53 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		011E0BE881CF4AA09807F045 /* TableeWidget.appex in Copy Files */ = {isa = PBXBuildFile; fileRef = CBFAA650AF2145E1A7554704 /* TableeWidget.appex */; };
+		0FC10BD0D82A4AE1A4FE248D /* TableeIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 003C0A6B560F47858CA24C3E /* TableeIntent.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		1D9FF8260764416BAEDD0E82 /* TableeInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1BC4DCC69D4B688B68D913 /* TableeInbox.swift */; };
+		266C5718420C460FA0FF61D5 /* TableeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5228C27999CA410C9DEFDD08 /* TableeStore.swift */; };
+		290B2DAF3A5541CB80290593 /* TableeInboxBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = DA68AD9AA81A448D8D98738A /* TableeInboxBridge.m */; };
+		312EFC89C75A4ED8B7C9FC6E /* TableeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5228C27999CA410C9DEFDD08 /* TableeStore.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		4D6C772FBCDA62AE1B5A53F9 /* libPods-Courses.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B5725BECE4E819DC4AB7C2E6 /* libPods-Courses.a */; };
+		4E9D3A6E9BE645FC8284C472 /* TableeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 240B758369274E6DB8976EC1 /* TableeWidget.swift */; };
 		733825D6132E296BE7BA77A8 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0651BAC59143ACB9D93AE8 /* ExpoModulesProvider.swift */; };
 		9616269633BDC960032D730A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4BDF713290DD350CD32A02F9 /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		2515345308994CD8BD8D110C /* Copy Files */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				011E0BE881CF4AA09807F045 /* TableeWidget.appex in Copy Files */,
+			);
+			name = "Copy Files";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		003C0A6B560F47858CA24C3E /* TableeIntent.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = TableeIntent.swift; path = Courses/TableeIntent.swift; sourceTree = "<group>"; };
 		0EBCBD33F58CB3A48E1E840A /* Pods-Courses.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Courses.release.xcconfig"; path = "Target Support Files/Pods-Courses/Pods-Courses.release.xcconfig"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* Courses.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Courses.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Courses/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Courses/Info.plist; sourceTree = "<group>"; };
+		240B758369274E6DB8976EC1 /* TableeWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = TableeWidget.swift; path = TableeWidget/TableeWidget.swift; sourceTree = "<group>"; };
 		46FC33DADA9D4E4CF4710777 /* Pods-Courses.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Courses.debug.xcconfig"; path = "Target Support Files/Pods-Courses/Pods-Courses.debug.xcconfig"; sourceTree = "<group>"; };
 		4BDF713290DD350CD32A02F9 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Courses/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		5228C27999CA410C9DEFDD08 /* TableeStore.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = TableeStore.swift; path = TableeShared/TableeStore.swift; sourceTree = "<group>"; };
+		9B1BC4DCC69D4B688B68D913 /* TableeInbox.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = TableeInbox.swift; path = Courses/TableeInbox.swift; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Courses/SplashScreen.storyboard; sourceTree = "<group>"; };
 		AF0651BAC59143ACB9D93AE8 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Courses/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		B5725BECE4E819DC4AB7C2E6 /* libPods-Courses.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Courses.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		CBFAA650AF2145E1A7554704 /* TableeWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = TableeWidget.appex; path = TableeWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA68AD9AA81A448D8D98738A /* TableeInboxBridge.m */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.c.objc; name = TableeInboxBridge.m; path = Courses/TableeInboxBridge.m; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Courses/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* Courses-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Courses-Bridging-Header.h"; path = "Courses/Courses-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -38,6 +65,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D6C772FBCDA62AE1B5A53F9 /* libPods-Courses.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7F91F8CD38C4BE4A90CE98A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -101,6 +135,11 @@
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				263D9A6F69D0288C4B60AEF8 /* Pods */,
 				F87BAC09A7F5B6A4EBBD80DC /* ExpoModulesProviders */,
+				003C0A6B560F47858CA24C3E /* TableeIntent.swift */,
+				9B1BC4DCC69D4B688B68D913 /* TableeInbox.swift */,
+				DA68AD9AA81A448D8D98738A /* TableeInboxBridge.m */,
+				5228C27999CA410C9DEFDD08 /* TableeStore.swift */,
+				240B758369274E6DB8976EC1 /* TableeWidget.swift */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -111,6 +150,7 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* Courses.app */,
+				CBFAA650AF2145E1A7554704 /* TableeWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -147,6 +187,7 @@
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
 				B87FBBBEE8DB13B40AD4A968 /* [CP] Embed Pods Frameworks */,
+				2515345308994CD8BD8D110C /* Copy Files */,
 			);
 			buildRules = (
 			);
@@ -156,6 +197,23 @@
 			productName = Courses;
 			productReference = 13B07F961A680F5B00A75B9A /* Courses.app */;
 			productType = "com.apple.product-type.application";
+		};
+		635B31BECAB14644B33FB676 /* TableeWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6B6939A89F3341AB8EFC07CF /* Build configuration list for PBXNativeTarget "TableeWidget" */;
+			buildPhases = (
+				66F78E33A4214A7C984C8915 /* Sources */,
+				D7F91F8CD38C4BE4A90CE98A /* Frameworks */,
+				8C00B086909346498AD0DB58 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TableeWidget;
+			productName = TableeWidget;
+			productReference = CBFAA650AF2145E1A7554704 /* TableeWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -172,9 +230,10 @@
 			};
 			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Courses" */;
 			compatibilityVersion = "Xcode 3.2";
-			developmentRegion = en;
+			developmentRegion = fr;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				fr,
 				en,
 				Base,
 			);
@@ -184,6 +243,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* Courses */,
+				635B31BECAB14644B33FB676 /* TableeWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -197,6 +257,13 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				9616269633BDC960032D730A /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8C00B086909346498AD0DB58 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -345,6 +412,19 @@
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
 				733825D6132E296BE7BA77A8 /* ExpoModulesProvider.swift in Sources */,
+				0FC10BD0D82A4AE1A4FE248D /* TableeIntent.swift in Sources */,
+				1D9FF8260764416BAEDD0E82 /* TableeInbox.swift in Sources */,
+				290B2DAF3A5541CB80290593 /* TableeInboxBridge.m in Sources */,
+				266C5718420C460FA0FF61D5 /* TableeStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		66F78E33A4214A7C984C8915 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				312EFC89C75A4ED8B7C9FC6E /* TableeStore.swift in Sources */,
+				4E9D3A6E9BE645FC8284C472 /* TableeWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -555,6 +635,64 @@
 			};
 			name = Release;
 		};
+		89C1BE7B3D674593B5628CE5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = TableeWidget/TableeWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "TableeWidget/TableeWidget-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = com.coursesapp.mobile.TableeWidget;
+				PRODUCT_NAME = TableeWidget;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		E1F394C2CB3D42739C7009E2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = TableeWidget/TableeWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "TableeWidget/TableeWidget-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
+				PRODUCT_BUNDLE_IDENTIFIER = com.coursesapp.mobile.TableeWidget;
+				PRODUCT_NAME = TableeWidget;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -563,6 +701,15 @@
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
 				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6B6939A89F3341AB8EFC07CF /* Build configuration list for PBXNativeTarget "TableeWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E1F394C2CB3D42739C7009E2 /* Debug */,
+				89C1BE7B3D674593B5628CE5 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

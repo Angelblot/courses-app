@@ -1,7 +1,8 @@
+import { useWizard } from '../../contexts/WizardContext';
 import { useCallback, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FicheScannee } from '../../components/FicheScannee';
@@ -19,6 +20,10 @@ const ajouterAuxFavoris = (fiche: FicheProduit) =>
   enregistrerScanFavori(fiche, ajouterProduit, basculerFavori);
 
 export default function Scan() {
+  const { destination, quantite } = useLocalSearchParams<{ destination?: string; quantite?: string }>();
+  const scanQty = Math.min(99, Math.max(1, Math.round(Number(quantite)) || 1));
+  const w = useWizard();
+  const pourListe = destination === 'liste';
   const [cameraActive, setCameraActive] = useState(false);
   useFocusEffect(useCallback(() => { setCameraActive(true); return () => setCameraActive(false); }, []));
   const [permission, demanderPermission] = useCameraPermissions();
@@ -46,6 +51,7 @@ export default function Scan() {
   // Une ref est mise à jour immédiatement, avant tout `await`, donc la
   // deuxième lecture la voit déjà posée.
   const verrouille = useRef(false);
+  const enregistrement = useRef(false);
   // Empêche deux passages de reprise de tourner en même temps. Même risque
   // et même remède que `verrouille` ci-dessus : `enfiler` et `remplacer`
   // sont une lecture-modification-écriture non atomique sur AsyncStorage, et
@@ -58,6 +64,7 @@ export default function Scan() {
 
   const reprendre = useCallback(() => {
     verrouille.current = false;
+    enregistrement.current = false;
     setEan(null);
     setResultat(null);
     setMessage(null);
@@ -95,6 +102,17 @@ export default function Scan() {
    */
   const enregistrer = useCallback(
     async (aEnregistrer: FicheProduit) => {
+      if (pourListe) {
+        if (enregistrement.current) return;
+        enregistrement.current = true;
+        try {
+        const res = await ajouterProduit(aEnregistrer, false);
+        const produit = res.produit ?? res.doublon;
+        if (produit) { w.ajouterProduitListe(produit.id, scanQty); setMessage({texte: `${scanQty} × ${produit.name} ajouté à ta liste de courses`, erreur: false}); setTimeout(reprendre, 1500); }
+        else { enregistrement.current = false; setMessage({texte: res.erreur ?? 'Connexion indisponible. Réessaie pour ajouter ce produit à la liste.', erreur: true}); }
+        } catch { enregistrement.current = false; setMessage({texte:'Enregistrement impossible. Réessaie.',erreur:true}); }
+        return;
+      }
       const r = await ajouterAuxFavoris(aEnregistrer);
       if (r.ok) {
         setMessage({ texte: 'Ajouté à tes favoris', erreur: false });
@@ -115,7 +133,7 @@ export default function Scan() {
         setTimeout(reprendre, 1600);
       }
     },
-    [reprendre, rafraichirCompteur],
+    [reprendre, rafraichirCompteur, pourListe, scanQty, w.ajouterProduitListe],
   );
 
   /**
@@ -139,6 +157,7 @@ export default function Scan() {
    */
   const mettreEnAttente = useCallback(async () => {
     if (!ean) return;
+    if (pourListe) { setMessage({texte: 'Pour ajouter à la liste, réessaie une fois connecté ou saisis le produit à la main.', erreur: true}); return; }
     await fileScan.enfiler({
       ean13: ean, name: ean, brand: null, imageUrl: null,
       grammageG: null, volumeMl: null, productType: null, categoryKey: null,
@@ -147,7 +166,7 @@ export default function Scan() {
     await rafraichirCompteur();
     setMessage({ texte: 'Mis en attente — ajouté dès le retour du réseau', erreur: false });
     setTimeout(reprendre, 1600);
-  }, [ean, reprendre, rafraichirCompteur]);
+  }, [ean, reprendre, rafraichirCompteur, pourListe]);
 
   const reprendreFileEnAttente = useCallback(() => {
     if (repriseEnCours.current) return;
@@ -297,6 +316,8 @@ export default function Scan() {
 
       {ean && (
         <FicheScannee
+          pourListe={pourListe}
+          quantite={scanQty}
           resultat={resultat}
           ean={ean}
           chargement={chargement}

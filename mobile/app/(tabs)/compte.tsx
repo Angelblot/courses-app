@@ -1,4 +1,5 @@
-import { Action } from '../../components/MaisonUI';
+import { nativeInbox } from '../../lib/native-inbox';
+import { Action, ui } from '../../components/MaisonUI';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
@@ -78,6 +79,14 @@ export default function Compte() {
     <SafeAreaView style={s.ecran}>
       <ScrollView contentContainerStyle={s.corps}>
         <Text style={s.titre}>Réglages</Text>
+        <View style={ui.notice}>
+          <Text style={ui.section}>Ajouter sans y penser</Text>
+          <Text style={ui.productName}>Avec Siri</Text>
+          <Text style={ui.subtitle}>{nativeInbox ? 'Dis « Siri, ajoute un produit dans Courses ». Siri te demande le produit et confirme l’ajout. Tu peux aussi personnaliser la quantité dans l’app Raccourcis, action « Noter un produit manquant ».' : 'Siri est disponible dans la version iPhone intégrant les raccourcis natifs. Il ne fonctionne pas dans cet aperçu web ni dans Expo Go.'}</Text>
+          <Text style={ui.productName}>Depuis ton écran d’accueil</Text>
+          <Text style={ui.subtitle}>Sur iPhone, ajoute le widget Courses « Il me manque… ». Un toucher ouvre l’ajout rapide. Les ajouts vocaux rejoignent ta liste à l’ouverture de l’app, sur le même compte.</Text>
+          <Action secondary onPress={()=>router.push('/ajout')}>Essayer l’ajout rapide</Action>
+        </View>
         <Action secondary onPress={() => router.push('/favoris')}>Mes favoris et produits</Action>
         <Action secondary onPress={() => router.push('/wizard/generation')}>Mes drives et Chrome</Action>
 

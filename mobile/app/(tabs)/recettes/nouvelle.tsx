@@ -1,259 +1,85 @@
-import { useState } from 'react';
-import {
-  ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable,
-  ScrollView, StyleSheet, Text, TextInput, View,
-} from 'react-native';
+import { useRef, useState } from 'react';
+import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import { Action, Photo, ui } from '../../../components/MaisonUI';
+import { Portions, rs } from '../../../components/RecipeUI';
 import { SelecteurIngredient, type ChoixIngredient } from '../../../components/SelecteurIngredient';
 import { useProducts } from '../../../stores/products';
 import { creerRecette } from '../../../stores/recipes';
-import {
-  UNITES, valideBrouillon,
-  type Brouillon, type IngredientBrouillon,
-} from '../../../lib/recette-brouillon.ts';
-import { libelleRayon } from '../../../lib/rayons.ts';
-import { choisirPhoto, deposerPhoto } from '../../../lib/photo-recette.ts';
-import { colors, radius, spacing } from '../../../lib/theme';
+import { UNITES, valideBrouillon, type Brouillon } from '../../../lib/recette-brouillon';
+import { choisirPhoto, deposerPhoto } from '../../../lib/photo-recette';
+import { colors } from '../../../lib/theme';
 
+type Ligne = ChoixIngredient & { key:number; total:string };
 export default function NouvelleRecette() {
-  const router = useRouter();
-  const { produits } = useProducts();
-  const [nom, setNom] = useState('');
-  const [parts, setParts] = useState('4');
-  const [ingredients, setIngredients] = useState<IngredientBrouillon[]>([]);
-  const [selecteurOuvert, setSelecteurOuvert] = useState(false);
-  const [photo, setPhoto] = useState<{ base64: string } | null>(null);
-  const [photoExistante, setPhotoExistante] = useState<string | null>(null);
-  const [avertissement, setAvertissement] = useState<string | null>(null);
-
-  const proposerPhoto = () => {
-    Alert.alert('Photo de la recette', undefined, [
-      { text: 'Prendre une photo', onPress: async () => setPhoto(await choisirPhoto('appareil')) },
-      { text: 'Choisir dans la photothèque', onPress: async () => setPhoto(await choisirPhoto('bibliotheque')) },
-      { text: 'Annuler', style: 'cancel' },
-    ]);
-  };
-  const [erreur, setErreur] = useState<string | null>(null);
-  const [enCours, setEnCours] = useState(false);
-
-  const ajouter = (choix: ChoixIngredient) => {
-    setSelecteurOuvert(false);
-    setIngredients((l) => [...l, { ...choix, quantity_per_serving: 1 }]);
-  };
-
-  const majQuantite = (i: number, valeur: string) => {
-    const n = Number(valeur.replace(',', '.')) || 0;
-    setIngredients((l) => l.map((ing, k) => (k === i ? { ...ing, quantity_per_serving: n } : ing)));
-  };
-
-  const majUnite = (i: number, unite: string) => {
-    setIngredients((l) => l.map((ing, k) => (k === i ? { ...ing, unit: unite } : ing)));
-  };
-
-  const enregistrer = async () => {
-    if (enCours) return;
-    const brouillon: Brouillon = { name: nom, servings_default: Number.parseInt(parts, 10), ingredients };
-    const probleme = valideBrouillon(brouillon);
-    if (probleme) { setErreur(probleme); return; }
-    setErreur(null);
-    setAvertissement(null);
-    setEnCours(true);
-
-    // Le dépôt a lieu ici et pas au choix de la photo : inutile d'encombrer le
-    // stockage si la recette n'est finalement pas enregistrée.
-    let adressePhoto = photoExistante;
-    if (photo) {
-      const d = await deposerPhoto(photo.base64);
-      if (d.ok && d.url) adressePhoto = d.url;
-      // Une photo qui ne passe pas ne doit pas faire perdre la recette.
-      else setAvertissement("La recette est enregistrée, mais la photo n'a pas pu être envoyée.");
-    }
-    brouillon.image_url = adressePhoto;
-    const r = await creerRecette(brouillon);
-    setEnCours(false);
-    if (r.ok) router.back();
-    else setErreur(r.erreur ?? "Impossible d'enregistrer la recette.");
-  };
-
-  return (
-    <SafeAreaView style={s.ecran}>
-      <KeyboardAvoidingView style={s.ecran} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={s.entete}>
-          <Pressable onPress={() => router.back()} hitSlop={8}>
-            <Text style={s.retour}>Annuler</Text>
-          </Pressable>
-          <Text style={s.titre}>Nouvelle recette</Text>
-          <View style={s.equilibre} />
-        </View>
-
-        <ScrollView contentContainerStyle={s.corps} keyboardShouldPersistTaps="handled">
-          <Pressable style={s.photo} onPress={proposerPhoto}>
-            {photo || photoExistante ? (
-              <Image
-                source={{ uri: photo ? `data:image/jpeg;base64,${photo.base64}` : photoExistante! }}
-                style={s.photoImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={[s.photoImage, s.photoVide]}>
-                <Text style={s.photoTexte}>Ajouter une photo</Text>
-              </View>
-            )}
-          </Pressable>
-
-          <Text style={s.label}>Nom de la recette</Text>
-          <TextInput
-            style={s.champ}
-            value={nom}
-            onChangeText={setNom}
-            placeholder="Gratin dauphinois"
-            placeholderTextColor={colors.textMuted}
-          />
-
-          <Text style={s.label}>Nombre de parts</Text>
-          <TextInput style={s.champ} value={parts} onChangeText={setParts} keyboardType="number-pad" />
-
-          <Text style={s.section}>Ingrédients</Text>
-
-          {ingredients.length === 0 && (
-            <Text style={s.vide}>
-              Aucun ingrédient. Cherche-les dans ton catalogue plutôt que de les ressaisir.
-            </Text>
-          )}
-
-          {ingredients.map((ing, i) => {
-            const produit = ing.product_id ? produits.find((p) => p.id === ing.product_id) : null;
-            return (
-              <View key={`${ing.name}-${i}`} style={s.carte}>
-                <View style={s.carteHaut}>
-                  {produit?.image_url
-                    ? <Image source={{ uri: produit.image_url }} style={s.vignette} resizeMode="contain" />
-                    : <View style={[s.vignette, s.vignetteVide]} />}
-                  <View style={s.carteTexte}>
-                    <Text style={s.nom} numberOfLines={2}>{ing.name}</Text>
-                    <Text style={s.rayon}>{libelleRayon(ing.rayon)}</Text>
-                  </View>
-                  <Pressable
-                    onPress={() => setIngredients((l) => l.filter((_, k) => k !== i))}
-                    hitSlop={8}
-                  >
-                    <Text style={s.retirer}>Retirer</Text>
-                  </Pressable>
-                </View>
-
-                <View style={s.rangee}>
-                  <View style={s.moitie}>
-                    <Text style={s.label}>Quantité par part</Text>
-                    <TextInput
-                      style={s.champ}
-                      value={String(ing.quantity_per_serving)}
-                      onChangeText={(t) => majQuantite(i, t)}
-                      keyboardType="decimal-pad"
-                    />
-                  </View>
-                  <View style={s.moitie}>
-                    <Text style={s.label}>Unité</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      <View style={s.unites}>
-                        {UNITES.map((u) => (
-                          <Pressable
-                            key={u}
-                            style={[s.unite, ing.unit === u && s.uniteActive]}
-                            onPress={() => majUnite(i, u)}
-                          >
-                            <Text style={[s.uniteTexte, ing.unit === u && s.uniteTexteActif]}>{u}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </ScrollView>
-                  </View>
-                </View>
-              </View>
-            );
-          })}
-
-          <Pressable style={s.ajouter} onPress={() => setSelecteurOuvert(true)}>
-            <Text style={s.ajouterTexte}>Ajouter un ingrédient</Text>
-          </Pressable>
-
-          {avertissement && <Text style={s.avertissement}>{avertissement}</Text>}
-          {erreur && <Text style={s.erreur}>{erreur}</Text>}
-
-          <Pressable style={s.bouton} onPress={enregistrer} disabled={enCours}>
-            {enCours
-              ? <ActivityIndicator color={colors.accentContrast} />
-              : <Text style={s.boutonTexte}>Enregistrer</Text>}
-          </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      <Modal visible={selecteurOuvert} animationType="slide" presentationStyle="pageSheet">
-        <SelecteurIngredient onChoisir={ajouter} onFermer={() => setSelecteurOuvert(false)} />
-      </Modal>
-    </SafeAreaView>
-  );
+  const router=useRouter(),{produits}=useProducts(),seq=useRef(0),lock=useRef(false);
+  const [nom,setNom]=useState(''),[parts,setParts]=useState(4),[ingredients,setIngredients]=useState<Ligne[]>([]);
+  const [prep,setPrep]=useState(''),[cuisson,setCuisson]=useState('');
+  const [selecteur,setSelecteur]=useState(false),[unites,setUnites]=useState<number|null>(null),[abandon,setAbandon]=useState(false);
+  const [photo,setPhoto]=useState<{base64:string}|null>(null),[photoMenu,setPhotoMenu]=useState(false);
+  const [erreur,setErreur]=useState(''),[busy,setBusy]=useState(false),[termine,setTermine]=useState(false),[avertissement,setAvertissement]=useState('');
+  const scroll=useRef<ScrollView>(null);
+  const modifie=!!nom||ingredients.length>0||!!photo||parts!==4||!!prep||!!cuisson;
+  function quitter(){if(busy)return;if(modifie&&!termine)setAbandon(true);else router.replace('/recettes');}
+  async function photoDepuis(source:'appareil'|'bibliotheque') {
+    setPhotoMenu(false);
+    try {const p=await choisirPhoto(source);if(p)setPhoto(p);}catch{setErreur('Impossible d’ouvrir les photos. Vérifie les permissions de l’application.');}
+  }
+  function ajouter(choix:ChoixIngredient) {
+    setIngredients(l=>[...l,{...choix,key:++seq.current,total:''}]);setSelecteur(false);setErreur('');
+  }
+  function modifier(key:number,patch:Partial<Ligne>){setErreur('');setIngredients(l=>l.map(i=>i.key===key?{...i,...patch}:i));}
+  async function enregistrer() {
+    if(lock.current)return;
+    const b:Brouillon={name:nom,servings_default:parts,ingredients:ingredients.map(i=>({name:i.name,product_id:i.product_id,rayon:i.rayon,unit:i.unit,quantity_per_serving:Number(i.total.replace(',','.'))/parts})),prep_minutes:prep===''?null:Number(prep),cook_minutes:cuisson===''?null:Number(cuisson)};
+    const quantiteInvalide=ingredients.find(i=>!i.total.trim()||!Number.isFinite(Number(i.total.replace(',','.')))||Number(i.total.replace(',','.'))<=0);
+    const dureeInvalide=[prep,cuisson].some(t=>t!==''&&(!/^\d+$/.test(t)||Number(t)>10080));
+    const probleme=valideBrouillon(b)||(quantiteInvalide?`Indique une quantité supérieure à zéro pour ${quantiteInvalide.name}.`:null)||(dureeInvalide?'Indique les durées en minutes entières, ou laisse-les vides.':null);
+    if(probleme){setErreur(probleme);return;}
+    lock.current=true;setBusy(true);setErreur('');setAvertissement('');
+    try {
+      if(photo){const p=await deposerPhoto(photo.base64);if(p.ok)b.image_url=p.url;else setAvertissement('La recette est enregistrée sans la photo. Tu pourras l’ajouter depuis Modifier.');}
+      const r=await creerRecette(b);
+      if(r.ok)setTermine(true);else{setErreur(r.erreur??'Enregistrement impossible. Tes saisies sont conservées.');setAvertissement('');}
+    }catch{setErreur('Connexion interrompue. Vérifie tes recettes avant de réessayer.');setAvertissement('');}
+    finally{setBusy(false);lock.current=false;}
+  }
+  return <SafeAreaView edges={['top']} style={rs.page}>
+    <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
+      <View style={rs.bar}><Pressable accessibilityRole="button" disabled={busy} onPress={quitter} style={rs.back}><Feather name="chevron-left" size={21} color={colors.accent}/><Text style={ui.link}>Recettes</Text></Pressable><Text style={ui.detail}>{termine?'Enregistrée':'Nouvelle recette'}</Text></View>
+      {termine?<View style={[rs.body,{paddingTop:48}]}><Feather name="check-circle" size={42} color={colors.accent}/><Text style={rs.title}>Une recette de plus à partager.</Text><Text style={rs.text}>« {nom.trim()} » est dans ta collection, avec ses {ingredients.length} ingrédients pour {parts} personnes.</Text>{!!avertissement&&<Text style={ui.error}>{avertissement}</Text>}<Action onPress={()=>router.replace('/recettes')}>Retrouver mes recettes</Action></View>:<>
+      <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={rs.body}>
+        <View style={{gap:8}}><Text style={rs.title}>On note une bonne recette ?</Text><Text style={rs.text}>Un nom, les ingrédients et leurs quantités. Tu pourras la retrouver pour préparer tes prochains repas.</Text></View>
+        <View><Text style={rs.label}>Nom de la recette</Text><TextInput accessibilityLabel="Nom de la recette" editable={!busy} maxLength={160} value={nom} onChangeText={v=>{setNom(v);setErreur('');}} placeholder="Ex. Gratin de courgettes" placeholderTextColor={colors.textMuted} style={ui.input}/></View>
+        <Pressable accessibilityRole="button" accessibilityLabel={photo?'Changer la photo':'Ajouter une photo'} disabled={busy} onPress={()=>Platform.OS==='web'?photoDepuis('bibliotheque'):setPhotoMenu(true)} style={[ui.row,{backgroundColor:'white',padding:12,borderRadius:14,gap:16}]}>
+          {photo?<Image source={{uri:`data:image/jpeg;base64,${photo.base64}`}} style={{width:84,height:84,borderRadius:10}}/>:<View style={{width:84,height:84,borderRadius:10,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'}}><Feather name="camera" size={26} color={colors.accent}/></View>}
+          <View style={{flex:1,gap:4}}><Text style={ui.productName}>{photo?'Changer la photo':'Ajouter une photo'}</Text><Text style={ui.detail}>Facultatif, mais plus facile à retrouver.</Text></View><Feather name="plus" size={18} color={colors.accent}/>
+        </Pressable>
+        <View style={rs.row}><View><Text style={rs.label}>Cette recette est pour</Text><Text style={rs.text}>{parts} personne{parts>1?'s':''}</Text></View><Portions value={parts} onChange={v=>{setParts(v);setErreur('');}} disabled={busy}/></View>
+        <View style={[ui.row,{alignItems:'flex-start'}]}>{([{label:'Préparation',value:prep,set:setPrep},{label:'Cuisson',value:cuisson,set:setCuisson}]).map(f=><View key={f.label} style={{flex:1}}><Text style={rs.label}>{f.label} · min</Text><TextInput accessibilityLabel={`${f.label} en minutes`} editable={!busy} value={f.value} onChangeText={v=>{f.set(v);setErreur('');}} keyboardType="number-pad" maxLength={5} placeholder="Facultatif" placeholderTextColor={colors.textMuted} style={ui.input}/></View>)}</View>
+        <View style={{gap:7,marginTop:12}}><Text style={rs.section}>Les ingrédients{ingredients.length?` (${ingredients.length})`:''}</Text><Text style={rs.text}>Saisis les quantités pour la recette entière, soit {parts} personnes. L’app les adaptera au moment de choisir ce repas.</Text></View>
+        {!ingredients.length&&<View style={{paddingVertical:14,gap:8}}><Text style={ui.productName}>Qu’est-ce qu’on met dedans ?</Text><Text style={rs.text}>Choisis un produit habituel, cherche dans Open Food Facts ou saisis simplement le nom.</Text></View>}
+        {ingredients.map(ing=>{
+          const produit=produits.find(p=>p.id===ing.product_id);
+          return <View key={ing.key} style={{padding:14,borderRadius:14,backgroundColor:'white',gap:12}}>
+            <View style={ui.row}><Photo name={ing.name} url={produit?.image_url} style={{width:48,height:48}}/><Text style={[ui.productName,{flex:1}]}>{ing.name}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${ing.name}`} disabled={busy} style={ui.iconButton} onPress={()=>setIngredients(l=>l.filter(i=>i.key!==ing.key))}><Feather name="x" size={19} color={colors.textMuted}/></Pressable></View>
+            <View style={[ui.row,{alignItems:'flex-end'}]}><View style={{flex:1}}><Text style={rs.label}>Quantité totale</Text><TextInput accessibilityLabel={`Quantité totale de ${ing.name}`} editable={!busy} value={ing.total} onChangeText={total=>modifier(ing.key,{total})} keyboardType="decimal-pad" maxLength={12} placeholder="Ex. 500" placeholderTextColor={colors.textMuted} style={ui.input}/></View><View style={{flex:1}}><Text style={rs.label}>Unité</Text><Pressable accessibilityRole="button" accessibilityLabel={`Unité de ${ing.name} : ${ing.unit}`} disabled={busy} onPress={()=>setUnites(ing.key)} style={[ui.input,ui.row,{justifyContent:'space-between'}]}><Text style={{color:colors.text,fontSize:15,flex:1}}>{ing.unit}</Text><Feather name="chevron-down" size={16} color={colors.accent}/></Pressable></View></View>
+          </View>;
+        })}
+        <Action secondary disabled={busy} onPress={()=>setSelecteur(true)}>Ajouter un ingrédient</Action>
+      </ScrollView>
+      <View style={rs.footer}><View style={rs.footInner}>
+        {!!erreur&&<Text accessibilityLiveRegion="assertive" style={ui.error}>{erreur}</Text>}
+        <Text style={ui.detail}>{ingredients.length} ingrédient{ingredients.length>1?'s':''} · pour {parts} personnes</Text>
+        <Action disabled={busy} onPress={enregistrer}>{busy?'Enregistrement…':'Enregistrer ma recette'}</Action>
+      </View></View>
+      </>}
+    </KeyboardAvoidingView>
+    <Modal visible={selecteur} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setSelecteur(false)}><SelecteurIngredient onChoisir={ajouter} onFermer={()=>setSelecteur(false)}/></Modal>
+    <Modal visible={unites!==null} transparent animationType="fade" onRequestClose={()=>setUnites(null)}><View style={rs.sheet}><View style={rs.dialog}><Text style={rs.section}>Choisir l’unité</Text><ScrollView style={{maxHeight:360}}>{UNITES.map(u=><Pressable accessibilityRole="button" key={u} style={rs.back} onPress={()=>{if(unites!==null)modifier(unites,{unit:u});setUnites(null);}}><Text style={ui.link}>{u}</Text></Pressable>)}</ScrollView><Action secondary onPress={()=>setUnites(null)}>Fermer</Action></View></View></Modal>
+    <Modal visible={photoMenu} transparent animationType="fade" onRequestClose={()=>setPhotoMenu(false)}><View style={rs.sheet}><View style={rs.dialog}><Text style={rs.section}>Photo de la recette</Text><Action onPress={()=>photoDepuis('bibliotheque')}>Choisir une photo</Action><Action secondary onPress={()=>photoDepuis('appareil')}>Prendre une photo</Action><Action secondary onPress={()=>setPhotoMenu(false)}>Annuler</Action></View></View></Modal>
+    <Modal visible={abandon} transparent animationType="fade" onRequestClose={()=>setAbandon(false)}><View style={rs.sheet}><View style={rs.dialog}><Text style={rs.section}>Quitter sans enregistrer ?</Text><Text style={rs.text}>Les informations saisies seront perdues.</Text><Action onPress={()=>setAbandon(false)}>Continuer ma recette</Action><Action secondary onPress={()=>router.replace('/recettes')}>Quitter sans enregistrer</Action></View></View></Modal>
+  </SafeAreaView>;
 }
-
-const s = StyleSheet.create({
-  ecran: { flex: 1, backgroundColor: colors.bg },
-  entete: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
-  },
-  retour: { color: colors.textMuted, fontSize: 15, fontWeight: '600' },
-  titre: { fontSize: 17, fontWeight: '700', color: colors.text },
-  equilibre: { width: 56 },
-  corps: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xxl },
-  photo: { borderRadius: radius.lg, overflow: 'hidden', marginBottom: spacing.md },
-  photoImage: { width: '100%', height: 180, backgroundColor: colors.surface },
-  photoVide: {
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed',
-  },
-  photoTexte: { color: colors.accent, fontWeight: '700', fontSize: 15 },
-  avertissement: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
-
-  label: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginTop: spacing.sm },
-  section: {
-    fontSize: 17, fontWeight: '700', color: colors.text,
-    marginTop: spacing.xl, marginBottom: spacing.xs,
-  },
-  vide: { fontSize: 13, color: colors.textMuted, lineHeight: 18, marginBottom: spacing.sm },
-  champ: {
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    padding: spacing.md, fontSize: 16, color: colors.text, backgroundColor: colors.surface,
-  },
-  carte: {
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, marginBottom: spacing.md,
-  },
-  carteHaut: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  vignette: { width: 40, height: 40, borderRadius: radius.sm, backgroundColor: colors.bg },
-  vignetteVide: { borderWidth: 1, borderColor: colors.border },
-  carteTexte: { flex: 1, gap: 2 },
-  nom: { fontSize: 15, fontWeight: '600', color: colors.text },
-  rayon: { fontSize: 12, color: colors.textMuted },
-  retirer: { fontSize: 13, fontWeight: '600', color: colors.danger },
-  rangee: { flexDirection: 'row', gap: spacing.md },
-  moitie: { flex: 1 },
-  unites: { flexDirection: 'row', gap: spacing.xs, paddingVertical: spacing.xs },
-  unite: {
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill,
-    paddingVertical: spacing.xs, paddingHorizontal: spacing.md,
-  },
-  uniteActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
-  uniteTexte: { fontSize: 13, color: colors.text },
-  uniteTexteActif: { fontWeight: '700', color: colors.accent },
-  ajouter: {
-    borderWidth: 1, borderColor: colors.accent, borderRadius: radius.md,
-    padding: spacing.md, alignItems: 'center',
-  },
-  ajouterTexte: { color: colors.accent, fontWeight: '700', fontSize: 14 },
-  erreur: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
-  bouton: {
-    backgroundColor: colors.accent, borderRadius: radius.md, padding: spacing.lg,
-    alignItems: 'center', marginTop: spacing.lg,
-  },
-  boutonTexte: { color: colors.accentContrast, fontWeight: '700', fontSize: 16 },
-});

@@ -12,7 +12,7 @@ export default function Favoris(){
  const p=useProducts(),w=useWizard();const [query,setQuery]=useState(''),[all,setAll]=useState(false),[detail,setDetail]=useState<Product|null>(null),[notice,setNotice]=useState('');
  useFocusEffect(useCallback(()=>{p.recharger();},[p.recharger]));
  const produits=p.produits.filter(p=>(all||p.favorite)&&p.name.toLocaleLowerCase('fr').includes(query.toLocaleLowerCase('fr')));
- return <SafeAreaView edges={['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}><Head title="Mes favoris" back/><ScanAction/>
+ return <SafeAreaView edges={['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}><Head title="Mes favoris" back/><Action onPress={()=>router.push('/habitudes')}>Passer mes habitudes par rayon</Action><ScanAction/>
  <TextInput accessibilityLabel="Chercher un produit" style={ui.input} placeholder="Chercher un produit…" value={query} onChangeText={setQuery}/>
  <View style={ui.row}><View style={{flex:1}}><Action secondary={all} onPress={()=>setAll(false)}>Favoris</Action></View><View style={{flex:1}}><Action secondary={!all} onPress={()=>setAll(true)}>Tous les produits</Action></View></View>
  {notice&&<Text accessibilityLiveRegion="polite" style={ui.link}>{notice}</Text>}{p.chargement&&<ActivityIndicator color={colors.accent}/>}{p.erreur&&<><Text style={ui.error}>{p.erreur}</Text><Action secondary onPress={p.recharger}>Réessayer</Action></>}

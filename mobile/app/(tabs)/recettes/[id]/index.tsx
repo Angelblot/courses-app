@@ -1,283 +1,82 @@
-import { Photo } from '../../../../components/MaisonUI';
-import { useCallback, useState } from 'react';
-import {
-  ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View,
-} from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { EtatVide } from '../../../../components/EtatVide';
-import { PastilleIngredient } from '../../../../components/PastilleIngredient';
+import { Action, Photo, ui } from '../../../../components/MaisonUI';
+import { Portions, rs } from '../../../../components/RecipeUI';
 import { SelecteurIngredient, type ChoixIngredient } from '../../../../components/SelecteurIngredient';
 import { useRecette, supprimerRecette, rattacherIngredient } from '../../../../stores/recipes';
 import { useProducts } from '../../../../stores/products';
-import {
-  quantitePourParts, initiale, indiceAplat, formatDuree,
-} from '../../../../lib/recettes-affichage.ts';
-import { formatIngredientQty } from '../../../../lib/unites.ts';
-import { colors, radius, spacing, texte } from '../../../../lib/theme';
+import { useWizard } from '../../../../contexts/WizardContext';
+import { formatDuree, quantitePourParts } from '../../../../lib/recettes-affichage';
+import { formatIngredientQty } from '../../../../lib/unites';
+import { colors } from '../../../../lib/theme';
 
 export default function DetailRecette() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
-  const { recette, chargement, erreur, recharger } = useRecette(id);
-  const { produits } = useProducts();
-  // Le réglage n'est qu'une aide à la lecture : il repart de la valeur
-  // enregistrée à chaque ouverture et ne modifie jamais la recette.
-  const [parts, setParts] = useState<number | null>(null);
-  const [erreurSuppression, setErreurSuppression] = useState<string | null>(null);
-  /** Ingrédient dont on cherche le produit, ou `null` si le sélecteur est fermé. */
-  const [aRattacher, setARattacher] = useState<{ id: string; nom: string } | null>(null);
-
-  const choisirProduit = async (choix: ChoixIngredient) => {
-    const cible = aRattacher;
-    setARattacher(null);
-    if (!cible) return;
-    const r = await rattacherIngredient(cible.id, choix.product_id, choix.rayon);
-    if (r.ok) recharger();
-    else setErreurSuppression(r.erreur ?? 'Impossible de rattacher cet ingrédient.');
-  };
-
-  const demanderSuppression = (id: string) => {
-    Alert.alert(
-      'Supprimer cette recette ?',
-      'Ses ingrédients seront supprimés avec elle. Cette action est définitive.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            const r = await supprimerRecette(id);
-            if (r.ok) router.back();
-            else setErreurSuppression(r.erreur ?? 'Impossible de supprimer cette recette.');
-          },
-        },
-      ],
-    );
-  };
-
-  const rechargerAuFocus = useCallback(() => { recharger(); }, [recharger]);
-  useFocusEffect(rechargerAuFocus);
-
-  if (chargement && !recette) {
-    return <SafeAreaView style={s.centre}><ActivityIndicator color={colors.accent} /></SafeAreaView>;
+  const {id}=useLocalSearchParams<{id:string}>(), router=useRouter();
+  const {recette,chargement,erreur,recharger}=useRecette(id), {produits}=useProducts(), w=useWizard();
+  const [parts,setParts]=useState<number|null>(null),[avis,setAvis]=useState('');
+  const [erreurAction,setErreurAction]=useState(''),[suppression,setSuppression]=useState(false),[busy,setBusy]=useState(false);
+  const [cible,setCible]=useState<{id:string;nom:string}|null>(null);
+  useEffect(()=>{setParts(null);setAvis('');setErreurAction('');},[id]);
+  useFocusEffect(useCallback(()=>{recharger();},[recharger]));
+  async function rattacher(choix:ChoixIngredient) {
+    if(!cible)return;
+    const ing=cible;setCible(null);setErreurAction('');
+    const r=await rattacherIngredient(ing.id,choix.product_id,choix.rayon);
+    if(r.ok)recharger();else setErreurAction(r.erreur??'Impossible de choisir ce produit. Réessaie.');
   }
-
-  if (erreur) {
-    return (
-      <SafeAreaView style={s.centre}>
-        <Text style={s.erreur}>{erreur}</Text>
-        <Pressable style={s.reessayer} onPress={recharger}>
-          <Text style={s.reessayerTexte}>Réessayer</Text>
-        </Pressable>
-      </SafeAreaView>
-    );
+  async function supprimer() {
+    if(busy||!recette)return;setBusy(true);
+    try {
+      const r=await supprimerRecette(recette.id);
+      if(r.ok){if(w.selectedRecipes[recette.id])w.toggleRecette(recette.id,recette.servings_default);router.replace('/recettes');}
+      else {setErreurAction(r.erreur??'Suppression impossible. Réessaie.');setSuppression(false);}
+    } catch {setErreurAction('Suppression impossible. Vérifie ta connexion.');setSuppression(false);} finally {setBusy(false);}
   }
-
-  if (!recette) {
-    return (
-      <SafeAreaView style={s.centre}>
-        <EtatVide titre="Recette introuvable">
-          Elle a peut-être été supprimée depuis un autre appareil.
-        </EtatVide>
-      </SafeAreaView>
-    );
-  }
-
-  const n = parts ?? recette.servings_default;
-
-  // Trois informations, montrées seulement si la recette les porte : une
-  // colonne vide vaudrait mieux qu'un « 0 min » inventé, et une absence de
-  // colonne vaut mieux qu'une colonne vide.
-  const stats = [
-    { cle: 'prep', icone: 'clock' as const, valeur: formatDuree(recette.prep_minutes), libelle: 'Préparation' },
-    { cle: 'cuisson', icone: 'thermometer' as const, valeur: formatDuree(recette.cook_minutes), libelle: 'Cuisson' },
-    {
-      cle: 'kcal', icone: 'activity' as const,
-      valeur: recette.kcal_per_serving ? `${recette.kcal_per_serving} kcal` : null,
-      libelle: 'Par portion',
-    },
-  ].filter((x) => x.valeur);
-
-  return (
-    <View style={s.ecran}>
-      <ScrollView contentContainerStyle={s.corps}>
-        <View>
-          <Photo recipe name={recette.name} url={recette.image_url} style={s.bandeau}/>
-          <SafeAreaView style={s.barre} edges={['top']}>
-            <Pressable style={s.rond} onPress={() => router.back()} hitSlop={8}>
-              <Feather name="arrow-left" size={20} color={colors.text} />
-            </Pressable>
-            <Pressable
-              style={s.rond}
-              onPress={() => router.push(`/recettes/${recette.id}/modifier`)}
-              hitSlop={8}
-            >
-              <Feather name="edit-2" size={18} color={colors.text} />
-            </Pressable>
-          </SafeAreaView>
-        </View>
-
-        <View style={s.texte}>
-          <Text style={s.titre}>{recette.name}</Text>
-          {recette.description && <Text style={s.description}>{recette.description}</Text>}
-
-          {stats.length > 0 && (
-            <View style={s.stats}>
-              {stats.map((x) => (
-                <View key={x.cle} style={s.stat}>
-                  <Feather name={x.icone} size={16} color={colors.accentContrast} />
-                  <Text style={s.statValeur}>{x.valeur}</Text>
-                  <Text style={s.statLibelle}>{x.libelle}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          <View style={s.blocIngredients}>
-          <View style={s.enteteIngredients}>
-            <Text style={s.section}>{`Ingrédients pour ${n} part${n > 1 ? 's' : ''}`}</Text>
-            {/* Le réglage jouxte le titre, comme chez Jow : c'est là qu'on
-                pense au nombre de convives, pas plus haut. Il n'est qu'une
-                aide à la lecture et ne modifie jamais la recette. */}
-            <View style={s.compteur}>
-              <Pressable style={s.pas} onPress={() => setParts(Math.max(1, n - 1))} hitSlop={8}>
-                <Text style={s.pasTexte}>−</Text>
-              </Pressable>
-              <Text style={s.compteurTexte}>{n}</Text>
-              <Pressable style={s.pas} onPress={() => setParts(n + 1)} hitSlop={8}>
-                <Text style={s.pasTexte}>+</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={s.pastilles}>
-            {recette.ingredients.map((ing) => {
-              const produit = ing.product_id
-                ? produits.find((p) => p.id === ing.product_id)
-                : null;
-              return (
-                <Pressable
-                  key={ing.id}
-                  style={s.cellule}
-                  onPress={() => setARattacher({ id: ing.id, nom: ing.name })}
-                >
-                  <PastilleIngredient
-                    nom={ing.name}
-                    quantite={formatIngredientQty(
-                      quantitePourParts(ing.quantity_per_serving, n), ing.unit,
-                    )}
-                    image={produit?.image_url ?? null}
-                    rattache={Boolean(ing.product_id)}
-                  />
-                </Pressable>
-              );
-            })}
-          </View>
-          </View>
-
-          {erreurSuppression && <Text style={s.erreur}>{erreurSuppression}</Text>}
-
-          <Text style={s.aideRattachement}>
-            Touche un ingrédient pour lui choisir un produit du catalogue.
-          </Text>
-
-          <Pressable style={s.supprimer} onPress={() => demanderSuppression(recette.id)}>
-            <Text style={s.supprimerTexte}>Supprimer cette recette</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-
-      <Modal
-        visible={aRattacher !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setARattacher(null)}
-      >
-        <SelecteurIngredient onChoisir={choisirProduit} onFermer={() => setARattacher(null)} />
-      </Modal>
+  const n=parts??(id?w.selectedRecipes[id]:undefined)??recette?.servings_default??2;
+  const choisi=!!recette&&w.selectedRecipes[recette.id]!=null;
+  const aJour=choisi&&w.selectedRecipes[recette!.id]===n;
+  return <SafeAreaView edges={['top']} style={rs.page}>
+    <View style={rs.bar}>
+      <Pressable accessibilityRole="button" onPress={()=>router.replace('/recettes')} style={rs.back}><Feather name="chevron-left" size={21} color={colors.accent}/><Text style={ui.link}>Recettes</Text></Pressable>
+      {recette&&<Pressable accessibilityRole="button" style={rs.back} onPress={()=>router.push(`/recettes/${recette.id}/modifier`)}><Feather name="edit-2" size={16} color={colors.accent}/><Text style={ui.link}>Modifier</Text></Pressable>}
     </View>
-  );
+    {!recette?<View style={rs.body}>{chargement?<ActivityIndicator color={colors.accent}/>:<><Text style={rs.title}>{erreur?'Impossible de charger la recette':'Recette introuvable'}</Text><Text style={rs.text}>{erreur??'Elle a peut-être été supprimée.'}</Text><Action secondary onPress={recharger}>Réessayer</Action></>}</View>:<>
+      <ScrollView contentContainerStyle={rs.body}>
+        <Photo recipe name={recette.name} url={recette.image_url} style={{width:'100%',height:230,borderRadius:16}}/>
+        <Text style={rs.title}>{recette.name}</Text>
+        <View style={[rs.row,{justifyContent:'flex-start',columnGap:22}]}>
+          {recette.prep_minutes!=null&&<Text style={rs.text}>Préparation · {formatDuree(recette.prep_minutes)??'0 min'}</Text>}
+          {recette.cook_minutes!=null&&<Text style={rs.text}>Cuisson · {formatDuree(recette.cook_minutes)??'Sans cuisson'}</Text>}
+          {!!recette.kcal_per_serving&&<Text style={rs.text}>{recette.kcal_per_serving} kcal / personne</Text>}
+        </View>
+        <View style={[rs.row,{paddingVertical:12,borderTopWidth:1,borderBottomWidth:1,borderColor:colors.border}]}>
+          <View><Text style={rs.label}>À table pour</Text><Text style={rs.text}>{n} personne{n>1?'s':''}</Text></View>
+          <Portions value={n} onChange={v=>{setParts(v);setAvis('');}}/>
+        </View>
+        <View style={{gap:4}}><Text style={rs.section}>Les ingrédients</Text><Text style={rs.text}>Quantités adaptées à {n} personne{n>1?'s':''}. Touche une ligne pour choisir le produit à acheter.</Text></View>
+        <View>{recette.ingredients.map(ing=>{
+          const produit=produits.find(p=>p.id===ing.product_id);
+          return <Pressable key={ing.id} accessibilityRole="button" accessibilityLabel={`Choisir le produit pour ${ing.name}`} onPress={()=>setCible({id:ing.id,nom:ing.name})} style={rs.ingredient}>
+            <Photo name={ing.name} url={produit?.image_url} style={{width:52,height:56}}/>
+            <View style={{flex:1,gap:3}}><Text style={ui.productName}>{ing.name}</Text><Text style={rs.quantity}>{formatIngredientQty(quantitePourParts(ing.quantity_per_serving,n),ing.unit)}</Text><Text style={ui.detail}>{produit?.name??'Choisir un produit'}</Text></View>
+            <Feather name="chevron-right" size={18} color={colors.accent}/>
+          </Pressable>;
+        })}{!recette.ingredients.length&&<Text style={rs.text}>Ajoute les ingrédients en modifiant cette recette pour préparer ta liste.</Text>}</View>
+        {!!recette.description&&<View style={{gap:10}}><Text style={rs.section}>À propos de cette recette</Text><Text style={[rs.text,{color:colors.text,lineHeight:26}]}>{recette.description}</Text></View>}
+        {!!avis&&<Text accessibilityLiveRegion="polite" style={ui.link}>{avis}</Text>}
+        {!!erreurAction&&<Text accessibilityLiveRegion="polite" style={ui.error}>{erreurAction}</Text>}
+        {choisi&&<Pressable accessibilityRole="button" style={rs.back} onPress={()=>{w.toggleRecette(recette.id,recette.servings_default);setAvis('Ce repas a été retiré de ton menu.');}}><Feather name="minus-circle" size={17} color={colors.accent}/><Text style={ui.link}>Retirer de mes repas</Text></Pressable>}
+        <Pressable accessibilityRole="button" onPress={()=>setSuppression(true)} style={rs.back}><Feather name="trash-2" size={16} color={colors.textMuted}/><Text style={rs.text}>Supprimer la recette…</Text></Pressable>
+      </ScrollView>
+      <View style={rs.footer}><View style={rs.footInner}>
+        <Text style={ui.detail}>{aJour?`Dans tes repas · ${n} personne${n>1?'s':''}`:'Les ingrédients rejoindront ta liste de courses.'}</Text>
+        <Action disabled={!recette.ingredients.length} onPress={()=>{if(aJour)router.push('/liste');else{w.setParts(recette.id,n);setAvis('Repas choisi. Les ingrédients sont dans ta liste.');}}}>{aJour?'Voir ma liste de courses':choisi?`Mettre à jour pour ${n} personnes`:'Choisir ce repas'}</Action>
+      </View></View>
+    </>}
+    <Modal visible={!!cible} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setCible(null)}><SelecteurIngredient onChoisir={rattacher} onFermer={()=>setCible(null)}/></Modal>
+    <Modal visible={suppression} transparent animationType="fade" onRequestClose={()=>!busy&&setSuppression(false)}><View style={rs.sheet}><View style={rs.dialog}><Text style={rs.section}>Supprimer cette recette ?</Text><Text style={rs.text}>La recette et ses ingrédients seront supprimés. Cette action est définitive.</Text><Action disabled={busy} onPress={supprimer}>{busy?'Suppression…':'Supprimer définitivement'}</Action><Action disabled={busy} secondary onPress={()=>setSuppression(false)}>Garder la recette</Action></View></View></Modal>
+  </SafeAreaView>;
 }
-
-const s = StyleSheet.create({
-  ecran: { flex: 1, backgroundColor: colors.bg },
-  centre: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.bg, gap: spacing.md, padding: spacing.xl,
-  },
-  corps: { paddingBottom: spacing.xxl },
-  bandeau: { height: 220, width: '100%', backgroundColor: colors.bg },
-  aplat: { alignItems: 'center', justifyContent: 'center' },
-  initiale: { fontSize: 64, fontWeight: '400' },
-  barre: {
-    position: 'absolute', top: 0, left: 0, right: 0,
-    flexDirection: 'row', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-  },
-  rond: {
-    width: 36, height: 36, borderRadius: radius.pill,
-    backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
-    marginTop: spacing.sm,
-  },
-  texte: { padding: spacing.lg, gap: spacing.sm },
-  titre: { fontSize: 30, fontWeight: '700', color: colors.text, textAlign: 'center', lineHeight: 36 },
-  description: { fontSize: 15, color: colors.textMuted, lineHeight: 22, textAlign: 'center' },
-  // Bandeau de statistiques : un bloc de couleur pleine, comme chez Jow, qui
-  // sépare le titre de la liste des ingrédients. Leur bandeau est rouge
-  // sombre ; on garde notre vert, il n'y a pas de raison d'emprunter aussi
-  // leur couleur.
-  stats: {
-    flexDirection: 'row', backgroundColor: colors.accent,
-    borderRadius: radius.card, paddingVertical: spacing.lg,
-    marginTop: spacing.lg,
-  },
-  stat: { flex: 1, alignItems: 'center', gap: 2 },
-  statValeur: { fontSize: 16, fontWeight: '600', color: colors.accentContrast, marginTop: 2 },
-  statLibelle: { fontSize: 12, fontWeight: '400', color: colors.accentContrast, opacity: 0.85 },
-
-  // Fond blanc : c'est le contraste avec le crème de la page qui détache le
-  // bloc chez Jow, sans le moindre trait ni la moindre ombre.
-  blocIngredients: {
-    backgroundColor: colors.surface, borderRadius: radius.card,
-    padding: spacing.xl, marginTop: spacing.xl,
-  },
-  enteteIngredients: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing.md,
-  },
-  cellule: { width: '48%', alignItems: 'center' },
-  aideRattachement: {
-    fontSize: 12, color: colors.textMuted, textAlign: 'center',
-    marginTop: spacing.lg, lineHeight: 17,
-  },
-  compteur: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: colors.surface, borderRadius: radius.pill,
-    borderWidth: 1, borderColor: colors.border,
-    paddingVertical: 4, paddingHorizontal: spacing.sm,
-  },
-  pas: {
-    width: 26, height: 26, borderRadius: radius.pill,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  pasTexte: { fontSize: 18, fontWeight: '700', color: colors.accent },
-  compteurTexte: { fontSize: 15, fontWeight: '700', color: colors.text, minWidth: 18, textAlign: 'center' },
-  section: { ...texte.section, color: colors.text, textAlign: 'center' },
-  pastilles: {
-    flexDirection: 'row', flexWrap: 'wrap',
-    justifyContent: 'space-between', rowGap: spacing.xl, marginTop: spacing.xl,
-  },
-  erreur: { color: colors.danger, fontSize: 14, textAlign: 'center' },
-  supprimer: {
-    marginTop: spacing.xxl, alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  supprimerTexte: { color: colors.danger, fontSize: 14, fontWeight: '600' },
-  reessayer: {
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    paddingVertical: spacing.sm, paddingHorizontal: spacing.lg,
-  },
-  reessayerTexte: { color: colors.text, fontWeight: '600', fontSize: 14 },
-});

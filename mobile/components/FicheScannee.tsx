@@ -12,6 +12,8 @@ import { colors, radius, spacing } from '../lib/theme';
 type Message = { texte: string; erreur: boolean };
 
 type Props = {
+  pourListe?: boolean;
+  quantite?: number;
   resultat: ResultatRecherche | null;
   ean: string;
   chargement: boolean;
@@ -28,7 +30,7 @@ type Props = {
 };
 
 export function FicheScannee({
-  resultat, ean, chargement, message, onAjouter, onAjouterManuel,
+  pourListe = false, quantite = 1, resultat, ean, chargement, message, onAjouter, onAjouterManuel,
   onMettreEnAttente, onIgnorer, rayon, onChangerRayon,
 }: Props) {
   const [nom, setNom] = useState('');
@@ -96,7 +98,7 @@ export function FicheScannee({
               <Text style={s.secondaireTexte}>Ignorer</Text>
             </Pressable>
             <Pressable style={[s.bouton, s.principal]} onPress={onAjouter}>
-              <Text style={s.principalTexte}>Ajouter aux favoris</Text>
+              <Text style={s.principalTexte}>{pourListe ? `Ajouter × ${quantite} à ma liste` : 'Ajouter aux favoris'}</Text>
             </Pressable>
           </View>
         </>
@@ -111,7 +113,7 @@ export function FicheScannee({
               disparaître le scan sans rien mettre en attente. */}
           <Text style={s.nom}>Réseau indisponible</Text>
           <Text style={s.detail}>
-            {`Impossible de joindre Open Food Facts pour le code ${ean}. Mets-le en attente : il sera ajouté automatiquement dès que le réseau reviendra.`}
+            {pourListe ? 'Reconnecte-toi puis réessaie le scan, ou note le nom depuis l’ajout rapide.' : `Impossible de joindre Open Food Facts pour le code ${ean}. Mets-le en attente : il sera ajouté automatiquement dès que le réseau reviendra.`}
           </Text>
 
           {message && (
@@ -124,9 +126,9 @@ export function FicheScannee({
             <Pressable style={[s.bouton, s.secondaire]} onPress={onIgnorer}>
               <Text style={s.secondaireTexte}>Fermer</Text>
             </Pressable>
-            <Pressable style={[s.bouton, s.principal]} onPress={onMettreEnAttente}>
+            {!pourListe && <Pressable style={[s.bouton, s.principal]} onPress={onMettreEnAttente}>
               <Text style={s.principalTexte}>Mettre en attente</Text>
-            </Pressable>
+            </Pressable>}
           </View>
 
           <Pressable onPress={() => setSaisieManuelle(true)}>
