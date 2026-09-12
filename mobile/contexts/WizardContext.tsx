@@ -1,5 +1,6 @@
+import { WidgetSync } from '../components/WidgetSync';
+import { importerAjouts } from '../lib/widget-products';
 import { nativeInbox } from '../lib/native-inbox';
-import { nouveauxAjouts } from '../lib/ajouts-quotidiens';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, AppState, View, Text } from 'react-native';
 import {
@@ -100,7 +101,7 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
         // Acknowledge only IDs committed to durable account storage.
         if (nativeInbox) {
           try { await nativeInbox.acknowledge(userId, etat.importsExternes ?? []); }
-          catch { setSauvegardeErreur('Ta liste est enregistrée. La synchronisation des ajouts Siri sera retentée à la prochaine ouverture.'); }
+          catch { setSauvegardeErreur('Ta liste est enregistrée. La synchronisation des ajouts Siri et widget sera retentée à la prochaine ouverture.'); }
         }
       })
       .catch(() => setSauvegardeErreur('Le brouillon n’a pas pu être enregistré sur cet appareil.'));
@@ -115,12 +116,9 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
         const pending = await nativeInbox!.read(userId);
         if (!actif) return;
         setEtat(e => {
-          const nouveaux = nouveauxAjouts(pending, e.importsExternes ?? []);
-          if (!nouveaux.length) return e;
-          return { ...e, importsExternes: [...(e.importsExternes ?? []), ...nouveaux.map(x => x.id)],
-            extras: [...e.extras, ...nouveaux.map(x => ({ id: `siri-${x.id}`, name: x.name, quantity: x.quantity, unit: 'unité', rayon: 'autre' as const }))] };
+          return importerAjouts(e, pending);
         });
-      } catch { if (actif) setSauvegardeErreur('Les ajouts Siri ne sont pas accessibles. Ouvre les réglages pour vérifier la configuration iPhone.'); }
+      } catch { if (actif) setSauvegardeErreur('Les ajouts Siri et widget ne sont pas accessibles. Ouvre les réglages pour vérifier la configuration iPhone.'); }
     }
     void importer();
     const listener = AppState.addEventListener('change', state => { if (state === 'active') void importer(); });
@@ -213,7 +211,7 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   ]);
 
   if (!pret) return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F7F2' }}><ActivityIndicator color="#48613A" /><Text>Restauration de ta liste…</Text></View>;
-  return <WizardCtx.Provider value={valeur}>{children}</WizardCtx.Provider>;
+  return <WizardCtx.Provider value={valeur}>{nativeInbox && userId && stockagePret ? <WidgetSync account={userId} state={etat} writes={ecritures} /> : null}{children}</WizardCtx.Provider>;
 }
 
 export function useWizard(): Contexte {

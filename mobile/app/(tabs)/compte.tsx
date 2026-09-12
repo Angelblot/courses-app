@@ -84,7 +84,7 @@ export default function Compte() {
           <Text style={ui.productName}>Avec Siri</Text>
           <Text style={ui.subtitle}>{nativeInbox ? 'Dis « Siri, ajoute un produit dans Courses ». Siri te demande le produit et confirme l’ajout. Tu peux aussi personnaliser la quantité dans l’app Raccourcis, action « Noter un produit manquant ».' : 'Siri est disponible dans la version iPhone intégrant les raccourcis natifs. Il ne fonctionne pas dans cet aperçu web ni dans Expo Go.'}</Text>
           <Text style={ui.productName}>Depuis ton écran d’accueil</Text>
-          <Text style={ui.subtitle}>Sur iPhone, ajoute le widget Courses « Il me manque… ». Un toucher ouvre l’ajout rapide. Les ajouts vocaux rejoignent ta liste à l’ouverture de l’app, sur le même compte.</Text>
+          <Text style={ui.subtitle}>Sur iPhone ou iPad, ajoute le widget Courses « Les essentiels ». Le grand format affiche six produits habituels avec leurs photos : touche + pour en ajouter un, puis « Suivants » pour changer de sélection. La coche confirme l’enregistrement sur cet appareil. Les ajouts du widget et de Siri rejoignent ta liste à l’ouverture de Courses, sur le même compte. Ouvre une première fois l’app pour actualiser tes produits.</Text>
           <Action secondary onPress={()=>router.push('/ajout')}>Essayer l’ajout rapide</Action>
         </View>
         <Action secondary onPress={() => router.push('/favoris')}>Mes favoris et produits</Action>

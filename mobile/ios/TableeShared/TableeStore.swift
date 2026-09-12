@@ -7,10 +7,44 @@ struct TableeMissing: Codable {
   let quantity: Int
   let source: String
   let createdAt: String
+  var productID: String? = nil
+}
+struct TableeProduct: Codable, Identifiable {
+  let id: String
+  let name: String
+  let detail: String
+  let imageURL: String?
+  var imageFile: String? = nil
+  var inList: Bool
 }
 struct TableeData: Codable {
   var account: String? = nil
   var pending: [TableeMissing] = []
+  // Optional fields keep inboxes written by build 29 readable.
+  var products: [TableeProduct]? = nil
+  var widgetAdded: [String: String]? = nil
+  var widgetPage: Int? = nil
+  var pageChangedAt: Date? = nil
+
+  func isAdded(_ id: String) -> Bool {
+    products?.first(where: { $0.id == id })?.inList == true || widgetAdded?[id] != nil || pending.contains { $0.productID == id }
+  }
+  mutating func addProduct(_ id: String, account expected: String) throws {
+    guard account == expected, let product = products?.first(where: { $0.id == id }) else {
+      throw NSError(domain: "Tablee", code: 2, userInfo: [NSLocalizedDescriptionKey: "Ouvre Courses pour actualiser tes produits."])
+    }
+    guard !isAdded(id) else { return }
+    let item = TableeMissing(id: UUID().uuidString, name: String(product.name.prefix(120)), quantity: 1,
+      source: "widget", createdAt: ISO8601DateFormatter().string(from: Date()), productID: id)
+    pending.append(item)
+    var added = widgetAdded ?? [:]; added[id] = item.id; widgetAdded = added
+  }
+  mutating func syncProducts(_ values: [TableeProduct], imported: [String]) {
+    products = values
+    if pageChangedAt == nil { pageChangedAt = .now }
+    let done = Set(imported)
+    widgetAdded = (widgetAdded ?? [:]).filter { !done.contains($0.value) }
+  }
 }
 enum TableeStore {
   static let group = "group.com.coursesapp.mobile"
