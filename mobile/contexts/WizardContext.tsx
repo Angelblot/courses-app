@@ -1,3 +1,4 @@
+import { manquesDuBrouillon, type Manque, type SessionStep } from '../lib/session-courses';
 import { WidgetSync } from '../components/WidgetSync';
 import { importerAjouts } from '../lib/widget-products';
 import { nativeInbox } from '../lib/native-inbox';
@@ -8,16 +9,6 @@ import {
 } from 'react';
 import type { CleRayon } from '../lib/rayons.ts';
 
-export const ETAPES = [
-  { cle: 'recettes', titre: 'Choisis tes recettes' },
-  { cle: 'quotidien', titre: 'Ton quotidien' },
-  { cle: 'ingredients', titre: 'Ingrédients de tes recettes' },
-  { cle: 'recap', titre: 'Récap de ta liste' },
-  { cle: 'generation', titre: 'Choisir mon drive' },
-] as const;
-
-export type CleEtape = (typeof ETAPES)[number]['cle'];
-
 export type LigneExtra = {
   id: string;
   name: string;
@@ -27,6 +18,9 @@ export type LigneExtra = {
 };
 
 export type Etat = {
+  sessionEtape?: SessionStep;
+  manques?: Record<string, Manque>;
+  doublonsValides?: string[];
   importsExternes?: string[];
   habitudesVues?: Record<string, boolean>;
   ligneQuantites: Record<string, number>;
@@ -51,17 +45,21 @@ const INITIAL: Etat = {
 };
 
 type Contexte = Etat & {
+  demarrerSession: () => void;
+  allerEtape: (etape: SessionStep) => void;
+  validerManque: (key: string, quantity: number, productId?: string) => void;
+  accepterDoublon: (id: string) => void;
   pret: boolean; sauvegardeErreur: string | null;
   modifierLigne: (key: string, n: number) => void;
   possederLigne: (key: string, owned: boolean) => void;
-  ajouterProduitListe: (id: string, quantite?: number) => void;
+  ajouterProduitListe: (id: string, quantite?: number, manque?: boolean) => void;
   deciderHabituel: (id: string, quantite: number, acheter: boolean) => void;
   revoirHabitudes: (ids: string[]) => void;
   toggleRecette: (id: string, partsParDefaut: number) => void;
   setParts: (id: string, n: number) => void;
   marquerProduit: (id: string, statut: 'needed' | 'have' | null) => void;
   setQuantite: (id: string, n: number) => void;
-  ajouterExtra: (e: Omit<LigneExtra, 'id'>) => void;
+  ajouterExtra: (e: Omit<LigneExtra, 'id'>, manque?: boolean) => void;
   retirerExtra: (id: string) => void;
   choisirProduit: (cleGroupe: string, produitId: string) => void;
   basculerDrive: (nom: string) => void;
@@ -126,7 +124,8 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   }, [userId, stockagePret]);
   const modifierLigne = useCallback((key: string, n: number) => setEtat(e => ({ ...e, ligneQuantites: { ...e.ligneQuantites, [key]: Math.max(0, Math.ceil(n)) } })), []);
   const possederLigne = useCallback((key: string, owned: boolean) => setEtat(e => ({ ...e, lignePossedees: { ...e.lignePossedees, [key]: owned } })), []);
-  const ajouterProduitListe = useCallback((id: string, quantite = 1) => setEtat(e => ({ ...e,
+  const ajouterProduitListe = useCallback((id: string, quantite = 1, manque?: boolean) => setEtat(e => ({ ...e,
+    manques: !(manque ?? !e.sessionEtape) ? e.manques : { ...manquesDuBrouillon(e), [`produit:${id}`]: { name: 'Produit enregistré', source: 'manuel', valide: false } },
     quotidien: { ...e.quotidien, [id]: 'needed' },
     quotidienQty: { ...e.quotidienQty, [id]: (e.quotidien[id] === 'needed' ? e.quotidienQty[id] ?? 1 : 0) + Math.max(1, Math.round(quantite)) },
     lignePossedees: { ...e.lignePossedees, [`produit:${id}`]: false },
@@ -176,11 +175,13 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
     }));
   }, []);
 
-  const ajouterExtra = useCallback((extra: Omit<LigneExtra, 'id'>) => {
+  const ajouterExtra = useCallback((extra: Omit<LigneExtra, 'id'>, manque?: boolean) => {
+    const extraId = `extra-${Date.now()}-${compteur}-${Math.random().toString(36).slice(2,8)}`;
     setCompteur((c) => c + 1);
     setEtat((e) => ({
       ...e,
-      extras: [...e.extras, { ...extra, id: `extra-${Date.now()}-${compteur}-${Math.random().toString(36).slice(2,8)}` }],
+      extras: [...e.extras, { ...extra, id: extraId }],
+      manques: !(manque ?? !e.sessionEtape) ? e.manques : { ...manquesDuBrouillon(e), [`extra:${extraId}`]: { name: extra.name, source: 'manuel' } },
     }));
   }, [compteur]);
 
@@ -201,12 +202,35 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
 
   const reinitialiser = useCallback(() => setEtat(e => ({ ...INITIAL, importsExternes: e.importsExternes })), []);
 
+  const demarrerSession = useCallback(() => setEtat(e => e.sessionEtape ? e : { ...e,
+    manques: manquesDuBrouillon(e), sessionEtape: 'recettes', habitudesVues: {}, doublonsValides: [],
+  }), []);
+  const allerEtape = useCallback((sessionEtape: SessionStep) => setEtat(e => ({ ...e, sessionEtape })), []);
+  const accepterDoublon = useCallback((id: string) => setEtat(e=>({...e,doublonsValides:[...(e.doublonsValides??[]),id]})),[]);
+  const validerManque = useCallback((key: string, quantity: number, productId?: string) => setEtat(e => {
+    const qty = Math.max(1, Math.round(quantity));
+    const manques = { ...manquesDuBrouillon(e) }, manque = manques[key];
+    if (!manque) return e;
+    const quotidien = {...e.quotidien}, quotidienQty = {...e.quotidienQty}, ligneQuantites = {...e.ligneQuantites}, lignePossedees = {...e.lignePossedees};
+    let extras = [...e.extras];
+    const target = productId ? `produit:${productId}` : key;
+    if (productId) {
+      if (key.startsWith('produit:') && key !== target) { delete quotidien[key.slice(8)]; delete quotidienQty[key.slice(8)]; }
+      if (key.startsWith('extra:')) extras = extras.filter(x=>`extra:${x.id}`!==key);
+      quotidien[productId] = 'needed'; quotidienQty[productId] = qty;
+      delete ligneQuantites[target]; lignePossedees[target] = false;
+    } else { extras = extras.map(x=>`extra:${x.id}`===key ? {...x,quantity:qty} : x); delete ligneQuantites[key]; }
+    if (target !== key) { delete manques[key]; delete ligneQuantites[key]; delete lignePossedees[key]; }
+    manques[target] = {...manque,valide:true};
+    return {...e,manques,quotidien,quotidienQty,extras,ligneQuantites,lignePossedees};
+  }),[]);
+
   const valeur = useMemo<Contexte>(() => ({
-    ...etat, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, deciderHabituel, revoirHabitudes,
+    ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, deciderHabituel, revoirHabitudes,
     toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
   }), [
-    etat, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, deciderHabituel, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
+    etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, deciderHabituel, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
   ]);
 

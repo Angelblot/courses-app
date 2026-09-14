@@ -1,3 +1,4 @@
+import { manquesDuBrouillon } from './session-courses.ts';
 import type { Etat } from '../contexts/WizardContext';
 import type { Product } from '../stores/products';
 import type { Recipe } from '../stores/recipes';
@@ -18,18 +19,22 @@ export function widgetProducts(state: Etat, products: Product[], recipes: Recipe
 export function importerAjouts(state: Etat, pending: unknown): Etat {
   const items = nouveauxAjouts(pending, state.importsExternes ?? []);
   if (!items.length) return state;
-  const next = { ...state, quotidien: {...state.quotidien}, quotidienQty: {...state.quotidienQty},
+  const next = { ...state, manques: {...manquesDuBrouillon(state)}, quotidien: {...state.quotidien}, quotidienQty: {...state.quotidienQty},
     lignePossedees: {...state.lignePossedees}, ligneQuantites: {...state.ligneQuantites}, extras: [...state.extras],
     importsExternes: [...(state.importsExternes ?? []), ...items.map(x => x.id)] };
   for (const item of items) {
     if (item.productID) {
       const id = item.productID;
+      next.manques[`produit:${id}`] = {name:item.name,source:'widget',valide:false};
       // An add from a stale widget must not double an item added in the app meanwhile.
       next.quotidien[id] = 'needed';
       next.quotidienQty[id] = Math.max(state.quotidienQty[id] ?? 0, item.quantity);
       next.lignePossedees[`produit:${id}`] = false;
       if (next.ligneQuantites[`produit:${id}`] === 0) delete next.ligneQuantites[`produit:${id}`];
-    } else next.extras.push({ id: `siri-${item.id}`, name: item.name, quantity: item.quantity, unit: 'unité', rayon: 'autre' });
+    } else {
+      next.extras.push({ id: `siri-${item.id}`, name: item.name, quantity: item.quantity, unit: 'unité', rayon: 'autre' });
+      next.manques[`extra:siri-${item.id}`] = {name:item.name,source:'siri',valide:false};
+    }
   }
   return next;
 }

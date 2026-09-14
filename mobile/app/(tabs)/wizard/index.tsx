@@ -1,2 +1,3 @@
 import { Redirect } from 'expo-router';
-export default function WizardIndex() { return <Redirect href="/liste" />; }
+import { useWizard } from '../../../contexts/WizardContext';
+export default function WizardIndex(){const w=useWizard();return <Redirect href={`/wizard/${w.sessionEtape??'recettes'}`}/>;}

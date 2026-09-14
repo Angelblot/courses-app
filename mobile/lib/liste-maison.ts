@@ -1,3 +1,4 @@
+import { normaliserNom } from './session-courses.ts';
 import type { Etat } from '../contexts/WizardContext';
 import type { Product } from '../stores/products';
 import type { Recipe } from '../stores/recipes';
@@ -51,12 +52,18 @@ export function listeMaison(e: Etat, recettes: Recipe[], produits: Product[]): L
     const existante = lignes.get(key);
     if (existante) { if (statut === 'have') existante.owned = true;
       else existante.totalQuantity = Math.max(existante.totalQuantity,qty);
+      existante.sources.push({type:'quotidien',label:e.manques?.[key]?.source==='widget'?'Widget':e.manques?.[key]?'Manque noté':e.habitudesVues?.[id]?'Habitudes':'Produit ajouté',qty});
       continue;
     }
-    lignes.set(key,{key,name:p.name,unit:p.unit,totalQuantity:qty,product_id:id,ean13:p.ean13,rayon:rayonDepuisLibelle(p.category),sources:[{type:'quotidien',label:'Favoris',qty}],owned:statut==='have',aPreciser:false,candidats:[]});
+    lignes.set(key,{key,name:p.name,unit:p.unit,totalQuantity:qty,product_id:id,ean13:p.ean13,rayon:rayonDepuisLibelle(p.category),sources:[{type:'quotidien',label:e.manques?.[key]?.source==='widget'?'Widget':e.manques?.[key]?'Manque noté':e.habitudesVues?.[id]?'Habitudes':'Produit ajouté',qty}],owned:statut==='have',aPreciser:false,candidats:[]});
   }
   for (const extra of e.extras) {
     const key = `extra:${extra.id}`;
+    const matches = [...lignes.values()].filter(l=>normaliserNom(l.name)===normaliserNom(extra.name)&&l.unit===extra.unit&&!l.owned&&!e.lignePossedees[key]&&e.ligneQuantites[key]!==0);
+    if (matches.length===1) {
+      const l=matches[0]; l.totalQuantity=Math.max(l.totalQuantity,e.ligneQuantites[key]??extra.quantity);
+      l.sources.push({type:'extra',label:extra.id.startsWith('siri-')?'Siri':'Ajout manuel',qty:extra.quantity}); continue;
+    }
     lignes.set(key,{key,name:extra.name,unit:extra.unit,totalQuantity:extra.quantity,product_id:null,ean13:null,rayon:extra.rayon,sources:[{type:'extra',label:'Ajout manuel',qty:extra.quantity}],owned:false,aPreciser:false,candidats:[]});
   }
   return [...lignes.values()].map(l=>{

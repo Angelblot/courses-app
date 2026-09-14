@@ -6,13 +6,13 @@ import { Feather } from '@expo/vector-icons';
 import { useRecipes } from '../../../stores/recipes';
 import { useWizard } from '../../../contexts/WizardContext';
 import { Photo, Action, Head, ui } from '../../../components/MaisonUI';
-export default function Recettes(){
+export default function Recettes({session=false}:{session?:boolean}){
  const r=useRecipes(),w=useWizard(),{width,fontScale}=useWindowDimensions();const [query,setQuery]=useState(''),[tab,setTab]=useState<'choisir'|'menu'>('choisir'),[rapides,setRapides]=useState(false);
  useFocusEffect(useCallback(()=>{r.recharger();},[r.recharger]));
  const choisis=r.recettes.filter(r=>w.selectedRecipes[r.id]!=null);
  const recettes=r.recettes.filter(r=>(tab==='choisir'||w.selectedRecipes[r.id]!=null)&&r.name.toLowerCase().includes(query.toLowerCase())&&(!rapides||((r.prep_minutes??0)+(r.cook_minutes??0)>0&&(r.prep_minutes??0)+(r.cook_minutes??0)<=30)));
  const columns=width>=360&&fontScale<1.4&&tab==='choisir'&&recettes.length>1?2:1;
- return <SafeAreaView edges={['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}>
+ return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}>
  <Head title="On mange quoi ?"/><Text style={ui.subtitle}>Choisis tes repas. Les ingrédients rejoignent ta liste déjà commencée.</Text>
  <View style={ui.row}>{(['choisir','menu'] as const).map(t=><Pressable key={t} accessibilityRole="tab" accessibilityState={{selected:tab===t}} onPress={()=>{setTab(t);setQuery('');setRapides(false);}} style={{flex:1,minHeight:48,borderBottomWidth:tab===t?3:1,borderBottomColor:tab===t?'#48613A':'#DCE1D6',justifyContent:'center'}}><Text style={[ui.link,{textAlign:'center'}]}>{t==='choisir'?'Choisir des recettes':`Mes repas (${choisis.length})`}</Text></Pressable>)}</View>
  <TextInput value={query} onChangeText={setQuery} style={ui.input} placeholder="Une recette, une envie…" accessibilityLabel="Chercher une recette"/>
@@ -25,5 +25,5 @@ export default function Recettes(){
  </View>})}</View>
  {!r.chargement&&!r.erreur&&!recettes.length&&<View style={ui.notice}><Text style={ui.productName}>{tab==='menu'?'Ton menu est encore ouvert.':'Aucune recette trouvée.'}</Text><Text style={ui.subtitle}>{tab==='menu'?'Choisis quelques repas, ou passe directement aux produits habituels.':'Essaie un autre nom ou enlève le filtre de durée.'}</Text>{tab==='menu'&&<Action secondary onPress={()=>setTab('choisir')}>Choisir mes repas</Action>}</View>}
  <View style={ui.sectionRow}><Text style={ui.detail}>Compléter ma collection</Text><Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>router.push('/recettes/nouvelle')}><Text style={ui.link}>Créer</Text></Pressable><Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>router.push('/recettes/importer')}><Text style={ui.link}>Importer</Text></Pressable></View>
- </ScrollView><View style={ui.footer}><Text accessibilityLiveRegion="polite" style={ui.detail}>{choisis.length} repas choisi{choisis.length>1?'s':''} · tes ajouts quotidiens restent dans la liste</Text><Action onPress={()=>router.push('/habitudes')}>{choisis.length?'Continuer avec mes habitudes':'Passer aux produits habituels'}</Action><Pressable accessibilityRole="button" style={{minHeight:44,justifyContent:'center'}} onPress={()=>router.push('/liste')}><Text style={[ui.link,{textAlign:'center'}]}>Voir ma liste complète</Text></Pressable></View></SafeAreaView>
+ </ScrollView><View style={ui.footer}><Text accessibilityLiveRegion="polite" style={ui.detail}>{choisis.length} repas choisi{choisis.length>1?'s':''} · tes ajouts quotidiens restent dans la liste</Text><Action onPress={()=>router.push(session?'/wizard/manques':'/wizard/recettes')}>{session?'Vérifier mes manques':'Préparer ma session de courses'}</Action><Pressable accessibilityRole="button" style={{minHeight:44,justifyContent:'center'}} onPress={()=>setTab(tab==='menu'?'choisir':'menu')}><Text style={[ui.link,{textAlign:'center'}]}>Revoir mes choix</Text></Pressable></View></SafeAreaView>
 }

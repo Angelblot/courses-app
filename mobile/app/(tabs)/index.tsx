@@ -1,26 +1,21 @@
-import { ImageBackground, Pressable, ScrollView, Text, View, ActivityIndicator } from 'react-native';
+import { ScrollView, Text, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 import { useMaison } from '../../contexts/useMaison';
-import { Head, Photo, ScanAction, Action, ui } from '../../components/MaisonUI';
-import { colors } from '../../lib/theme';
+import { Head, Photo, Action, ui } from '../../components/MaisonUI';
+import { manquesDuBrouillon, manqueActif, SESSION_STEPS } from '../../lib/session-courses';
 export default function Maison(){
- const {w,p,r,acheter,loading,erreur}=useMaison();
- const mois=new Intl.DateTimeFormat('fr-FR',{month:'long'}).format(new Date());
+ const {w,p,r,loading,erreur}=useMaison();
+ const manques=Object.entries(manquesDuBrouillon(w)).filter(([key])=>manqueActif(w,key));
  return <SafeAreaView edges={['top']} style={ui.screen}><ScrollView contentContainerStyle={ui.content}>
- <Head title="Courses"/><Text style={ui.heading}>On prépare les courses ?</Text><Text style={ui.subtitle}>Ta liste de {mois}</Text>
- {erreur?<View><Text style={ui.error}>{erreur}</Text><Action secondary onPress={()=>{p.recharger();r.recharger();}}>Réessayer</Action></View>:null}
- {w.sauvegardeErreur&&<Text style={ui.error}>{w.sauvegardeErreur}</Text>}
- <ImageBackground source={require('../../assets/tablee/grocery-banner.webp')} imageStyle={{borderRadius:16}} resizeMode="cover" style={{height:210,width:'100%',justifyContent:'center',padding:18,borderRadius:16,overflow:'hidden'}}>
- <View style={{alignSelf:'flex-start',backgroundColor:'#F5F7F2E8',borderRadius:12,padding:12,maxWidth:'74%',gap:8}}>
- {loading?<ActivityIndicator color={colors.accent}/>:<Text style={[ui.heading,{fontSize:30}]}>{acheter.length} article{acheter.length>1?'s':''}</Text>}
- <Text style={ui.detail}>Dans ta liste en cours</Text><Action onPress={()=>router.push('/liste')}>{acheter.length?'Reprendre ma liste':'Commencer ma liste'}</Action></View>
- </ImageBackground><Action onPress={()=>router.push('/ajout')}>+ Il me manque un produit</Action>
- <View style={ui.notice}><Text style={ui.productName}>Préparer mes prochaines courses</Text><Text style={ui.detail}>Tes manques sont déjà notés. Complète avec tes repas, puis tes habitudes.</Text><View style={[ui.row,{marginTop:10}]}><View style={{flex:1}}><Action secondary onPress={()=>router.push('/recettes')}>Choisir mes repas</Action></View><View style={{flex:1}}><Action secondary onPress={()=>router.push('/habitudes')}>Mes habitudes</Action></View></View></View><ScanAction/>
- <View style={ui.sectionRow}><Text style={ui.section}>À reprendre d’habitude</Text><Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>router.push('/favoris')}><Text style={ui.link}>Tout voir</Text></Pressable></View>
- {p.produits.filter(p=>p.favorite).slice(0,3).map(p=><View key={p.id} style={ui.product}><Photo name={p.name} url={p.image_url}/><View style={{flex:1}}><Text style={ui.productName}>{p.name}</Text><Text style={ui.detail}>{p.volume_ml?`${p.volume_ml} ml`:p.grammage_g?`${p.grammage_g} g`:p.brand}</Text>{w.quotidien[p.id]==='needed'&&<Text style={ui.detail}>{w.quotidienQty[p.id]??1} demandé{(w.quotidienQty[p.id]??1)>1?'s':''}</Text>}</View><Pressable accessibilityRole="button" accessibilityLabel={`Ajouter ${p.name} à ma liste`} onPress={()=>w.ajouterProduitListe(p.id)} style={ui.add}><Feather name="plus" size={24} color="white"/></Pressable></View>)}
- {!loading&&!erreur&&!p.produits.some(p=>p.favorite)&&<Text style={ui.subtitle}>Scanne un produit pour enregistrer ton premier favori.</Text>}
- <Action secondary onPress={()=>router.push('/favoris')}>Rechercher ou ajouter un produit</Action>
- </ScrollView></SafeAreaView>
+ <Head title="Courses"/><Text style={ui.heading}>Les courses, à ton rythme.</Text><Text style={ui.subtitle}>Note ce qui manque au fil des jours. Prépare le reste quand tu es prêt.</Text>
+ <View style={[ui.notice,{marginTop:8,gap:12,padding:20}]}><Text style={ui.section}>{w.sessionEtape?'Ta session est en cours.':'On prépare les prochaines courses ?'}</Text><Text style={ui.subtitle}>{w.sessionEtape?`Reprends à l’étape « ${SESSION_STEPS.find(s=>s.cle===w.sessionEtape)?.label} ». Tes choix sont conservés.`:'Choisis tes repas, vérifie tes manques et passe tes habitudes en revue.'}</Text><Action onPress={()=>{w.demarrerSession();router.push(`/wizard/${w.sessionEtape??'recettes'}`);}}>{w.sessionEtape?'Reprendre ma session':'Commencer une session'}</Action></View>
+ <View style={ui.sectionRow}><Text style={ui.section}>Ce qu’il me manque</Text><Text style={ui.detail}>{manques.length} produit{manques.length>1?'s':''}</Text></View>
+ <Text style={ui.detail}>Depuis le widget, Siri ou tes ajouts dans l’app.</Text>
+ {loading&&<ActivityIndicator/>}{erreur&&<><Text style={ui.error}>{erreur}</Text><Action secondary onPress={()=>{p.recharger();r.recharger();}}>Réessayer</Action></>}{w.sauvegardeErreur&&<Text style={ui.error}>{w.sauvegardeErreur}</Text>}
+ {manques.slice(0,4).map(([key,m])=>{const id=key.startsWith('produit:')?key.slice(8):undefined,prod=p.produits.find(p=>p.id===id),extra=w.extras.find(x=>`extra:${x.id}`===key);return <View key={key} style={ui.product}><Photo name={prod?.name??m.name} url={prod?.image_url}/><View style={{flex:1}}><Text style={ui.productName}>{prod?.name??extra?.name??m.name}</Text><Text style={ui.detail}>{m.source==='widget'?'Widget':m.source==='siri'?'Siri':'Noté pour les courses'}</Text></View><Text style={ui.num}>× {id?w.quotidienQty[id]??1:extra?.quantity??1}</Text></View>})}
+ {!loading&&!manques.length&&<Text style={ui.subtitle}>Rien de noté pour le moment. Le prochain produit ajouté au widget apparaîtra ici.</Text>}
+ {manques.length>0&&<Action secondary onPress={()=>router.push('/manques')}>Voir mes manques</Action>}
+ <Action secondary onPress={()=>router.push('/ajout')}>Noter un produit manquant</Action>
+ </ScrollView></SafeAreaView>;
 }

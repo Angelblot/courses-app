@@ -2,7 +2,7 @@ import { useWizard } from '../../contexts/WizardContext';
 import { useCallback, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FicheScannee } from '../../components/FicheScannee';
@@ -20,10 +20,11 @@ const ajouterAuxFavoris = (fiche: FicheProduit) =>
   enregistrerScanFavori(fiche, ajouterProduit, basculerFavori);
 
 export default function Scan() {
-  const { destination, quantite } = useLocalSearchParams<{ destination?: string; quantite?: string }>();
+  const { destination, quantite, manque } = useLocalSearchParams<{ destination?: string; quantite?: string; manque?: string }>();
   const scanQty = Math.min(99, Math.max(1, Math.round(Number(quantite)) || 1));
   const w = useWizard();
   const pourListe = destination === 'liste';
+  const retour = <Pressable accessibilityRole="button" style={s.bouton} onPress={()=>router.replace(pourListe?(manque==='0'?'/wizard/exceptions':'/ajout'):'/favoris')}><Text style={s.boutonTexte}>Revenir à mes produits</Text></Pressable>;
   const [cameraActive, setCameraActive] = useState(false);
   useFocusEffect(useCallback(() => { setCameraActive(true); return () => setCameraActive(false); }, []));
   const [permission, demanderPermission] = useCameraPermissions();
@@ -108,7 +109,7 @@ export default function Scan() {
         try {
         const res = await ajouterProduit(aEnregistrer, false);
         const produit = res.produit ?? res.doublon;
-        if (produit) { w.ajouterProduitListe(produit.id, scanQty); setMessage({texte: `${scanQty} × ${produit.name} ajouté à ta liste de courses`, erreur: false}); setTimeout(reprendre, 1500); }
+        if (produit) { w.ajouterProduitListe(produit.id, scanQty, manque === undefined ? undefined : manque === '1'); setMessage({texte: `${scanQty} × ${produit.name} ajouté à ta liste de courses`, erreur: false}); setTimeout(reprendre, 1500); }
         else { enregistrement.current = false; setMessage({texte: res.erreur ?? 'Connexion indisponible. Réessaie pour ajouter ce produit à la liste.', erreur: true}); }
         } catch { enregistrement.current = false; setMessage({texte:'Enregistrement impossible. Réessaie.',erreur:true}); }
         return;
@@ -133,7 +134,7 @@ export default function Scan() {
         setTimeout(reprendre, 1600);
       }
     },
-    [reprendre, rafraichirCompteur, pourListe, scanQty, w.ajouterProduitListe],
+    [reprendre, rafraichirCompteur, pourListe, scanQty, manque, w.ajouterProduitListe],
   );
 
   /**
@@ -283,7 +284,7 @@ export default function Scan() {
   if (!permission.granted) {
     return (
       <SafeAreaView style={[s.ecran, s.centre]}>
-        <Text style={s.titre}>Accès à l'appareil photo</Text>
+        {retour}<Text style={s.titre}>Accès à l'appareil photo</Text>
         <Text style={s.corps}>
           Le scan a besoin de la caméra pour lire les codes-barres de tes produits.
         </Text>
@@ -303,7 +304,8 @@ export default function Scan() {
         barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8'] }}
         onBarcodeScanned={ean ? undefined : surLecture}
       />}
-      <SafeAreaView style={s.consigne} pointerEvents="none">
+      <SafeAreaView style={s.consigne} pointerEvents="box-none">
+        {retour}
         <Text style={s.consigneTexte}>Vise le code-barres du produit</Text>
         {(enAttenteCount > 0 || avisFile) && (
           <Text style={[s.fileTexte, avisFile?.erreur && s.fileTexteAlerte]}>
