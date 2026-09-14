@@ -1,0 +1,24 @@
+const {chromium}=require('playwright');const fs=require('fs');
+const user={id:'11111111-1111-4111-8111-111111111111',aud:'authenticated',role:'authenticated',email:'demo@example.test'};
+const token=['eyJhbGciOiJIUzI1NiJ9',Buffer.from(JSON.stringify({sub:user.id,exp:Math.floor(Date.now()/1000)+36000,role:'authenticated'})).toString('base64url'),'demo'].join('.');
+const session={access_token:token,refresh_token:'demo',expires_in:36000,expires_at:Math.floor(Date.now()/1000)+36000,token_type:'bearer',user};
+const products=[{id:'oeufs',name:'Œufs Plein Air',ean13:'1234567890123',unit:'unité',brand:'Plein air',category:'pls',favorite:true,image_url:null,grammage_g:null,volume_ml:null,product_type:'oeuf'},{id:'patates',name:'Pommes de terre',ean13:'1234567890124',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:1000,volume_ml:null,product_type:'pomme_de_terre'},{id:'oignons',name:'Oignons jaunes',ean13:'1234567890125',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:500,volume_ml:null,product_type:'oignon'}];
+const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,image_url:null,prep_minutes:15,cook_minutes:40,recipe_ingredients:[{id:'ing',name:'Pommes de terre',quantity_per_serving:300,unit:'g',rayon:'fruits_legumes',product_id:'patates'}]}];
+(async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{
+ const page=await b.newPage({viewport:{width:390,height:844},serviceWorkers:'block'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const choices=[...products,{...products[2],id:'rouges',name:'Oignons rouges',grammage_g:750},{...products[2],id:'filet',name:'Oignons jaunes en filet',grammage_g:1000}];
+ await page.route('https://qmymwicsgilhoihtfdjm.supabase.co/**',async route=>{const url=route.request().url();let data=[];if(url.includes('/auth/v1/user'))data=user;else if(url.includes('/auth/v1/token'))data=session;else if(url.includes('/rest/v1/products'))data=choices;else if(url.includes('/rest/v1/recipes'))data=recipes;await route.fulfill({json:data});});
+ await page.addInitScript(({session,id})=>{localStorage.setItem('sb-qmymwicsgilhoihtfdjm-auth-token',JSON.stringify(session));if(!localStorage.getItem('seeded-rail')){localStorage.setItem('tablee-maison-v1:'+id,JSON.stringify({quotidien:{oignons:'needed'},quotidienQty:{oignons:2},manques:{'produit:oignons':{name:'Oignons jaunes',source:'widget'}}}));localStorage.setItem('seeded-rail','yes');}}, {session,id:user.id});
+ await page.goto('http://localhost:8082/wizard/manques');await page.getByRole('textbox',{name:'Chercher un remplacement pour Oignons jaunes'}).fill('oignon');
+ const chosen=page.getByRole('button',{name:/Produit sélectionné : Oignons jaunes,/});await chosen.waitFor();
+ fs.mkdirSync('.impeccable/review/product-suggestions',{recursive:true});await page.screenshot({path:'.impeccable/review/product-suggestions/phone.png'});
+ await page.getByRole('button',{name:/Choisir ce produit : Oignons rouges,/}).click();
+ await page.getByRole('button',{name:'Confirmer 2 × Oignons rouges',exact:true}).click();
+ await page.waitForTimeout(400);const draft=await page.evaluate(id=>JSON.parse(localStorage.getItem('tablee-maison-v1:'+id)),user.id);
+ if(draft.quotidien.rouges!=='needed'||draft.quotidienQty.rouges!==2||draft.quotidien.oignons)throw Error('Replacement/quantity regression');
+ await page.goto('http://localhost:8082/wizard/exceptions');await page.getByRole('textbox',{name:'Produit manquant'}).fill('oignon');
+ await page.setViewportSize({width:1024,height:1366});await page.screenshot({path:'.impeccable/review/product-suggestions/tablet.png'});
+ await page.getByRole('button',{name:/Ajouter × 1 : Oignons jaunes,/}).click();
+ if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Horizontal page overflow');
+ if(errors.length)throw Error(errors.join('\n'));console.log('PASS photo selection, quantity preservation, replacement and quick add');
+ }catch(e){console.error(e);process.exitCode=1}finally{await b.close()}})();

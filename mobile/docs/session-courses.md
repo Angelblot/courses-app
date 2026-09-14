@@ -29,3 +29,7 @@ Le choix du drive reste bloqué tant qu’il existe des manques non confirmés, 
 Le comportement est défini dans `lib/session-courses.ts`, `lib/liste-maison.ts` et `contexts/WizardContext.tsx`. Les écrans principaux sont `components/Manques.tsx`, `app/(tabs)/index.tsx` et `app/(tabs)/wizard/[etape].tsx`, avec leurs composants d’étape.
 
 Validation de cette version : 204 tests unitaires, vérification TypeScript, parcours E2E et export du bundle iOS réussis, y compris la régression de suppression d’une ligne fusionnée. Les E2E utilisent React Native Web et des services simulés ; ils ne valident pas le matériel iOS ni les interactions natives réelles. Revue finale : SHIP. Cette version n’a pas été publiée sur TestFlight.
+
+## Propositions de produits
+
+Les remplacements des manques, choix de produits au bilan, résultats du catalogue et résultats Open Food Facts utilisent une rangée horizontale de cartes. Chaque carte présente la photo disponible, le nom, la marque et le format. La sélection est indiquée par une bordure verte et une coche, sans changer la quantité. Dans l’ajout exceptionnel, le bouton indique explicitement la quantité ajoutée. Une sélection ferme le clavier ; la confirmation du remplacement reste distincte.

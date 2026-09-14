@@ -1,3 +1,4 @@
+import { ProductSuggestions, productSuggestion } from '../ProductSuggestions';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { EtatVide } from '../EtatVide';
@@ -52,28 +53,8 @@ export function EtapeIngredients() {
               <Text style={s.aucun}>
                 Aucun produit de ton catalogue ne correspond. Il partira sous son nom générique.
               </Text>
-            ) : g.matchingProducts.length === 1 ? (
-              <Text style={s.unique}>{g.matchingProducts[0].name}</Text>
             ) : (
-              <View style={s.candidats}>
-                {g.matchingProducts.map((p) => {
-                  const actif = p.id === retenu;
-                  return (
-                    <Pressable
-                      key={p.id}
-                      style={[s.candidat, actif && s.candidatActif]}
-                      onPress={() => w.choisirProduit(g.key, p.id)}
-                    >
-                      <Text
-                        style={[s.candidatTexte, actif && s.candidatTexteActif]}
-                        numberOfLines={2}
-                      >
-                        {p.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <ProductSuggestions items={produits.filter(p=>g.matchingProducts.some(c=>c.id===p.id)).map(productSuggestion)} selectedId={retenu} onSelect={id=>w.choisirProduit(g.key,id)}/>
             )}
           </View>
         );

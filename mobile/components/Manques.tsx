@@ -1,3 +1,4 @@
+import { ProductSuggestions, productSuggestion } from './ProductSuggestions';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +18,8 @@ function ManqueRow({lineKey,manque,products}:{lineKey:string;manque:Manque;produ
  <View style={ui.row}><Photo name={name} url={selected?.image_url}/><View style={{flex:1}}><Text style={ui.productName}>{name}</Text><Text style={ui.detail}>{sources[manque.source]}{manque.valide?' · Vérifié':''}</Text><Text style={ui.detail}>{selected?[selected.brand,selected.volume_ml?`${selected.volume_ml} ml`:selected.grammage_g?`${selected.grammage_g} g`:selected.unit].filter(Boolean).join(' · '):'Libellé libre · choisis un produit ou garde ce nom'}</Text></View></View>
  {(!manque.valide||edit)&&<><View style={ui.sectionRow}><Text style={ui.detail}>Nombre d’articles</Text><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel={`Diminuer ${name}`} style={ui.iconButton} onPress={()=>setQty(Math.max(1,qty-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{qty}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Augmenter ${name}`} style={ui.iconButton} onPress={()=>setQty(Math.min(99,qty+1))}><Text style={ui.title}>+</Text></Pressable></View></View>
  <TextInput style={ui.input} value={search} onChangeText={setSearch} placeholder="Changer de produit ou de format…" accessibilityLabel={`Chercher un remplacement pour ${name}`}/>
- {search.trim().length>=2&&products.filter(p=>p.name.toLowerCase().includes(search.toLowerCase())).slice(0,8).map(p=><Action key={p.id} secondary={chosen!==p.id} onPress={()=>{setChosen(p.id);setSearch('');}}>{p.name}{p.volume_ml?` · ${p.volume_ml} ml`:p.grammage_g?` · ${p.grammage_g} g`:''}</Action>)}
+ {search.trim().length>=2&&<ProductSuggestions items={products.filter(p=>p.name.toLowerCase().includes(search.trim().toLowerCase())).slice(0,20).map(productSuggestion)} selectedId={chosen} onSelect={setChosen}/>}
+ {search.trim().length>=2&&!products.some(p=>p.name.toLowerCase().includes(search.trim().toLowerCase()))&&<Text style={ui.detail}>Aucun produit trouvé. Essaie un autre nom.</Text>}
  {!!id&&!product&&!selected&&<Text style={ui.error}>Ce produit n’est plus dans le catalogue. Choisis un remplacement ou retire ce manque.</Text>}
  <Action disabled={!!chosen&&!selected} onPress={()=>{w.validerManque(lineKey,qty,chosen);setEdit(false);}}>Confirmer {qty} × {name}</Action></>}
  <View style={ui.sectionRow}>{manque.valide&&<Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>setEdit(!edit)}><Text style={ui.link}>{edit?'Fermer':'Modifier'}</Text></Pressable>}<Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>w.modifierLigne(lineKey,0)}><Text style={ui.detail}>Je n’en ai plus besoin</Text></Pressable></View>
