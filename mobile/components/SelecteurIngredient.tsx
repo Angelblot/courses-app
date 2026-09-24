@@ -3,7 +3,8 @@ import {
   ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { filtrerCatalogue } from '../lib/recettes-affichage.ts';
-import { rechercherParNom, type FicheProduit } from '../lib/openfoodfacts.ts';
+import { type FicheProduit } from '../lib/openfoodfacts.ts';
+import { useRechercheOff } from '../hooks/useRechercheOff';
 import { rayonDepuisLibelle, type CleRayon } from '../lib/rayons.ts';
 import { useProducts, ajouterProduit, type Product } from '../stores/products';
 import { PastilleNutri } from './PastilleNutri';
@@ -32,25 +33,14 @@ function depuisProduit(p: Product): ChoixIngredient {
 export function SelecteurIngredient({ onChoisir, onFermer }: Props) {
   const { produits, recharger } = useProducts();
   const [requete, setRequete] = useState('');
-  const [enRecherche, setEnRecherche] = useState(false);
-  const [resultatsOff, setResultatsOff] = useState<FicheProduit[] | null>(null);
-  const [messageOff, setMessageOff] = useState<string | null>(null);
+  const off = useRechercheOff();
+  const { enRecherche, resultats: resultatsOff } = off;
   const [erreur, setErreur] = useState<string | null>(null);
 
   const duCatalogue = filtrerCatalogue(produits, requete).slice(0, MAX_CATALOGUE);
   const assezLong = requete.trim().length >= 3;
 
-  /** Jamais déclenchée à la frappe : Open Food Facts est gratuit et fragile. */
-  const chercherOff = async () => {
-    setEnRecherche(true);
-    setMessageOff(null);
-    setResultatsOff(null);
-    const r = await rechercherParNom(requete);
-    setEnRecherche(false);
-    if (r.etat === 'trouve') setResultatsOff(r.fiches);
-    else if (r.etat === 'vide') setMessageOff('Aucun résultat pour cette recherche.');
-    else setMessageOff('Open Food Facts est injoignable. Ton catalogue reste utilisable.');
-  };
+  const chercherOff = () => { void off.chercher(requete); };
 
   const choisirFiche = async (fiche: FicheProduit) => {
     // Un code-barres déjà connu ne doit pas créer un doublon : on rattache
@@ -86,7 +76,9 @@ export function SelecteurIngredient({ onChoisir, onFermer }: Props) {
       <TextInput
         style={s.champ}
         value={requete}
-        onChangeText={setRequete}
+        onChangeText={texte => { setRequete(texte); off.reinitialiser(); setErreur(null); }}
+        returnKeyType="search"
+        onSubmitEditing={chercherOff}
         placeholder="Lardons, crème, spaghetti…"
         placeholderTextColor={colors.textMuted}
         autoFocus
@@ -122,7 +114,9 @@ export function SelecteurIngredient({ onChoisir, onFermer }: Props) {
             : <Text style={s.boutonTexte}>Chercher dans Open Food Facts</Text>}
         </Pressable>
         {!assezLong && <Text style={s.vide}>Saisis au moins trois caractères.</Text>}
-        {messageOff && <Text style={s.vide}>{messageOff}</Text>}
+        {enRecherche && <Text accessibilityLiveRegion="polite" style={s.vide}>{off.progression}</Text>}
+        {off.erreur && <Text accessibilityLiveRegion="polite" style={s.vide}>{off.erreur}</Text>}
+        {resultatsOff?.length === 0 && <Text style={s.vide}>Aucun résultat pour cette recherche.</Text>}
 
         {resultatsOff?.map((f) => {
           const deja = produits.some((p) => p.ean13 && p.ean13 === f.ean13);

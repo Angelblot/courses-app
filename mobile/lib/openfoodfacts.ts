@@ -184,43 +184,100 @@ export function analyserRechercheNom(json: unknown): FicheProduit[] {
 export type ResultatRechercheNom =
   | { etat: 'trouve'; fiches: FicheProduit[] }
   | { etat: 'vide' }
-  | { etat: 'indisponible' };
+  | { etat: 'annule' }
+  | { etat: 'indisponible'; raison?: 'limite' | 'reseau'; reessayerDans?: number };
 
-/** Nombre de résultats demandés : au-delà, la liste devient illisible au pouce. */
-const TAILLE_PAGE = 12;
+export type OptionsRechercheNom = {
+  signal?: AbortSignal;
+  onTentative?: (numero: number) => void;
+};
 
-/**
- * Cherche des produits par nom dans Open Food Facts.
- *
- * On emploie `cgi/search.pl` et non `/api/v2/search` : cette dernière répondait
- * `503` le 22/08/2026 — « Page temporarily unavailable ». L'ancienne route
- * fonctionne et rend les mêmes champs.
- *
- * L'indisponibilité est un état ordinaire, pas une erreur : Open Food Facts est
- * un service gratuit, et le catalogue local reste utilisable sans lui.
- */
-export async function rechercherParNom(requete: string): Promise<ResultatRechercheNom> {
-  const q = requete.trim();
-  if (q.length < 3) return { etat: 'vide' };
+/** Cache borné et reprises limitées : pas de recherche à chaque frappe. */
+export function creerRechercheParNom({
+  requeteHttp = (...args: Parameters<typeof fetch>) => fetch(...args),
+  maintenant = Date.now,
+  delaiTentative = 12_000,
+  budget = 25_000,
+  pause = 1_000,
+} = {}) {
+  const cache = new Map<string, { date: number; resultat: ResultatRechercheNom }>();
+  let limiteJusqua = 0;
 
-  const controleur = new AbortController();
-  const minuteur = setTimeout(() => controleur.abort(), DELAI_MS);
-  try {
-    const url = 'https://world.openfoodfacts.org/cgi/search.pl'
-      + `?search_terms=${encodeURIComponent(q)}`
-      + '&search_simple=1&action=process&json=1'
-      + `&page_size=${TAILLE_PAGE}`
-      + `&fields=${CHAMPS},code`;
-    const reponse = await fetch(url, {
-      headers: { 'User-Agent': 'courses-app/1.0 (usage familial)' },
-      signal: controleur.signal,
+  return async (requete: string, options: OptionsRechercheNom = {}): Promise<ResultatRechercheNom> => {
+    const q = requete.trim().replace(/\s+/g, ' ');
+    if (options.signal?.aborted) return { etat: 'annule' };
+    if (q.length < 3) return { etat: 'vide' };
+    const cle = q.toLocaleLowerCase('fr');
+    const memorise = cache.get(cle);
+    if (memorise && maintenant() - memorise.date < 5 * 60_000) return memorise.resultat;
+    if (maintenant() < limiteJusqua) return {
+      etat: 'indisponible', raison: 'limite', reessayerDans: Math.ceil((limiteJusqua - maintenant()) / 1_000),
+    };
+
+    const global = new AbortController();
+    const annuler = () => global.abort();
+    options.signal?.addEventListener('abort', annuler, { once: true });
+    const fin = setTimeout(annuler, budget);
+    const attendre = (ms: number) => new Promise<void>(resolve => {
+      if (global.signal.aborted) { resolve(); return; }
+      const terminer = () => { clearTimeout(timer); global.signal.removeEventListener('abort', terminer); resolve(); };
+      const timer = setTimeout(terminer, ms);
+      global.signal.addEventListener('abort', terminer, { once: true });
     });
-    if (!reponse.ok) return { etat: 'indisponible' };
-    const fiches = analyserRechercheNom(await reponse.json());
-    return fiches.length ? { etat: 'trouve', fiches } : { etat: 'vide' };
-  } catch {
-    return { etat: 'indisponible' };
-  } finally {
-    clearTimeout(minuteur);
-  }
+    const url = 'https://world.openfoodfacts.org/cgi/search.pl'
+      + `?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1`
+      + `&page_size=12&fields=${CHAMPS},code`;
+    try {
+      for (let tentative = 1; tentative <= 3 && !global.signal.aborted; tentative++) {
+        if (tentative > 1) await attendre(pause * (tentative - 1));
+        if (global.signal.aborted) break;
+        options.onTentative?.(tentative);
+        const controleur = new AbortController();
+        const abandonner = () => controleur.abort();
+        global.signal.addEventListener('abort', abandonner, { once: true });
+        const timer = setTimeout(abandonner, delaiTentative);
+        try {
+          const reponse = await requeteHttp(url, {
+            headers: { 'User-Agent': 'courses-app/1.0 (usage familial)' }, signal: controleur.signal,
+          });
+          // Une limitation n'est pas une panne : respecter Retry-After et éviter
+          // qu'un nouveau clic ou un autre écran relance immédiatement la requête.
+          if (reponse.status === 429) {
+            const valeur = reponse.headers.get('Retry-After');
+            const secondes = valeur === null ? NaN : Number(valeur);
+            const date = valeur ? Date.parse(valeur) : NaN;
+            const attente = Number.isFinite(secondes) ? secondes * 1_000
+              : Number.isFinite(date) ? date - maintenant() : 60_000;
+            limiteJusqua = maintenant() + Math.max(1_000, attente);
+            return { etat: 'indisponible', raison: 'limite', reessayerDans: Math.ceil((limiteJusqua - maintenant()) / 1_000) };
+          }
+          if (!reponse.ok) {
+            if (reponse.status === 408 || reponse.status >= 500) continue;
+            return { etat: 'indisponible', raison: 'reseau' };
+          }
+          const json = await reponse.json();
+          // Une page de maintenance / réponse invalide n'est pas « aucun produit ».
+          if (!json || !Array.isArray(json.products)) continue;
+          if (global.signal.aborted || controleur.signal.aborted) continue;
+          const fiches = analyserRechercheNom(json);
+          const resultat: ResultatRechercheNom = fiches.length ? { etat: 'trouve', fiches } : { etat: 'vide' };
+          cache.delete(cle);
+          cache.set(cle, { date: maintenant(), resultat });
+          if (cache.size > 30) cache.delete(cache.keys().next().value!);
+          return resultat;
+        } catch {
+          // Réseau, timeout ou JSON invalide : le budget borne toutes les reprises.
+        } finally {
+          clearTimeout(timer);
+          global.signal.removeEventListener('abort', abandonner);
+        }
+      }
+      return options.signal?.aborted ? { etat: 'annule' } : { etat: 'indisponible', raison: 'reseau' };
+    } finally {
+      clearTimeout(fin);
+      options.signal?.removeEventListener('abort', annuler);
+    }
+  };
 }
+
+export const rechercherParNom = creerRechercheParNom();
