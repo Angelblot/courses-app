@@ -53,6 +53,23 @@
 	<string>Le micro n'est pas utilisé par l'application ; cette autorisation vient du module de caméra.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choisis une photo pour illustrer ta recette.</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>EXExpoAppSceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>NSUserActivityTypes</key>
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
