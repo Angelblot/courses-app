@@ -3,8 +3,8 @@
   "short_name": "Courses",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#00bcd4",
+  "background_color": "#f5f7f2",
+  "theme_color": "#48613a",
   "orientation": "portrait",
   "icons": [
     {

@@ -78,11 +78,34 @@ def _consolidate(
         else:
             bucket[key] = item
 
+    selected = {}
+    for r in payload.recipes:
+        recipe = db.get(Recipe, r.recipe_id)
+        if recipe is None:
+            raise HTTPException(422, "Une recette sélectionnée n’est plus disponible")
+        selected[r.recipe_id] = recipe
+    refs = {(r.id, ing.name, ing.unit) for r in selected.values() for ing in r.ingredients}
+    overridden = set()
+    for choice in payload.ingredient_overrides:
+        keys = {(ref.recipe_id, ref.name, ref.unit) for ref in choice.ingredients}
+        if not keys.issubset(refs) or keys & overridden:
+            raise HTTPException(422, "Choix d’ingrédient invalide ou en double")
+        overridden.update(keys)
+        if choice.owned:
+            continue
+        product = db.get(Product, choice.product_id) if choice.product_id else None
+        if product is None:
+            raise HTTPException(422, "Le produit choisi n’est plus disponible")
+        _add(WizardConsolidatedItem(name=product.name, quantity=choice.quantity,
+            unit=product.unit, category=product.category, product_id=product.id, product_label=product.name))
+
     for r in payload.recipes:
         recipe = db.get(Recipe, r.recipe_id)
         if recipe is None:
             continue
         for ing in recipe.ingredients:
+            if (recipe.id, ing.name, ing.unit) in overridden:
+                continue
             # Résoudre food_id → product_id (si food_id présent)
             product_id = ing.product_id  # fallback sur l'ancien lien direct
             product_label = None

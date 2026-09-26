@@ -1,28 +1,43 @@
 import { create } from 'zustand';
+import { useRecipesStore } from './recipesStore.js';
+import { useProductsStore } from './productsStore.js';
+import { persist } from 'zustand/middleware';
 import { WizardAPI, ResolverAPI } from '../api.js';
 import { useUIStore } from './uiStore.js';
 import { convertToProductQty, isConvertible, formatIngredientQty, normalizeUnit } from '../lib/unitConverter.js';
 
 export const WIZARD_STEPS = [
-  { key: 'recipes', label: 'Recettes' },
-  { key: 'checklist', label: 'Quotidien' },
-  { key: 'ingredients', label: 'Ingrédients' },
-  { key: 'recap', label: 'Récap' },
-  { key: 'generate', label: 'Générer' },
+  { key: 'recipes', label: 'Mes repas' },
+  { key: 'checklist', label: 'Ma liste' },
+  { key: 'recap', label: 'Mes paniers' },
 ];
+export const canonicalStep = (step) => ({ ingredients: 'checklist', generate: 'recap' }[step] || step);
 
 const INITIAL = {
   selectedRecipes: {},
+  ingredientChoices: {},
   quotidien: {},
   quotidienQty: {},
   extras: [],
-  selectedDrives: ['carrefour', 'leclerc'],
+  selectedDrives: [],
+  lastStep: 'recipes',
+  draftStarted: false,
+  launchError: null,
   sessionId: null,
   generating: false,
 };
 
-export const useWizardStore = create((set, get) => ({
+export const useWizardStore = create(persist((set, get) => ({
   ...INITIAL,
+
+  setLastStep: (lastStep) => set({ lastStep, draftStarted: true }),
+  lastSessionId: null,
+  favoriteRecipes: [],
+  defaultServings: 4,
+  setDefaultServings: (n) => set({ defaultServings: Math.max(1, Math.min(20, Number(n) || 4)) }),
+  toggleFavoriteRecipe: (id) => set((s) => ({ favoriteRecipes: s.favoriteRecipes.includes(id) ? s.favoriteRecipes.filter((v) => v !== id) : [...s.favoriteRecipes, id] })),
+  setIngredientChoice: (key, patch) => set((s) => ({ ingredientChoices: { ...s.ingredientChoices, [key]: { ...s.ingredientChoices[key], ...patch } } })),
+  updateExtra: (id, patch) => set((s) => ({ extras: s.extras.map((e) => e.id === id ? {...e, ...patch} : e) })),
 
   reset: () =>
     set({
@@ -85,9 +100,19 @@ export const useWizardStore = create((set, get) => ({
   setDrives: (drives) => set({ selectedDrives: drives }),
 
   launch: async () => {
-    const { selectedRecipes, quotidien, quotidienQty, extras, selectedDrives } = get();
+    if (get().generating || get().selectedDrives.length === 0) return null;
+    const { selectedRecipes, quotidien, quotidienQty, extras, selectedDrives, ingredientChoices } = get();
+    const recipes = useRecipesStore.getState().items;
+    const products = useProductsStore.getState().items;
+    const ingredient_overrides = getRecipeIngredientMatches({recipes, products, selectedRecipes}).flatMap((group) => {
+      const choice = resolveIngredientChoice(group, ingredientChoices, quotidien, products);
+      if (!choice.owned && !choice.product) return [];
+      return [{ ingredients: group.sources.map((source) => ({recipe_id: Number(source.recipeId), name: source.ingredientName, unit: source.originalUnit})),
+        owned: choice.owned, product_id: choice.product?.id || null, quantity: choice.quantity }];
+    });
 
     const payload = {
+      ingredient_overrides,
       recipes: Object.entries(selectedRecipes).map(([recipe_id, servings]) => ({
         recipe_id,
         servings,
@@ -95,37 +120,34 @@ export const useWizardStore = create((set, get) => ({
       quotidien: Object.entries(quotidien).map(([product_id, status]) => ({
         product_id: Number(product_id) || product_id,
         needed: status === 'needed',
-        quantity: quotidienQty[product_id],
+        quantity: Math.max(1, quotidienQty[product_id] || 1),
       })),
-      extras: extras.map(({ id, ...rest }) => rest),
+      extras: extras.filter((e) => !e.owned).map(({ id, owned, ...rest }) => rest),
       drives: selectedDrives,
     };
 
-    set({ generating: true });
+    set({ generating: true, launchError: null });
     try {
-      let session;
-      try {
-        session = await WizardAPI.createSession(payload);
-      } catch {
-        session = { id: `local-${Date.now()}` };
-      }
+      const session = await WizardAPI.createSession(payload);
+      if (session?.id == null) throw new Error('Session indisponible');
       set({ sessionId: session.id });
-
-      try {
-        await WizardAPI.launchGeneration(session.id, { drives: selectedDrives });
-      } catch {
-        /* silent: mock results fallback */
-      }
-
-      useUIStore.getState().notifySuccess('Génération lancée');
+      await WizardAPI.launchGeneration(session.id, { drives: selectedDrives });
+      set({ lastSessionId: session.id });
+      useUIStore.getState().notifySuccess('Demande envoyée. Consulte le suivi de tes paniers.');
       return session.id;
     } catch (err) {
-      useUIStore.getState().notifyError(err);
+      set({ launchError: 'La demande n’a pas pu être confirmée. Tes choix sont conservés. Vérifie le suivi avant de réessayer.' });
       return null;
     } finally {
       set({ generating: false });
     }
   },
+}), {
+  name: 'courses-draft',
+  version: 1,
+  partialize: ({ selectedRecipes, quotidien, quotidienQty, extras, selectedDrives, lastStep, draftStarted, lastSessionId, ingredientChoices, favoriteRecipes, defaultServings }) => ({
+    selectedRecipes, quotidien, quotidienQty, extras, selectedDrives, lastStep, draftStarted, lastSessionId, ingredientChoices, favoriteRecipes, defaultServings,
+  }),
 }));
 
 function normalizeName(name) {
@@ -241,88 +263,37 @@ export function getRecipeUsage({
   };
 }
 
-export function buildConsolidatedItems({
-  recipes,
-  selectedRecipes,
-  quotidien,
-  quotidienQty,
-  extras,
-  products,
-}) {
+export function resolveIngredientChoice(group, choices = {}, quotidien = {}, products = []) {
+  const saved = choices[group.key] || {};
+  const product = products.find((p) => String(p.id) === String(saved.productId)) || group.matchingProducts[0];
+  const owned = saved.owned ?? (product && quotidien[product.id] === 'owned') ?? false;
+  const quantity = saved.quantity ?? (product ? Math.max(1, convertToProductQty(group.totalQty, group.unit, product).qty || 1) : group.totalQty);
+  return {product, quantity, owned};
+}
+
+export function buildConsolidatedItems({recipes, selectedRecipes, quotidien, quotidienQty, extras, products, ingredientChoices = {}}) {
   const bucket = new Map();
-  const keyOf = (name, unit) =>
-    `${name.trim().toLowerCase()}__${(unit || '').toLowerCase()}`;
-
   const push = (entry, source) => {
-    const k = keyOf(entry.name, entry.unit);
-    const existing = bucket.get(k);
-    if (existing) {
-      existing.totalQuantity += entry.quantity;
-      existing.sources.push(source);
-    } else {
-      bucket.set(k, {
-        key: k,
-        name: entry.name,
-        unit: entry.unit || 'unité',
-        rayon: entry.rayon || 'Divers',
-        category: entry.category || 'Divers',
-        totalQuantity: entry.quantity,
-        sources: [source],
-      });
-    }
+    const key = `${entry.productId || ''}__${entry.name.trim().toLowerCase()}__${entry.unit}`;
+    if (bucket.has(key)) { const item = bucket.get(key); item.totalQuantity += entry.quantity; item.sources.push(source); }
+    else bucket.set(key, {...entry, key, totalQuantity: entry.quantity, rayon: entry.rayon || entry.category || 'Divers', sources: [source]});
   };
-
-  // product_types already covered by a "needed" product → skip generic ingredient
-  // to avoid showing both "Lardons 200g" and "Allumettes CARREFOUR" in the recap.
-  const coveredProductTypes = new Set(
-    Object.entries(quotidien || {})
-      .filter(([, status]) => status === 'needed')
-      .map(([pid]) => (products || []).find((pr) => String(pr.id) === String(pid)))
-      .filter((p) => p && p.product_type)
-      .map((p) => p.product_type),
-  );
-
-  (recipes || []).forEach((recipe) => {
-    const servings = selectedRecipes[recipe.id];
-    if (servings == null) return;
-    (recipe.ingredients || []).forEach((ing) => {
-      if (ing.product_type && coveredProductTypes.has(ing.product_type)) return;
-      push(
-        { ...ing, quantity: ing.quantity_per_serving * servings },
-        {
-          type: 'recipe',
-          label: recipe.name,
-          qty: ing.quantity_per_serving * servings,
-        },
-      );
-    });
+  getRecipeIngredientMatches({recipes, selectedRecipes, products}).forEach((group) => {
+    const {owned, product, quantity} = resolveIngredientChoice(group, ingredientChoices, quotidien, products);
+    if (owned || group.totalQty <= 0) return;
+    push({ name: product?.name || group.ingredientName, productId: product?.id, quantity, unit: product?.unit || group.unit,
+      rayon: product?.rayon || group.categoryHint, category: product?.category },
+      {type: 'recipe', label: [...new Set(group.sources.map((s) => s.recipeName))].join(', '), qty: quantity});
   });
-
-  Object.entries(quotidien || {}).forEach(([productId, status]) => {
+  Object.entries(quotidien || {}).forEach(([id, status]) => {
     if (status !== 'needed') return;
-    const p = (products || []).find((pr) => String(pr.id) === String(productId));
+    const p = products.find((p) => String(p.id) === String(id));
     if (!p) return;
-    const qty = (quotidienQty && quotidienQty[productId]) || p.default_quantity || 1;
-    push(
-      {
-        name: p.name,
-        quantity: qty,
-        unit: p.unit || 'unité',
-        rayon: p.rayon || p.category || 'Quotidien',
-        category: p.category || 'Quotidien',
-      },
-      { type: 'quotidien', label: 'Quotidien', qty },
-    );
+    const quantity = quotidienQty[id] || p.default_quantity || 1;
+    push({name:p.name, productId:p.id, quantity, unit:p.unit || 'unité', rayon:p.rayon, category:p.category}, {type:'quotidien',label:'En plus des repas',qty:quantity});
   });
-
-  (extras || []).forEach((e) => {
-    push(e, { type: 'extra', label: 'Ajout manuel', qty: e.quantity });
-  });
-
-  return Array.from(bucket.values()).sort((a, b) => {
-    if (a.rayon !== b.rayon) return a.rayon.localeCompare(b.rayon);
-    return a.name.localeCompare(b.name);
-  });
+  (extras || []).filter((e) => !e.owned).forEach((e) => push(e, {type:'extra',label:'Ajout manuel',qty:e.quantity,extraId:e.id}));
+  return [...bucket.values()].sort((a,b) => a.rayon.localeCompare(b.rayon,'fr') || a.name.localeCompare(b.name,'fr'));
 }
 
 export function groupByRayon(items) {
@@ -372,13 +343,15 @@ export function getRecipeIngredientMatches({
       const productType = ing.product_type || null;
       const ingName = (ing.name || '').trim();
       // Group by product_type if available, fall back to lowercased name.
-      const groupKey = productType || `name:${ingName.toLowerCase()}`;
+      const groupKey = `${productType || `name:${ingName.toLowerCase()}`}::${(ing.unit || 'unité').toLowerCase()}`;
       const qty = (ing.quantity_per_serving || 0) * servings;
 
       const existing = groups.get(groupKey);
       if (existing) {
         existing.totalQty += qty;
+        if (ing.product_id && !existing.productIds.includes(ing.product_id)) existing.productIds.push(ing.product_id);
         existing.sources.push({
+          ingredientName: ing.name, originalUnit: ing.unit,
           recipeId: recipe.id,
           recipeName: recipe.name,
           qty,
@@ -392,12 +365,14 @@ export function getRecipeIngredientMatches({
           totalQty: qty,
           unit: ing.unit || 'unité',
           sources: [{
-            recipeId: recipe.id,
+            ingredientName: ing.name, originalUnit: ing.unit,
+          recipeId: recipe.id,
             recipeName: recipe.name,
             qty,
             unit: ing.unit || 'unité',
           }],
-          categoryHint: ing.category_hint || ing.category || null,
+          productIds: [ing.product_id].filter(Boolean),
+          categoryHint: ing.rayon || ing.category_hint || ing.category || null,
         });
       }
     });
@@ -405,9 +380,7 @@ export function getRecipeIngredientMatches({
 
   // Resolve matching products for each group
   return Array.from(groups.values()).map((group) => {
-    const matchingProducts = group.productType
-      ? products.filter((p) => p.product_type === group.productType)
-      : [];
+    const matchingProducts = products.filter((p) => group.productIds.some((id) => String(id) === String(p.id)) || (group.productType && p.product_type === group.productType));
     return { ...group, matchingProducts };
   });
 }

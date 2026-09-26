@@ -1,0 +1,86 @@
+{
+  "recipes": [
+    {
+      "name": "Poulet rôti aux légumes",
+      "src": "/media/tablee/recipes/poulet-roti.webp"
+    },
+    {
+      "name": "Gratin dauphinois",
+      "src": "/media/tablee/recipes/gratin-dauphinois.webp"
+    },
+    {
+      "name": "Salade César",
+      "src": "/media/tablee/recipes/salade-cesar.webp"
+    },
+    {
+      "name": "Pâtes à la carbonara",
+      "src": "/media/tablee/recipes/carbonara.webp"
+    },
+    {
+      "name": "Crêpes sucrées",
+      "src": "/media/tablee/recipes/crepes.webp"
+    }
+  ],
+  "products": [
+    {
+      "name": "Œufs Plein Air",
+      "src": "/media/tablee/products/oeufs.webp"
+    },
+    {
+      "name": "Recharge gaz universelle",
+      "src": "/media/tablee/products/gaz.webp"
+    },
+    {
+      "name": "Sacs réutilisables consignés Drive",
+      "src": "/media/tablee/products/sac.webp"
+    },
+    {
+      "name": "Essuie-tout Ultra Absorption Blanc CARREFOUR",
+      "src": "/media/tablee/products/essuie-tout.webp"
+    },
+    {
+      "name": "Briquet Maxi Colorés",
+      "src": "/media/tablee/products/briquet.webp"
+    },
+    {
+      "name": "Pommes de terre de conservation vrac",
+      "src": "/media/tablee/products/pommes-de-terre.webp"
+    },
+    {
+      "name": "Oignons jaunes vrac",
+      "src": "/media/tablee/products/oignons.webp"
+    },
+    {
+      "name": "Papier Toilette Confort Doux",
+      "src": "/media/tablee/products/papier-toilette.webp"
+    },
+    {
+      "name": "Savon Liquide Mains Lait Et Miel CARREFOUR",
+      "src": "/media/tablee/products/savon.webp"
+    },
+    {
+      "name": "Dentifrice Anti-tartre",
+      "src": "/media/tablee/products/dentifrice.webp"
+    },
+    {
+      "name": "Brosse à dents classique medium Médium CARREFOUR",
+      "src": "/media/tablee/products/brosse-dents.webp"
+    },
+    {
+      "name": "Déodorant bille Anti-transpirant Protection 5 Sans Alcool",
+      "src": "/media/tablee/products/deodorant.webp"
+    },
+    {
+      "name": "Gel douche Hypoallergénique Peaux Normales",
+      "src": "/media/tablee/products/gel-douche.webp"
+    },
+    {
+      "name": "Mouchoirs Confort 3 Epaisseurs Ultra Doux FSC CARREFOUR",
+      "src": "/media/tablee/products/mouchoirs.webp"
+    },
+    {
+      "name": "Papier Toilette Doux Et Épais Triple Épaisseur Décoré Essential CARREFOUR",
+      "src": "/media/tablee/products/papier-toilette.webp"
+    }
+  ]
+}

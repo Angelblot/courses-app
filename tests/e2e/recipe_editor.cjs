@@ -1,0 +1,25 @@
+const {chromium}=require('playwright');const fs=require('fs');
+const user={id:'11111111-1111-4111-8111-111111111111',aud:'authenticated',role:'authenticated',email:'demo@example.test'};
+const token=['eyJhbGciOiJIUzI1NiJ9',Buffer.from(JSON.stringify({sub:user.id,exp:Math.floor(Date.now()/1000)+36000,role:'authenticated'})).toString('base64url'),'demo'].join('.');
+const session={access_token:token,refresh_token:'demo',expires_in:36000,expires_at:Math.floor(Date.now()/1000)+36000,token_type:'bearer',user};
+const products=[{id:'oeufs',name:'Œufs Plein Air',ean13:'1234567890123',unit:'unité',brand:'Plein air',category:'pls',favorite:true,image_url:null,grammage_g:null,volume_ml:null,product_type:'oeuf'},{id:'patates',name:'Pommes de terre',ean13:'1234567890124',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:1000,volume_ml:null,product_type:'pomme_de_terre'},{id:'oignons',name:'Oignons jaunes',ean13:'1234567890125',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:500,volume_ml:null,product_type:'oignon'}];
+const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,image_url:null,prep_minutes:15,cook_minutes:40,recipe_ingredients:[{id:'ing',name:'Pommes de terre',quantity_per_serving:300,unit:'g',rayon:'fruits_legumes',product_id:'patates'}]}];
+(async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{
+ const page=await b.newPage({viewport:{width:390,height:844},serviceWorkers:'block'}),errors=[];page.on('pageerror',e=>errors.push(e.message));let recipeBody,ingredientBody;page.setDefaultTimeout(12000);
+ const recipe={...recipes[0],recipe_ingredients:[...recipes[0].recipe_ingredients,{id:'ing2',name:'Oignons jaunes',quantity_per_serving:.5,unit:'unité',rayon:'fruits_legumes',product_id:'oignons'},{id:'ing3',name:'Œufs',quantity_per_serving:1,unit:'unité',rayon:'pls',product_id:'oeufs'}]};
+ await page.route('https://qmymwicsgilhoihtfdjm.supabase.co/**',async route=>{const req=route.request(),url=req.url();let data=[];if(url.includes('/auth/v1/user'))data=user;else if(url.includes('/auth/v1/token'))data=session;else if(url.includes('/rest/v1/products'))data=products;else if(url.includes('/rest/v1/recipes')){if(req.method()==='PATCH')recipeBody=req.postDataJSON();data=url.includes('id=eq.')?recipe:[recipe];}else if(url.includes('/rest/v1/recipe_ingredients')&&req.method()==='POST')ingredientBody=req.postDataJSON();await route.fulfill({json:data});});
+ await page.addInitScript(session=>localStorage.setItem('sb-qmymwicsgilhoihtfdjm-auth-token',JSON.stringify(session)),session);
+ await page.goto('http://localhost:8082/recettes/rec1/modifier');await page.getByRole('button',{name:'Modifier Oignons jaunes',exact:true}).waitFor({timeout:60000});
+ fs.mkdirSync('.impeccable/review/recipe-editor',{recursive:true});await page.screenshot({path:'.impeccable/review/recipe-editor/phone.png'});
+ await page.getByRole('button',{name:'Modifier Oignons jaunes',exact:true}).click();
+ await page.getByRole('textbox',{name:'Quantité par personne de Oignons jaunes',exact:true}).fill('0,75');
+ await page.getByRole('button',{name:'Unité de Oignons jaunes : unité',exact:true}).click();await page.getByRole('button',{name:'kg',exact:true}).click();
+ await page.getByText('Choisir l’unité',{exact:true}).waitFor({state:'hidden'});await page.waitForTimeout(250);await page.screenshot({path:'.impeccable/review/recipe-editor/phone-expanded.png'});
+ await page.getByRole('button',{name:'Retirer Oignons jaunes',exact:true}).click();await page.getByRole('button',{name:'Annuler le retrait',exact:true}).click();
+ await page.getByRole('button',{name:'Retour',exact:true}).click();await page.getByRole('button',{name:'Continuer à modifier',exact:true}).click();
+ await page.getByText('Quitter sans enregistrer ?',{exact:true}).waitFor({state:'hidden'});await page.setViewportSize({width:1024,height:1366});await page.waitForTimeout(250);await page.screenshot({path:'.impeccable/review/recipe-editor/tablet.png'});
+ if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow');
+ await page.getByRole('button',{name:'Enregistrer les modifications',exact:true}).click();await page.getByText('Ta recette est prête.',{exact:true}).waitFor();
+ if(ingredientBody?.find(i=>i.name==='Oignons jaunes')?.quantity_per_serving!==.75||ingredientBody?.find(i=>i.name==='Oignons jaunes')?.unit!=='kg'||ingredientBody.length!==3||recipeBody.servings_default!==2)throw Error('Incorrect saved recipe '+JSON.stringify({ingredientBody,recipeBody}));
+ if(errors.length)throw Error(errors.join('\n'));console.log('PASS: decimal input, unit selection, undo removal, cancel guard, save payload, phone/tablet');
+ }catch(e){console.error(e);process.exitCode=1}finally{await b.close()}})();

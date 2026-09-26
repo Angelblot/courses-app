@@ -4,6 +4,7 @@ import { Icon } from './Icon.jsx';
 export function AsyncImage({
   src: srcProp,
   keyword,
+  fallbackSrc,
   alt = '',
   className = '',
   aspect,
@@ -20,18 +21,16 @@ export function AsyncImage({
       setSrc(srcProp);
       return;
     }
-    const kw = (keyword || '').trim();
-    if (!kw) {
-      setStatus('error');
-      setSrc('');
-      return;
-    }
-    setStatus('loading');
-    setSrc(`https://source.unsplash.com/featured/?${encodeURIComponent(kw)}`);
-  }, [srcProp, keyword]);
+    setStatus(fallbackSrc ? 'loading' : 'error');
+    setSrc(fallbackSrc || '');
+  }, [srcProp, keyword, fallbackSrc]);
+
+  const generated = src.startsWith('/media/tablee/');
+  const description = generated ? `${alt} — illustration générée` : alt;
 
   const wrapperClass = [
     'async-img',
+    status === 'error' && 'async-img--error',
     rounded && 'async-img--round',
     className,
   ]
@@ -41,15 +40,18 @@ export function AsyncImage({
   const style = aspect ? { aspectRatio: aspect } : undefined;
 
   return (
-    <div className={wrapperClass} style={style}>
+    <div className={wrapperClass} style={style} title={generated ? description : undefined}>
       {src && status !== 'error' && (
         <img
           key={src}
           src={src}
-          alt={alt}
+          alt={description}
           className={`async-img__img ${status === 'loaded' ? 'async-img__img--loaded' : ''}`}
           onLoad={() => setStatus('loaded')}
-          onError={() => setStatus('error')}
+          onError={() => {
+            if (fallbackSrc && src !== fallbackSrc) { setSrc(fallbackSrc); setStatus('loading'); }
+            else setStatus('error');
+          }}
           loading="lazy"
           decoding="async"
         />

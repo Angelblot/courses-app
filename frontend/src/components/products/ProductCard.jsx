@@ -1,3 +1,4 @@
+import { productImageFallback } from '../../lib/tableeImages.js';
 import { Button } from '../ui/Button.jsx';
 import { Icon } from '../ui/Icon.jsx';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
@@ -144,9 +145,9 @@ export function ProductCard({
       : undefined;
 
   return (
-    <article className={classes}>
+    <article className={`${classes} catalog-product`}>
       <AsyncImage
-        src={product.image_url || undefined}
+        src={product.image_url || undefined} fallbackSrc={productImageFallback(product)}
         keyword={keyword}
         alt={product.name}
         className="item__image"

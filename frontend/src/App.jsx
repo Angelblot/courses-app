@@ -1,4 +1,7 @@
+import { CurrentListPage } from './pages/CurrentListPage.jsx';
+import { MealsPage } from './pages/MealsPage.jsx';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { SettingsPage } from './pages/SettingsPage.jsx';
 import { Layout } from './components/Layout.jsx';
 import { HomePage } from './pages/HomePage.jsx';
 import { WizardPage } from './pages/WizardPage.jsx';
@@ -14,6 +17,8 @@ export default function App() {
     <BrowserRouter>
       <Layout>
         <Routes>
+          <Route path="/current-list" element={<CurrentListPage />} />
+          <Route path="/meals" element={<MealsPage />} />
           <Route path="/" element={<HomePage />} />
           <Route path="/wizard" element={<Navigate to="/wizard/recipes" replace />} />
           <Route path="/wizard/:step" element={<WizardPage />} />
@@ -22,6 +27,7 @@ export default function App() {
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/lists" element={<ListsPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/drives" element={<DrivesPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

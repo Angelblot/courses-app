@@ -1,0 +1,210 @@
+/**
+ * Analyse d'une recette importée. Fonctions pures, sans réseau.
+ * Lancer : node --test mobile/lib/import-recette.test.mjs   (Node >= 22)
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  analyserLigne, lireParts, lireDuree, lireCalories, extraireRecette,
+} from './import-recette.ts';
+
+// Lignes réellement rendues par Marmiton, mesurées le 22/08.
+test('une quantité, une unité connue, un nom', () => {
+  assert.deepEqual(analyserLigne('600 g de bourguignon'),
+    { quantite: 600, unite: 'g', nom: 'bourguignon', aVerifier: false });
+});
+
+test('une unité inconnue est retenue quand elle précède « de »', () => {
+  assert.deepEqual(analyserLigne('1 bouteille de vin rouge assez bon'),
+    { quantite: 1, unite: 'bouteille', nom: 'vin rouge assez bon', aVerifier: false });
+});
+
+test('sans unité, la quantité compte des exemplaires', () => {
+  assert.deepEqual(analyserLigne('4 oignons'),
+    { quantite: 4, unite: 'unité', nom: 'oignons', aVerifier: false });
+});
+
+test('un mot seul après le nombre ne devient pas une unité', () => {
+  // Sans la règle du « de », « bouquet » deviendrait l'unité et le nom serait
+  // vide.
+  assert.deepEqual(analyserLigne('1 bouquet garni'),
+    { quantite: 1, unite: 'unité', nom: 'bouquet garni', aVerifier: false });
+});
+
+test('une ligne sans quantité est signalée, jamais inventée', () => {
+  assert.deepEqual(analyserLigne('sel'),
+    { quantite: 0, unite: 'unité', nom: 'sel', aVerifier: true });
+  assert.equal(analyserLigne('poivre').aVerifier, true);
+});
+
+test("l'élision est retirée du nom", () => {
+  const r = analyserLigne("2 cuillères à soupe d'huile d'olive");
+  assert.equal(r.quantite, 2);
+  assert.equal(r.unite, 'cuillère à soupe');
+  assert.equal(r.nom, "huile d'olive");
+});
+
+test('les fractions et les décimales à la française sont comprises', () => {
+  assert.equal(analyserLigne('1/2 citron').quantite, 0.5);
+  assert.equal(analyserLigne('1,5 kg de pommes de terre').quantite, 1.5);
+  assert.equal(analyserLigne('1.5 kg de pommes de terre').quantite, 1.5);
+});
+
+test('une ligne vide ne produit pas un ingrédient fantôme', () => {
+  assert.equal(analyserLigne('').nom, '');
+  assert.equal(analyserLigne('   ').aVerifier, true);
+});
+
+test('le nombre de parts se lit sous toutes ses formes', () => {
+  assert.equal(lireParts('4 personnes'), 4);
+  assert.equal(lireParts(6), 6);
+  assert.equal(lireParts(['8 parts']), 8);
+  assert.equal(lireParts('pour 2 gourmands'), 2);
+});
+
+test('un nombre de parts illisible retombe sur 4', () => {
+  // Inventer 1 ferait des quantités quatre fois trop petites sans que rien ne
+  // le signale.
+  assert.equal(lireParts(null), 4);
+  assert.equal(lireParts('quelques'), 4);
+  assert.equal(lireParts(0), 4);
+});
+
+const BLOC_SIMPLE = JSON.stringify({
+  '@type': 'Recipe',
+  name: 'Gratin',
+  recipeYield: '4 personnes',
+  image: 'https://exemple.test/g.jpg',
+  recipeIngredient: ['600 g de pommes de terre', 'sel'],
+});
+
+test('la recette se trouve dans un bloc simple', () => {
+  const r = extraireRecette([BLOC_SIMPLE]);
+  assert.equal(r.nom, 'Gratin');
+  assert.equal(r.parts, 4);
+  assert.equal(r.image, 'https://exemple.test/g.jpg');
+  assert.equal(r.ingredients.length, 2);
+});
+
+test('la recette se trouve dans un tableau', () => {
+  const r = extraireRecette([JSON.stringify([{ '@type': 'WebPage' }, JSON.parse(BLOC_SIMPLE)])]);
+  assert.equal(r.nom, 'Gratin');
+});
+
+test('la recette se trouve dans un @graph', () => {
+  const r = extraireRecette([JSON.stringify({ '@graph': [JSON.parse(BLOC_SIMPLE)] })]);
+  assert.equal(r.nom, 'Gratin');
+});
+
+test('un bloc malformé est ignoré, pas fatal', () => {
+  const r = extraireRecette(['{ pas du json', BLOC_SIMPLE]);
+  assert.equal(r.nom, 'Gratin');
+});
+
+test("l'absence de recette se dit, elle ne s'invente pas", () => {
+  assert.equal(extraireRecette([]), null);
+  assert.equal(extraireRecette([JSON.stringify({ '@type': 'Article' })]), null);
+  assert.equal(extraireRecette(['{ cassé']), null);
+});
+
+test("l'image peut être un objet ou un tableau", () => {
+  const avecObjet = extraireRecette([JSON.stringify({
+    '@type': 'Recipe', name: 'X', recipeIngredient: ['sel'],
+    image: { url: 'https://exemple.test/o.jpg' },
+  })]);
+  assert.equal(avecObjet.image, 'https://exemple.test/o.jpg');
+
+  const avecTableau = extraireRecette([JSON.stringify({
+    '@type': 'Recipe', name: 'X', recipeIngredient: ['sel'],
+    image: ['https://exemple.test/t.jpg'],
+  })]);
+  assert.equal(avecTableau.image, 'https://exemple.test/t.jpg');
+});
+
+// --- Abréviations françaises, relevées sur des recettes Jow le 24/08 ---
+// Elles ne sont pas suivies de « de » : sans règle propre, elles finissaient
+// dans le nom de l'ingrédient — « 2 unités de càs Sauce soja » ne veut rien
+// dire et serait remonté tel quel au panier.
+
+test('les abréviations de cuillères sont reconnues', () => {
+  assert.deepEqual(analyserLigne('2 càs Sauce soja salée'),
+    { quantite: 2, unite: 'cuillère à soupe', nom: 'Sauce soja salée', aVerifier: false });
+  assert.deepEqual(analyserLigne('1 càc Miel (liquide)'),
+    { quantite: 1, unite: 'cuillère à café', nom: 'Miel (liquide)', aVerifier: false });
+  assert.equal(analyserLigne('2 c. à s. de farine').unite, 'cuillère à soupe');
+});
+
+test('les abréviations pointées sont reconnues', () => {
+  assert.deepEqual(analyserLigne('0.25 gou. Ail'),
+    { quantite: 0.25, unite: 'gousse', nom: 'Ail', aVerifier: false });
+  assert.equal(analyserLigne('2 tran. Pain de campagne').unite, 'tranche');
+  assert.equal(analyserLigne("0.5 pinc. Piment d'Espelette").unite, 'pincée');
+  assert.equal(analyserLigne('0.1 bou. Persil (frais)').unite, 'bouquet');
+});
+
+test('les unités de cuisine sans abréviation sont reconnues', () => {
+  assert.equal(analyserLigne('4 brins Ciboulette').unite, 'brin');
+  assert.equal(analyserLigne('1 poignée Salade').unite, 'poignée');
+  assert.equal(analyserLigne('1 quartiers Citron jaune').unite, 'quartier');
+});
+
+test("une abréviation ne mange pas un nom qui lui ressemble", () => {
+  // « bou. » vaut bouquet, mais « bouteille » reste un mot entier — et sans
+  // « de » derrière, il appartient au nom.
+  assert.equal(analyserLigne('1 bouteille de vin rouge').unite, 'bouteille');
+  assert.equal(analyserLigne('3 boules de mozzarella').unite, 'boules');
+  assert.equal(analyserLigne('2 gousses Ail').unite, 'gousse');
+});
+
+// --- Durées et calories, relevées le 24/08 sur Jow et Marmiton ---
+
+test('les durées ISO se lisent en minutes', () => {
+  assert.equal(lireDuree('PT18M'), 18);
+  assert.equal(lireDuree('PT1H'), 60);
+  assert.equal(lireDuree('PT1H30M'), 90);
+  assert.equal(lireDuree('PT5H'), 300);
+});
+
+test('une durée nulle est une donnée, pas une absence', () => {
+  // « PT0M » en cuisson veut dire « aucune cuisson » — c'est un fait, et
+  // l'écran choisira de ne pas l'afficher. Le confondre avec l'inconnu
+  // reviendrait à effacer une information.
+  assert.equal(lireDuree('PT0M'), 0);
+  assert.equal(lireDuree(null), null);
+  assert.equal(lireDuree('quelques minutes'), null);
+  assert.equal(lireDuree(''), null);
+});
+
+test('les calories se lisent quel que soit le libellé', () => {
+  // Jow écrit « 754 kcal », Marmiton « 667 calories ».
+  assert.equal(lireCalories({ calories: '754 kcal' }), 754);
+  assert.equal(lireCalories({ calories: '667 calories' }), 667);
+  assert.equal(lireCalories({ calories: 512 }), 512);
+});
+
+test("une valeur nutritionnelle absente ne s'invente pas", () => {
+  assert.equal(lireCalories(null), null);
+  assert.equal(lireCalories({}), null);
+  assert.equal(lireCalories({ calories: 'beaucoup' }), null);
+  assert.equal(lireCalories({ calories: '0 kcal' }), null);
+});
+
+test('la recette extraite porte ses durées et ses calories', () => {
+  const r = extraireRecette([JSON.stringify({
+    '@type': 'Recipe', name: 'X', recipeIngredient: ['sel'],
+    prepTime: 'PT10M', cookTime: 'PT1H7M',
+    nutrition: { calories: '337 kcal' },
+  })]);
+  assert.equal(r.preparationMin, 10);
+  assert.equal(r.cuissonMin, 67);
+  assert.equal(r.kcalParPart, 337);
+});
+
+test("une recette sans ces informations les rend nulles", () => {
+  const r = extraireRecette([JSON.stringify({
+    '@type': 'Recipe', name: 'X', recipeIngredient: ['sel'],
+  })]);
+  assert.equal(r.preparationMin, null);
+  assert.equal(r.cuissonMin, null);
+  assert.equal(r.kcalParPart, null);
+});

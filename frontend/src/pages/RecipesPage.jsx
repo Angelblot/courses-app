@@ -25,8 +25,8 @@ const FAB_BASE = {
   zIndex: 40,
   transition: 'transform 150ms ease, background 150ms ease',
 };
-const FAB_OPEN = { ...FAB_BASE, background: '#2D6A4F' };
-const FAB_CLOSE = { ...FAB_BASE, background: '#1A1A1A' };
+const FAB_OPEN = { ...FAB_BASE, background: 'var(--color-accent)' };
+const FAB_CLOSE = { ...FAB_BASE, background: 'var(--color-text)' };
 
 const PlusIcon = () => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

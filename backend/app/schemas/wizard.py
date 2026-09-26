@@ -43,9 +43,24 @@ class WizardConsolidatedItem(BaseModel):
     product_label: Optional[str] = None
 
 
+class WizardIngredientRef(BaseModel):
+    recipe_id: int
+    name: str = Field(..., min_length=1, max_length=255)
+    unit: str = Field(..., min_length=1, max_length=20)
+
+
+class WizardIngredientOverride(BaseModel):
+    """User's pantry decision or chosen retail pack for grouped ingredients."""
+    ingredients: List[WizardIngredientRef] = Field(..., min_length=1)
+    owned: bool = False
+    product_id: Optional[int] = None
+    quantity: float = Field(1, gt=0, allow_inf_nan=False)
+
+
 class WizardSessionCreate(BaseModel):
     """Payload de création d'une session wizard."""
 
+    ingredient_overrides: List[WizardIngredientOverride] = Field(default_factory=list)
     recipes: List[WizardRecipeInput] = Field(default_factory=list)
     quotidien: List[WizardQuotidienInput] = Field(default_factory=list)
     extras: List[WizardExtraInput] = Field(default_factory=list)

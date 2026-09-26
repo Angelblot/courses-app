@@ -1,3 +1,4 @@
+import { productImageFallback } from '../../lib/tableeImages.js';
 import { useState, useEffect, useRef } from 'react';
 import { ResolverAPI } from '../../api.js';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
@@ -238,11 +239,11 @@ export function ProductSubstitutionSheet({
                     padding: '12px 16px',
                     marginBottom: 8,
                     border: `1px solid ${
-                      isSelected ? '#3b82f6' : isBest ? '#e2e8f0' : '#f1f5f9'
+                      isSelected ? 'var(--color-accent)' : isBest ? '#e2e8f0' : '#f1f5f9'
                     }`,
                     borderRadius: 12,
                     backgroundColor: isSelected
-                      ? '#eff6ff'
+                      ? 'var(--color-accent-soft)'
                       : isBest
                         ? '#fafafa'
                         : '#ffffff',
@@ -268,23 +269,15 @@ export function ProductSubstitutionSheet({
                       overflow: 'hidden',
                     }}
                   >
-                    {candidate.image_url ? (
-                      <img
-                        src={candidate.image_url}
-                        alt={candidate.product_name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.parentElement.innerHTML = `<span style="color:#94a3b8;font-size:20px">📦</span>`;
-                        }}
-                      />
-                    ) : (
-                      <Icon
-                        name={iconForProduct(candidate)}
-                        size={22}
-                        color="#94a3b8"
-                      />
-                    )}
+                    <AsyncImage
+                      src={candidate.image_url}
+                      fallbackSrc={productImageFallback({ name: candidate.product_name })}
+                      alt={candidate.product_name}
+                      aspect="1"
+                      className="substitution-image"
+                      fallbackIcon={iconForProduct(candidate)}
+                      fallbackIconSize={22}
+                    />
                   </div>
 
                   {/* Product info */}

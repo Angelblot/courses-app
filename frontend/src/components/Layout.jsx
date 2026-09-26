@@ -4,7 +4,7 @@ import { Toasts } from './ui/Toasts.jsx';
 
 export function Layout({ children }) {
   const { pathname } = useLocation();
-  const hideNav = pathname.startsWith('/wizard') || pathname.startsWith('/results');
+  const hideNav = pathname === '/current-list' || pathname.startsWith('/wizard') || pathname.startsWith('/results');
 
   return (
     <div className="app app--light">

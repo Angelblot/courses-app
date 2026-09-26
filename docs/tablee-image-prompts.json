@@ -1,0 +1,121 @@
+{
+  "tool": "Built-in Imagegen",
+  "date": "2026-09-08",
+  "scope": "Five seeded recipes and 15 products without photos (two toilet-paper variants share one generic illustration). Production API returned 503; inventory based on committed seeds.",
+  "jobs": [
+    {
+      "slug": "poulet-roti",
+      "name": "Poulet rôti aux légumes",
+      "kind": "recipe",
+      "prompt": "Use case: photorealistic-natural. Asset type: recipe photography for the Tablée grocery planning app. Subject: golden roasted chicken breast fillets with roast potato chunks, yellow onion wedges, thyme and olive oil, arranged in a rustic ceramic oven dish. Landscape photograph 1536x1024, close editorial food photography, gentle natural window light, appetizing natural textures, warm food colors on an off-white linen table, quiet background, no people, no lettering, no logos, no watermark. Entire main dish inside frame with small margin, important food centered for 16:9 and square crops. Consistent elegant everyday French home cooking art direction. Single image of this dish only, no collage."
+    },
+    {
+      "slug": "gratin-dauphinois",
+      "name": "Gratin dauphinois",
+      "kind": "recipe",
+      "prompt": "Use case: photorealistic-natural. Asset type: recipe photography for the Tablée grocery planning app. Subject: French potato gratin in a shallow ceramic baking dish, thin potato slices layered with cream milk garlic, lightly golden grated cheese crust, a serving removed showing creamy layers. Landscape photograph 1536x1024, close editorial food photography, gentle natural window light, appetizing natural textures, warm food colors on an off-white linen table, quiet background, no people, no lettering, no logos, no watermark. Entire main dish inside frame with small margin, important food centered for 16:9 and square crops. Consistent elegant everyday French home cooking art direction. Single image of this dish only, no collage."
+    },
+    {
+      "slug": "salade-cesar",
+      "name": "Salade César",
+      "kind": "recipe",
+      "prompt": "Use case: photorealistic-natural. Asset type: recipe photography for the Tablée grocery planning app. Subject: romaine lettuce Caesar salad with grilled chicken breast strips, parmesan shavings, crisp golden croutons and creamy Caesar dressing in a ceramic bowl. Landscape photograph 1536x1024, close editorial food photography, gentle natural window light, appetizing natural textures, warm food colors on an off-white linen table, quiet background, no people, no lettering, no logos, no watermark. Entire main dish inside frame with small margin, important food centered for 16:9 and square crops. Consistent elegant everyday French home cooking art direction. Single image of this dish only, no collage."
+    },
+    {
+      "slug": "carbonara",
+      "name": "Pâtes à la carbonara",
+      "kind": "recipe",
+      "prompt": "Use case: photorealistic-natural. Asset type: recipe photography for the Tablée grocery planning app. Subject: spaghetti carbonara with golden smoked bacon pieces, silky egg and parmesan sauce, grated parmesan and black pepper, in a shallow white ceramic bowl. Landscape photograph 1536x1024, close editorial food photography, gentle natural window light, appetizing natural textures, warm food colors on an off-white linen table, quiet background, no people, no lettering, no logos, no watermark. Entire main dish inside frame with small margin, important food centered for 16:9 and square crops. Consistent elegant everyday French home cooking art direction. Single image of this dish only, no collage."
+    },
+    {
+      "slug": "crepes",
+      "name": "Crêpes sucrées",
+      "kind": "recipe",
+      "prompt": "Use case: photorealistic-natural. Asset type: recipe photography for the Tablée grocery planning app. Subject: thin French homemade crepes, softly folded and stacked, golden lace edges and a very light dusting of sugar on a ceramic plate, no fruit no chocolate. Landscape photograph 1536x1024, close editorial food photography, gentle natural window light, appetizing natural textures, warm food colors on an off-white linen table, quiet background, no people, no lettering, no logos, no watermark. Entire main dish inside frame with small margin, important food centered for 16:9 and square crops. Consistent elegant everyday French home cooking art direction. Single image of this dish only, no collage."
+    },
+    {
+      "slug": "oeufs",
+      "name": "Œufs Plein Air",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: six brown eggs in an open unbranded molded paper carton. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "gaz",
+      "name": "Recharge gaz universelle",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: one generic small cylindrical metal lighter refill gas canister, red plastic cap, unbranded blank label. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "sac",
+      "name": "Sacs réutilisables consignés Drive",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: one reusable cream canvas grocery tote, upright, two handles, empty, unbranded. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "essuie-tout",
+      "name": "Essuie-tout Ultra Absorption Blanc CARREFOUR",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: one white embossed kitchen paper towel roll standing upright. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "briquet",
+      "name": "Briquet Maxi Colorés",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: one simple red disposable pocket lighter, metal top, no flame. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "pommes-de-terre",
+      "name": "Pommes de terre de conservation vrac",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: four loose unpeeled golden potatoes, natural realistic skin. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "oignons",
+      "name": "Oignons jaunes vrac",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: three yellow onions, one cut in half revealing white layers. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "papier-toilette",
+      "name": "Papier Toilette Confort Doux",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: two white soft toilet tissue rolls, one upright and one laying on side. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "savon",
+      "name": "Savon Liquide Mains Lait Et Miel CARREFOUR",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: one generic unbranded translucent pump dispenser containing pale honey colored hand soap, white pump. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "dentifrice",
+      "name": "Dentifrice Anti-tartre",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: one white unbranded toothpaste tube with a simple blue band and white cap, no lettering. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "brosse-dents",
+      "name": "Brosse à dents classique medium Médium CARREFOUR",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: one manual toothbrush with white and teal handle and clean white bristles. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "deodorant",
+      "name": "Déodorant bille Anti-transpirant Protection 5 Sans Alcool",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: one small generic white roll-on deodorant bottle with cap placed next to it showing roller ball. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "gel-douche",
+      "name": "Gel douche Hypoallergénique Peaux Normales",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: one generic unbranded translucent pale blue shower gel bottle with white flip top cap. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    },
+    {
+      "slug": "mouchoirs",
+      "name": "Mouchoirs Confort 3 Epaisseurs Ultra Doux FSC CARREFOUR",
+      "kind": "product",
+      "prompt": "Use case: product-mockup. Asset type: generic grocery product illustration for the Tablée app. Subject: one minimal unbranded cream rectangular tissue box with a single white soft tissue emerging. Square 1024x1024, photographic studio still life, centered isolated object with generous 16 percent margin on clean off-white #fbfcfe background. Soft daylight from upper left, small natural grounded shadow. Accurate recognizable object, natural materials. No branding, no invented brand packaging, no words or lettering, no price, no watermark, no hands, no collage. This is an illustrative generic product, not an official retailer photo."
+    }
+  ]
+}

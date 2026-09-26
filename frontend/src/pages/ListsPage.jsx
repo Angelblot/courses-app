@@ -46,28 +46,27 @@ export function ListsPage() {
   }
 
   function handleStartWizard() {
-    resetWizard();
-    navigate('/wizard/recipes');
+    navigate(`/wizard/${useWizardStore.getState().lastStep || 'recipes'}`);
   }
 
   return (
     <section className="stack stack--lg">
       <header className="page-header">
-        <h2 className="page-header__title">Mes phases de courses</h2>
+        <h2 className="page-header__title">Mes listes de courses</h2>
         <p className="page-header__subtitle">
-          Historique de tes listes. Rejoue-les ou crées-en une nouvelle.
+          Historique de tes listes. Retrouve-les ou crée une nouvelle liste.
         </p>
       </header>
 
       <Card className="list-start-card">
         <div className="list-start-card__body">
-          <strong>Nouvelle phase&nbsp;?</strong>
+          <strong>Tes prochaines courses&nbsp;?</strong>
           <span className="list-start-card__hint">
-            Lance le wizard en 4 étapes.
+            Prépare ou reprends ta liste.
           </span>
         </div>
         <Button onClick={handleStartWizard}>
-          Démarrer <ArrowRight />
+          Préparer <ArrowRight />
         </Button>
       </Card>
 
@@ -82,7 +81,7 @@ export function ListsPage() {
       </form>
 
       {lists.length === 0 ? (
-        <EmptyState title="Aucune phase">
+        <EmptyState title="Aucune liste">
           <Link to="/" className="text-accent">Lance-en une</Link> pour démarrer ton historique.
         </EmptyState>
       ) : (

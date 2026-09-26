@@ -1,3 +1,4 @@
+import { productImageFallback } from '../../lib/tableeImages.js';
 import { useEffect, useRef, useState } from 'react';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -162,7 +163,7 @@ export function ProductCardEditable({
       aria-label={`Édition de ${product.name}`}
     >
       <AsyncImage
-        src={product.image_url || undefined}
+        src={product.image_url || undefined} fallbackSrc={productImageFallback(product)}
         keyword={keyword}
         alt={product.name}
         className="item__image"

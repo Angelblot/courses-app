@@ -1,5 +1,37 @@
 # DESIGN — Courses App
 
+## Référence visuelle confirmée par l’utilisateur — 8 septembre 2026
+
+La dernière maquette jointe par l’utilisateur fait autorité :
+`exec-b7362c91-bf01-438e-a0dd-ae3bed12d0e5.png` (deux écrans, titrée Réserve).
+L’interface doit reprendre cette composition concrète, indépendamment du nom
+Tablée employé dans les échanges précédents.
+
+- Accueil orienté courses : en-tête Courses, liste du mois, grand bandeau
+  photographique avec nombre réel d’articles et action de reprise, trois produits
+  favoris avec photo et ajout, champ d’ajout produit en bas.
+- Navigation : Courses, Recettes, Réglages. Les recettes restent disponibles
+  dans leur onglet ; elles ne remplacent plus l’accueil orienté produits.
+- Liste : titre centré, onglets À acheter / Déjà chez moi, rayons lisibles,
+  lignes blanches compactes avec photo, nom, conditionnement connu, case et
+  compteur, action Choisir mon drive dans le pied fixe.
+- Palette issue de la référence : fond clair verdâtre `#f5f7f2`, accent vert
+  `#48613a`, cartes blanches, texte sombre. Styles finaux dans `reserve.css`.
+- Les photos enregistrées sont TOUJOURS prioritaires, y compris les photos
+  initiales des recettes. Les visuels générés ne servent qu’en absence de photo
+  ou en cas d’échec de son chargement. Aucun champ image existant n’est réécrit.
+- Les images produit génériques couvrent les quinze produits sans photo du
+  catalogue initial. Le nouveau bandeau d’accueil est une illustration
+  décorative distincte, sans remplacement des photos produit.
+- Brouillon, portions, favoris de recettes, choix d’ingrédients et quantités
+  restent conservés. Les produits déjà possédés sont exclus de la demande.
+- Ne pas recopier les valeurs illustratives de la maquette : nombre d’articles,
+  produits, conditionnements et mois proviennent des données disponibles.
+
+Les sections suivantes sont les spécifications historiques, à lire sous réserve
+de cette direction approuvée.
+
+
 Document de design produit & UX. Deux parties :
 
 - **Partie I — Itération en cours.** Spécification détaillée des 4 features

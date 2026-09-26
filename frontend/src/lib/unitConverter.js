@@ -70,29 +70,31 @@ export function convertToProductQty(ingredientQty, ingredientUnit, product) {
   const ingNorm = normalizeUnit(ingredientUnit);
   const prodUnit = (product.unit || 'unité').trim().toLowerCase();
 
-  // Cas 1: même unité normalisée → ratio direct
+  const ingInG = _toGrams(ingredientQty, ingredientUnit);
+  const ingInMl = _toMl(ingredientQty, ingredientUnit);
+
+  // Normalize metric units before comparing them or rounding retail packs.
   if (ingNorm === normalizeUnit(prodUnit)) {
-    return { qty: Math.ceil(ingredientQty), approximate: false };
+    const qty = ingNorm === 'g' ? ingInG / _toGrams(1, prodUnit) : ingNorm === 'ml' ? ingInMl / _toMl(1, prodUnit) : ingredientQty;
+    return { qty: Math.ceil(qty), approximate: false };
   }
 
   // Cas 2: ingrédient en g et produit en "unité" → grammage_g
   if (ingNorm === 'g' && normalizeUnit(prodUnit) === 'unité' && product.grammage_g != null && product.grammage_g > 0) {
-    return { qty: Math.ceil(ingredientQty / product.grammage_g), approximate: true };
+    return { qty: Math.ceil(ingInG / product.grammage_g), approximate: true };
   }
 
   // Cas 2b: ingrédient en kg → convertir en g d'abord
-  const ingInG = _toGrams(ingredientQty, ingredientUnit);
   if (ingInG != null && normalizeUnit(prodUnit) === 'unité' && product.grammage_g != null && product.grammage_g > 0) {
     return { qty: Math.ceil(ingInG / product.grammage_g), approximate: true };
   }
 
   // Cas 3: ingrédient en ml et produit en "unité" → volume_ml
   if (ingNorm === 'ml' && normalizeUnit(prodUnit) === 'unité' && product.volume_ml != null && product.volume_ml > 0) {
-    return { qty: Math.ceil(ingredientQty / product.volume_ml), approximate: true };
+    return { qty: Math.ceil(ingInMl / product.volume_ml), approximate: true };
   }
 
   // Cas 3b: ingrédient en L/cl → convertir en ml d'abord
-  const ingInMl = _toMl(ingredientQty, ingredientUnit);
   if (ingInMl != null && normalizeUnit(prodUnit) === 'unité' && product.volume_ml != null && product.volume_ml > 0) {
     return { qty: Math.ceil(ingInMl / product.volume_ml), approximate: true };
   }

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-12T15:42:05.469258+00:00",
+  "title": "Design System: Tablée Maison — widget Les essentiels",
+  "extensions": {
+    "shadows": [],
+    "motion": [],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Ajout produit",
+      "kind": "custom",
+      "description": "Illustration HTML de la capsule native ; la cible réelle est la tuile entière.",
+      "html": "<button class=\"ds-capsule\">+</button>",
+      "css": ".ds-capsule { display:inline-flex; align-items:center; justify-content:center; height:28px; padding:0 10px; border:0; border-radius:999px; font:700 12px system-ui; background:rgb(28.2% 38% 22.7%); color:white; }.ds-capsule:focus-visible { outline:2px solid currentColor; outline-offset:3px; }"
+    },
+    {
+      "name": "Confirmation produit",
+      "kind": "custom",
+      "description": "Illustration HTML de la capsule native ; la cible réelle est la tuile entière.",
+      "html": "<span class=\"ds-capsule\">✓ Ajouté</span>",
+      "css": ".ds-capsule { display:inline-flex; align-items:center; justify-content:center; height:28px; padding:0 8px; border:0; border-radius:999px; font:700 12px system-ui; background:rgb(28.2% 38% 22.7% / 15%); color:rgb(12% 18% 10%); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Tablée Maison",
+    "overview": "Document local à la surface native Operate, concept choisi 01 « Les essentiels ». L’identité olive, sauge et crème accompagne les photos des produits favoris : reconnaître un produit et l’ajouter en un geste. Ce fichier décrit le widget réalisé, sans remplacer le système historique à la racine. Aucun PRODUCT.md n’est présent.",
+    "keyCharacteristics": [
+      "Photos produits, fond doux et contraste lisible.",
+      "Composition fixe adaptée à chaque famille WidgetKit.",
+      "Ajout confirmé dans la tuile, pagination explicite."
+    ],
+    "rules": [],
+    "dos": [
+      "**Do** conserver les photos, les noms accessibles et les variantes de couleur système.",
+      "**Do** conserver six produits au maximum en Large et ExtraLarge, avec adaptation explicite des petits formats."
+    ],
+    "donts": [
+      "**Don't** rendre la confirmation interactive ni présenter la rotation OS comme une fréquence garantie.",
+      "**Don't** confondre une capture Simulator avec une validation des intents sur appareil réel."
+    ]
+  }
+}

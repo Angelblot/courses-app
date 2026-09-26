@@ -1,9 +1,12 @@
+import { productImageFallback } from '../../lib/tableeImages.js';
+import { recipeImage, recipeImageFallback } from '../../lib/tableeImages.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useProductsStore } from '../../stores/productsStore.js';
 import { useRecipesStore } from '../../stores/recipesStore.js';
 import {
   useWizardStore,
   getRecipeIngredientMatches,
+  resolveIngredientChoice,
 } from '../../stores/wizardStore.js';
 import { Card } from '../ui/Card.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -119,162 +122,36 @@ function groupSourcesByRecipe(sources) {
 }
 
 export function RecipeProductMatching() {
-  const products = useProductsStore((s) => s.items);
-  const productsLoaded = useProductsStore((s) => s.loaded);
-  const loadProducts = useProductsStore((s) => s.load);
-
-  const recipes = useRecipesStore((s) => s.items);
-  const loadRecipes = useRecipesStore((s) => s.load);
-
-  const selectedRecipes = useWizardStore((s) => s.selectedRecipes);
-  const quotidien = useWizardStore((s) => s.quotidien);
-  const quotidienQty = useWizardStore((s) => s.quotidienQty);
-  const markProduct = useWizardStore((s) => s.markProduct);
-  const setQuotidienQty = useWizardStore((s) => s.setQuotidienQty);
-
-  const [chosenByGroup, setChosenByGroup] = useState({});
-  const [substitutionSheet, setSubstitutionSheet] = useState({
-    open: false,
-    groupKey: null,
-    ingredientName: '',
-    ingredientQty: 0,
-    ingredientUnit: 'unité',
-    categoryHint: null,
-  });
-
-  useEffect(() => {
-    loadProducts();
-    loadRecipes();
-  }, [loadProducts, loadRecipes]);
-
-  const matches = useMemo(
-    () =>
-      getRecipeIngredientMatches({
-        selectedRecipes,
-        recipes,
-        products,
-      }),
-    [selectedRecipes, recipes, products],
-  );
-
-  // Auto-mark le produit choisi comme "needed" + initialise la qty par défaut.
-  useEffect(() => {
-    matches.forEach((group) => {
-      if (group.matchingProducts.length === 0) return;
-      if (group.totalQty <= 0) return;
-      const chosenId = chosenByGroup[group.key] ?? group.matchingProducts[0].id;
-      const product = group.matchingProducts.find((p) => p.id === chosenId);
-      if (!product) return;
-      if (quotidien[chosenId] !== 'needed') {
-        markProduct(chosenId, 'needed');
-      }
-      if (quotidienQty[chosenId] == null) {
-        setQuotidienQty(chosenId, suggestedPackCount(group, product));
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matches, chosenByGroup]);
-
-  function handleQuantityChange(productId, qty) {
-    setQuotidienQty(productId, qty);
-    if (qty > 0 && quotidien[productId] !== 'needed') {
-      markProduct(productId, 'needed');
-    }
-  }
-
-  function handleOpenSubstitution(group) {
-    setSubstitutionSheet({
-      open: true,
-      groupKey: group.key,
-      ingredientName: group.ingredientName,
-      ingredientQty: group.totalQty,
-      ingredientUnit: group.unit,
-      categoryHint: group.categoryHint,
-    });
-  }
-
-  function handleSubstitutionSelect(candidate) {
-    if (!candidate || !candidate.product_id) return;
-    const qty = candidate.pack_count || 1;
-    const groupKey = substitutionSheet.groupKey;
-    // Démarque l'ancien produit choisi pour ce groupe (s'il existe)
-    if (groupKey) {
-      const group = matches.find((g) => g.key === groupKey);
-      const previousId = chosenByGroup[groupKey] ?? group?.matchingProducts?.[0]?.id;
-      if (previousId && previousId !== candidate.product_id) {
-        markProduct(previousId, null);
-      }
-      setChosenByGroup((prev) => ({ ...prev, [groupKey]: candidate.product_id }));
-    }
-    markProduct(candidate.product_id, 'needed');
-    setQuotidienQty(candidate.product_id, qty);
-  }
-
-  if (!productsLoaded) return null;
-
-  const hasSelectedRecipes = Object.keys(selectedRecipes || {}).length > 0;
-  if (!hasSelectedRecipes) {
-    return (
-      <section className="stack stack--lg">
-        <EmptyState icon="chef" title="Aucune recette sélectionnée">
-          Reviens à l'étape précédente pour choisir tes recettes.
-        </EmptyState>
-      </section>
-    );
-  }
-
-  const renderable = matches.filter((g) => g.totalQty > 0);
-
-  if (renderable.length === 0) {
-    return (
-      <section className="stack stack--lg">
-        <EmptyState icon="check" title="Pas d'ingrédients à matcher">
-          Tes recettes n'ont pas d'ingrédients listés.
-        </EmptyState>
-      </section>
-    );
-  }
-
-  const matchedCount = renderable.filter((g) => g.matchingProducts.length > 0).length;
-  const unmatchedCount = renderable.length - matchedCount;
-
-  return (
-    <section className="stack stack--lg">
-      <div className="recipe-ingredients-header">
-        <h2 className="recipe-ingredients-header__title">
-          Les ingrédients de tes recettes
-        </h2>
-        <p className="recipe-ingredients-header__subtitle">
-          {matchedCount} produit{matchedCount > 1 ? 's' : ''} trouvé
-          {matchedCount > 1 ? 's' : ''} dans ton catalogue
-          {unmatchedCount > 0 ? ` · ${unmatchedCount} à confirmer` : ''}
-        </p>
-      </div>
-
-      <div className="stack stack--md">
-        {renderable.map((group) => (
-          <IngredientMatchCard
-            key={group.key}
-            group={group}
-            chosenProductId={chosenByGroup[group.key]}
-            quotidienQty={quotidienQty}
-            onQuantityChange={handleQuantityChange}
-            onOpenSubstitution={() => handleOpenSubstitution(group)}
-          />
-        ))}
-      </div>
-
-      <ProductSubstitutionSheet
-        isOpen={substitutionSheet.open}
-        onClose={() => setSubstitutionSheet((p) => ({ ...p, open: false }))}
-        ingredientName={substitutionSheet.ingredientName}
-        ingredientQty={substitutionSheet.ingredientQty}
-        ingredientUnit={substitutionSheet.ingredientUnit}
-        categoryHint={substitutionSheet.categoryHint}
-        onSelect={handleSubstitutionSelect}
-      />
-    </section>
-  );
+  const {items:products, loaded, loading, error, load} = useProductsStore();
+  const {items:recipes} = useRecipesStore();
+  const {selectedRecipes, ingredientChoices, setIngredientChoice, quotidien} = useWizardStore();
+  const [sheet, setSheet] = useState(null);
+  const [showOwned, setShowOwned] = useState(false);
+  useEffect(() => { if (!loaded && !loading && !error) load(); }, [loaded, loading, error, load]);
+  const matches = useMemo(() => getRecipeIngredientMatches({recipes, products, selectedRecipes}).filter((g) => g.totalQty > 0), [recipes, products, selectedRecipes]);
+  const groups = matches.map((g) => ({...g, choice:resolveIngredientChoice(g, ingredientChoices, quotidien, products)}));
+  const ownedCount = groups.filter((g) => g.choice.owned).length;
+  // Unresolved products come first without moving rows after a decision.
+  const ordered = [...groups].sort((a,b) => Number(a.matchingProducts.length > 0) - Number(b.matchingProducts.length > 0));
+  if (!Object.keys(selectedRecipes).length) return null;
+  return <section className="stack stack--lg">
+    <div className="recipe-ingredients-header"><h2>Pour tes repas</h2><p className="text-muted">Les ingrédients sont regroupés. Retire ce que tu as déjà.</p></div>
+    {loading && <p role="status">Chargement des ingrédients…</p>}
+    {error && <div role="alert" className="notice notice--error">{error} <button className="text-action" onClick={load}>Réessayer</button></div>}
+    {loaded && matches.length === 0 && <p className="notice">Ces recettes ne contiennent aucun ingrédient. Ajoute des produits ci-dessous.</p>}
+    {ordered.filter((g) => !g.choice.owned || showOwned).map((group) => {
+      const {product, quantity, owned} = group.choice;
+      const available = product && !group.matchingProducts.some((p) => p.id === product.id) ? {...group, matchingProducts:[product,...group.matchingProducts]} : group;
+      return <div className={`ingredient-review ${owned ? 'is-owned' : ''}`} key={group.key}>
+        {owned ? <div className="owned-ingredient"><Icon name="check" size={20}/><span>{group.ingredientName}<small>Déjà à la maison · retiré de la liste</small></span></div> : <IngredientMatchCard group={available} chosenProductId={product?.id} quotidienQty={product ? {[product.id]:quantity} : {}} onQuantityChange={(_, quantity) => setIngredientChoice(group.key,{quantity})} onOpenSubstitution={() => setSheet(group)} />}
+        <button className="text-action pantry-action" aria-pressed={owned} onClick={() => {setIngredientChoice(group.key,{owned:!owned}); if (!owned) setShowOwned(true);}}>{owned ? 'Remettre dans la liste' : 'J’en ai déjà'}</button>
+      </div>;
+    })}
+    {ownedCount > 0 && <button className="text-action" aria-expanded={showOwned} onClick={() => setShowOwned(!showOwned)}>{showOwned ? 'Masquer' : 'Voir'} les {ownedCount} ingrédients déjà à la maison</button>}
+    <ProductSubstitutionSheet isOpen={!!sheet} onClose={() => setSheet(null)} ingredientName={sheet?.ingredientName || ''} ingredientQty={sheet?.totalQty || 0} ingredientUnit={sheet?.unit || 'unité'} categoryHint={sheet?.categoryHint} onSelect={(candidate) => {
+      if (candidate?.product_id && sheet) {setIngredientChoice(sheet.key,{productId:candidate.product_id,quantity:candidate.pack_count || 1,owned:false});setSheet(null);}
+    }} />
+  </section>;
 }
 
 function IngredientMatchCard({
@@ -290,7 +167,7 @@ function IngredientMatchCard({
     [group.sources],
   );
   const hasMultipleRecipes = sourcesByRecipe.length > 1;
-  const [breakdownOpen, setBreakdownOpen] = useState(hasMultipleRecipes);
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
 
   // Etat empty : aucun produit du catalogue matché
   if (group.matchingProducts.length === 0) {
@@ -302,7 +179,7 @@ function IngredientMatchCard({
           </div>
           <div className="ingredient-card__title">
             <span className="ingredient-card__name">{group.ingredientName}</span>
-            <span className="ingredient-card__brand">Aucun produit trouvé</span>
+            <span className="ingredient-card__brand">Produit à choisir · sinon ajouté en ingrédient libre</span>
           </div>
         </div>
 
@@ -356,7 +233,7 @@ function IngredientMatchCard({
       <div className="ingredient-card__identity">
         <div className="ingredient-card__image-wrap">
           <AsyncImage
-            src={product.image_url || undefined}
+            src={product.image_url || undefined} fallbackSrc={productImageFallback(product)}
             keyword={keyword}
             alt={product.name}
             className="ingredient-card__image"
@@ -370,10 +247,11 @@ function IngredientMatchCard({
             <span className="ingredient-card__brand">{product.brand}</span>
           )}
         </div>
+        <span className="ingredient-card__total">{formattedTotal}</span>
       </div>
 
-      <div className="ingredient-card__divider" />
-
+      {convertToProductQty(group.totalQty, group.unit, product).qty === 0 && <p className="notice">Conditionnement inconnu : vérifie la quantité au drive.</p>}
+      <details className="ingredient-details"><summary>Ajuster les quantités</summary>
       <div className="ingredient-card__section">
         <span className="ingredient-card__label">Pour la recette</span>
         <div className="ingredient-card__need">
@@ -443,14 +321,14 @@ function IngredientMatchCard({
         </>
       )}
 
-      {altCount > 0 && (
+      </details>
+      {(
         <button
           type="button"
           className="ingredient-card__alt-link"
           onClick={onOpenSubstitution}
         >
-          {altCount} autre produit{altCount > 1 ? 's' : ''} disponible
-          {altCount > 1 ? 's' : ''}
+          Changer de produit
         </button>
       )}
     </Card>

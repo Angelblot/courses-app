@@ -1,0 +1,33 @@
+import { ProductSuggestions, productSuggestion } from '../../components/ProductSuggestions';
+import { useState, useRef } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Head, Action, ui } from '../../components/MaisonUI';
+import { useProducts, ajouterProduit, basculerFavori } from '../../stores/products';
+import { useWizard } from '../../contexts/WizardContext';
+import { type FicheProduit } from '../../lib/openfoodfacts';
+import { useRechercheOff } from '../../hooks/useRechercheOff';
+import { nombreArticles } from '../../lib/ajouts-quotidiens';
+export default function Ajout({session=false}:{session?:boolean}){
+ const params=useLocalSearchParams<{name?:string}>();const [nom,setNom]=useState(typeof params.name==='string'?params.name:'');
+ const [qty,setQty]=useState(1),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[erreur,setErreur]=useState(''),[fiche,setFiche]=useState<FicheProduit|null>(null),[habituel,setHabituel]=useState(false);
+ const p=useProducts(),w=useWizard(),lock=useRef(false);
+ const off=useRechercheOff(),resultats=off.resultats;
+ function confirme(n:string){setMessage(`${qty} × ${n} ajouté${qty>1?'s':''} à ta liste.`);setNom('');setFiche(null);off.reinitialiser();setQty(1);setHabituel(false);}
+ function search(){if(busy)return;setErreur('');setFiche(null);void off.chercher(nom);}
+ async function importer(){if(!fiche||lock.current)return;lock.current=true;setBusy(true);setErreur('');try{const res=await ajouterProduit(fiche,habituel);const produit=res.produit??res.doublon;if(produit){if(habituel&&!produit.favorite){const fav=await basculerFavori(produit.id,true);if(!fav.ok){setErreur('Impossible d’enregistrer ce produit habituel. Réessaie.');return;}}w.ajouterProduitListe(produit.id,qty,!session);confirme(produit.name);p.recharger();}else setErreur(res.reseau?'Connexion indisponible. La fiche est conservée à l’écran pour réessayer.':res.erreur??'Impossible d’enregistrer ce produit.');}catch{setErreur('Enregistrement impossible. Réessaie.');}finally{lock.current=false;setBusy(false);}}
+ const locaux=p.produits.filter(p=>nom.trim().length>0&&p.name.toLowerCase().includes(nom.trim().toLowerCase())).slice(0,5);
+ return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}><Head title={session?"Un achat exceptionnel ?":"Il me manque…"} back={!session}/><Text style={ui.subtitle}>{session?'Cherche un produit, scanne son code-barres ou note simplement son nom.':'Note-le maintenant, tu le retrouveras pour tes prochaines courses.'}</Text>
+ {!!message&&<View style={ui.notice}><Text accessibilityLiveRegion="polite" style={ui.link}>{message}</Text><Action secondary onPress={()=>router.push(session?'/wizard/recap':'/manques')}>Voir les produits notés</Action></View>}
+ <TextInput accessibilityLabel="Produit manquant" autoFocus={!params.name} maxLength={120} editable={!busy} returnKeyType="search" onSubmitEditing={search} value={nom} onChangeText={v=>{setNom(v);off.reinitialiser();setErreur('');setFiche(null);setMessage('');}} placeholder="Lait, café, papier toilette…" style={ui.input}/>
+ <View style={ui.sectionRow}><Text style={ui.productName}>Nombre d’articles</Text><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel="Diminuer la quantité" style={ui.iconButton} onPress={()=>setQty(nombreArticles(qty-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{qty}</Text><Pressable accessibilityRole="button" accessibilityLabel="Augmenter la quantité" style={ui.iconButton} onPress={()=>setQty(nombreArticles(qty+1))}><Text style={ui.title}>+</Text></Pressable></View></View>
+ {locaux.length>0&&<Text style={ui.section}>Dans tes produits</Text>}<ProductSuggestions items={locaux.map(productSuggestion)} actionLabel={`Ajouter × ${qty}`} onSelect={id=>{const produit=locaux.find(p=>p.id===id);if(produit){w.ajouterProduitListe(id,qty,!session);confirme(produit.name);}}}/>
+ <Action disabled={!nom.trim()||busy} onPress={()=>{const n=nom.trim();w.ajouterExtra({name:n,quantity:qty,unit:'unité',rayon:'autre'},!session);confirme(n);}}>Noter {nom.trim()||'ce produit'} dans ma liste</Action>
+ <Text style={ui.section}>Trouver le produit exact</Text><Text style={ui.subtitle}>Pour un achat exceptionnel, récupère sa photo et son code-barres sans en faire un favori.</Text><Action secondary disabled={nom.trim().length<3||busy||off.enRecherche} onPress={search}>{off.enRecherche?'Recherche en cours…':'Chercher sur Open Food Facts'}</Action><Action secondary onPress={()=>router.push({pathname:'/scan',params:{destination:'liste',quantite:String(qty),manque:session?'0':'1'}})}>Scanner pour ajouter à ma liste</Action>
+ {busy&&<ActivityIndicator/>}{off.enRecherche&&<View style={ui.sectionRow}><ActivityIndicator/><Text accessibilityLiveRegion="polite" style={ui.detail}>{off.progression}</Text></View>}{!!off.erreur&&<Text accessibilityLiveRegion="polite" style={ui.error}>{off.erreur}</Text>}{!!erreur&&<Text accessibilityLiveRegion="polite" style={ui.error}>{erreur}</Text>}
+ {resultats?.length===0&&!busy&&!off.enRecherche&&!erreur&&!off.erreur&&<Text style={ui.subtitle}>Aucun produit trouvé. Précise le nom ou scanne son code-barres.</Text>}
+ <ProductSuggestions items={(resultats??[]).map((f,i)=>({id:`${f.ean13}-${i}`,name:f.name,image:f.imageUrl,brand:f.brand,detail:f.grammageG?`${f.grammageG} g`:f.volumeMl?`${f.volumeMl} ml`:null}))} selectedId={fiche&&resultats?`${fiche.ean13}-${resultats.indexOf(fiche)}`:null} onSelect={id=>setFiche(resultats?.find((f,i)=>`${f.ean13}-${i}`===id)??null)}/>
+ {fiche&&<View style={ui.notice}><Text style={ui.productName}>{qty} × {fiche.name}</Text><Text style={ui.detail}>Code-barres : {fiche.ean13||'non renseigné'}</Text><Pressable accessibilityRole="checkbox" accessibilityState={{checked:habituel}} style={{minHeight:48,justifyContent:'center'}} onPress={()=>setHabituel(!habituel)}><Text style={ui.link}>{habituel?'✓':'○'} En faire aussi un produit habituel</Text></Pressable><Action disabled={busy||!/^(?:\d{8}|\d{12}|\d{13}|\d{14})$/.test(fiche.ean13)} onPress={importer}>Confirmer l’ajout à ma liste</Action></View>}
+ </ScrollView>{session&&<View style={ui.footer}><Text style={ui.detail}>Rien à ajouter ? Passe directement au bilan.</Text><Action onPress={()=>router.replace('/wizard/recap')}>Faire le bilan de ma liste</Action></View>}</SafeAreaView>
+}

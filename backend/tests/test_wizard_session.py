@@ -196,3 +196,47 @@ def test_generate_session_not_found(client):
         "/api/wizard/sessions/9999/generate", json={"drives": ["carrefour"]}
     )
     assert res.status_code == 404
+
+
+def test_pantry_and_product_overrides_persist_without_double_counting(client):
+    product = _create_product(client, name='Spaghetti paquet 500g', unit='unité')
+    recipe = _create_recipe(client)
+    override = {'ingredients': [{'recipe_id': recipe['id'], 'name': 'Spaghetti', 'unit': 'g'}],
+                'product_id': product['id'], 'quantity': 2}
+    owned = {'ingredients': [{'recipe_id': recipe['id'], 'name': 'Viande hachée', 'unit': 'g'}], 'owned': True}
+    response = client.post('/api/wizard/sessions', json={
+        'recipes': [{'recipe_id': recipe['id'], 'servings': 4}],
+        'ingredient_overrides': [override, owned],
+        'quotidien': [{'product_id': product['id'], 'quantity': 1, 'needed': True}],
+    })
+    assert response.status_code == 201
+    result = response.json()
+    assert len(result['consolidated_items']) == 1
+    assert result['consolidated_items'][0]['quantity'] == 3
+    assert result['consolidated_items'][0]['unit'] == 'unité'
+    stored = client.get(f"/api/wizard/sessions/{result['id']}").json()
+    assert stored['payload']['ingredient_overrides'][1]['owned'] is True
+    assert stored['consolidated_items'] == result['consolidated_items']
+
+
+def test_ingredient_choice_cannot_reference_unselected_recipe(client):
+    recipe = _create_recipe(client)
+    response = client.post('/api/wizard/sessions', json={'ingredient_overrides': [
+        {'ingredients': [{'recipe_id': recipe['id'], 'name': 'Spaghetti', 'unit': 'g'}], 'owned': True}
+    ]})
+    assert response.status_code == 422
+
+
+def test_grouped_choice_across_recipes_adds_pack_only_once(client):
+    first, second = _create_recipe(client), _create_recipe(client, name='Autres pâtes')
+    product = _create_product(client, name='Spaghetti', unit='unité')
+    response = client.post('/api/wizard/sessions', json={
+        'recipes': [{'recipe_id': r['id'], 'servings': 2} for r in [first, second]],
+        'ingredient_overrides': [{'ingredients': [
+            {'recipe_id': r['id'], 'name': 'Spaghetti', 'unit': 'g'} for r in [first, second]],
+            'product_id': product['id'], 'quantity': 1}],
+    })
+    assert response.status_code == 201
+    items = response.json()['consolidated_items']
+    assert next(i for i in items if i['product_id'] == product['id'])['quantity'] == 1
+    assert next(i for i in items if i['name'] == 'Viande hachée')['quantity'] == 500

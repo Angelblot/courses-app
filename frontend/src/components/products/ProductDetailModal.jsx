@@ -1,3 +1,4 @@
+import { productImageFallback } from '../../lib/tableeImages.js';
 import { useEffect, useMemo, useState } from 'react';
 import { ProductsAPI } from '../../api.js';
 import { AsyncImage } from '../ui/AsyncImage.jsx';
@@ -154,7 +155,7 @@ export function ProductDetailModal({ product, onClose, onEdit }) {
       >
         <div style={HEADER}>
           <AsyncImage
-            src={product.image_url || undefined}
+            src={product.image_url || undefined} fallbackSrc={productImageFallback(product)}
             keyword={keyword}
             alt={product.name}
             className="item__image"
@@ -163,6 +164,7 @@ export function ProductDetailModal({ product, onClose, onEdit }) {
             fallbackIconSize={18}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
+            {!product.image_url && productImageFallback(product) && <small className="muted">Illustration générée · emballage indicatif</small>}
             <div
               style={{
                 fontWeight: 600,

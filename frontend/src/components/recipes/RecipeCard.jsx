@@ -1,3 +1,4 @@
+import { recipeImage, recipeImageFallback } from '../../lib/tableeImages.js';
 import { Button } from '../ui/Button.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { Icon } from '../ui/Icon.jsx';
@@ -44,6 +45,7 @@ export function RecipeCard({ recipe, onDelete, onUse, onEdit, isEditing }) {
       aria-label={onEdit ? `Éditer ${recipe.name}` : undefined}
     >
       <AsyncImage
+        src={recipeImage(recipe)} fallbackSrc={recipeImageFallback(recipe)}
         keyword={keyword}
         alt={recipe.name}
         className="recipe-card__image"
@@ -74,7 +76,7 @@ export function RecipeCard({ recipe, onDelete, onUse, onEdit, isEditing }) {
         )}
         {onUse && (
           <Button variant="secondary" size="sm" onClick={() => onUse(recipe)}>
-            Wizard
+            Choisir
           </Button>
         )}
         {onDelete && (

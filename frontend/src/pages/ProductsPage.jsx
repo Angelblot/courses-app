@@ -59,6 +59,7 @@ export function ProductsPage() {
   const toggleFavorite = useProductsStore((s) => s.toggleFavorite);
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const [query, setQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [inlineEditingId, setInlineEditingId] = useState(null);
   const [detailProduct, setDetailProduct] = useState(null);
@@ -125,9 +126,9 @@ export function ProductsPage() {
   );
 
   const filtered = useMemo(() => {
-    if (!activeCategory) return driveFiltered;
-    return driveFiltered.filter((p) => p.category_key === activeCategory);
-  }, [driveFiltered, activeCategory]);
+    const normalize = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    return driveFiltered.filter((p) => (!activeCategory || p.category_key === activeCategory) && normalize(`${p.name} ${p.brand || ''}`).includes(normalize(query)));
+  }, [driveFiltered, activeCategory, query]);
 
   const groups = useMemo(() => {
     const map = new Map();
@@ -194,9 +195,11 @@ export function ProductsPage() {
         </p>
       </header>
 
+      <input className="search-field" type="search" aria-label="Rechercher un produit" placeholder="Rechercher un produit ou une marque…" value={query} onChange={(e) => setQuery(e.target.value)} />
+
       <div className="section-header">
         <span className="section-header__count">
-          {items.length} produit{items.length > 1 ? 's' : ''}
+          {filtered.length} produit{filtered.length > 1 ? 's' : ''}
           {activeDrive !== 'all' && ` · drive ${driveLabel(activeDrive)}`}
           {activeCategoryEntry && ` · ${filtered.length} dans « ${activeCategoryEntry.label} »`}
         </span>
@@ -251,8 +254,8 @@ export function ProductsPage() {
           Ajoute ton premier produit pour démarrer ton catalogue.
         </EmptyState>
       ) : filtered.length === 0 ? (
-        <EmptyState title="Rien dans cette catégorie">
-          Change de filtre ou ajoute un produit à cette catégorie.
+        <EmptyState title="Aucun produit trouvé">
+          Modifie ta recherche ou change de catégorie.
         </EmptyState>
       ) : (
         <div className="stack stack--lg">

@@ -44,6 +44,7 @@ function emptyForm() {
   return {
     name: '',
     description: '',
+    image_url: '',
     category: '',
     servings_default: 2,
     ingredients: [emptyIngredient()],
@@ -64,6 +65,7 @@ function normalizeIncoming(value) {
   return {
     name: value.name || '',
     description: value.description || '',
+    image_url: value.image_url || '',
     category: value.category || '',
     servings_default: value.servings_default || 2,
     ingredients: ingredients.length ? ingredients : [emptyIngredient()],
@@ -139,6 +141,7 @@ export function RecipeForm({ onSubmit, onCancel, initialValue, title }) {
       const cleaned = {
         name: form.name.trim(),
         description: form.description,
+        image_url: form.image_url.trim() || null,
         category: form.category,
         servings_default: form.servings_default,
         ingredients: form.ingredients
@@ -196,6 +199,7 @@ export function RecipeForm({ onSubmit, onCancel, initialValue, title }) {
           />
         </div>
 
+        <Input label="Photo du plat (URL)" type="url" maxLength={500} placeholder="https://…" value={form.image_url} onChange={(e) => update({ image_url: e.target.value })} />
         <Textarea
           placeholder="Description / notes…"
           value={form.description}

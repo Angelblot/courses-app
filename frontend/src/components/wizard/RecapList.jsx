@@ -26,6 +26,7 @@ export function RecapList() {
   const selectedRecipes = useWizardStore((s) => s.selectedRecipes);
   const quotidien = useWizardStore((s) => s.quotidien);
   const quotidienQty = useWizardStore((s) => s.quotidienQty);
+  const ingredientChoices = useWizardStore((s) => s.ingredientChoices);
   const extras = useWizardStore((s) => s.extras);
   const removeExtra = useWizardStore((s) => s.removeExtra);
 
@@ -37,9 +38,9 @@ export function RecapList() {
         quotidien,
         quotidienQty,
         extras,
-        products,
+        products, ingredientChoices,
       }),
-    [recipes, selectedRecipes, quotidien, quotidienQty, extras, products],
+    [recipes, selectedRecipes, quotidien, quotidienQty, extras, products, ingredientChoices],
   );
 
   const groups = useMemo(() => groupByRayon(items), [items]);
@@ -82,7 +83,7 @@ export function RecapList() {
                   {entries.map((item) => {
                     const extraSource = item.sources.find((s) => s.type === 'extra');
                     const extraEntry = extraSource
-                      ? extras.find((e) => e.name === item.name)
+                      ? extras.find((e) => e.id === extraSource.extraId)
                       : null;
                     const hasRecipeSource = item.sources.some(
                       (s) => s.type === 'recipe',

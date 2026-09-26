@@ -73,13 +73,7 @@ export const DrivesAPI = {
 const EMPTY_FALLBACK = [];
 
 export const RecipesAPI = {
-  list: async () => {
-    try {
-      return await api('/api/recipes/');
-    } catch (e) {
-      return EMPTY_FALLBACK;
-    }
-  },
+  list: () => api('/api/recipes/'),
   get: (id) => api(`/api/recipes/${id}`),
   create: (data) => api('/api/recipes/', { method: 'POST', body: data }),
   update: (id, data) => api(`/api/recipes/${id}`, { method: 'PUT', body: data }),

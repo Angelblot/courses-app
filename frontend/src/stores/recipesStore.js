@@ -5,15 +5,17 @@ import { useUIStore } from './uiStore.js';
 export const useRecipesStore = create((set, get) => ({
   items: [],
   loading: false,
+  error: null,
   loaded: false,
 
   load: async () => {
     if (get().loading) return;
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
       const items = await RecipesAPI.list();
       set({ items, loaded: true });
     } catch (err) {
+      set({ error: 'Impossible de charger les données. Réessaie dans un instant.' });
       useUIStore.getState().notifyError(err);
     } finally {
       set({ loading: false });

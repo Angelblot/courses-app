@@ -1,3 +1,4 @@
+import { productImageFallback } from '../../lib/tableeImages.js';
 import { useMemo } from 'react';
 import { Card } from '../ui/Card.jsx';
 import { Badge } from '../ui/Badge.jsx';
@@ -142,7 +143,7 @@ export function RecipeIngredientsSection({
                 {/* Product image */}
                 <div className="recipe-ingredient-card__image-wrap">
                   <AsyncImage
-                    src={product.image_url || undefined}
+                    src={product.image_url || undefined} fallbackSrc={productImageFallback(product)}
                     keyword={keyword}
                     alt={product.name}
                     className="recipe-ingredient-card__image"

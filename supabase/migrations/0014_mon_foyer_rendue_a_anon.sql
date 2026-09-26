@@ -1,0 +1,23 @@
+-- Rend l'exécution de `mon_foyer()` au rôle `anon`.
+--
+-- La migration 0013 la lui retirait, en retirant le droit à PUBLIC. C'était
+-- un excès : les politiques RLS de huit tables appellent cette fonction, si
+-- bien qu'une requête sans session ne rendait plus une liste vide mais une
+-- erreur 42501. L'isolation était la même — rien ne fuit dans les deux cas —
+-- mais l'application affiche ses erreurs à l'écran, et ce chemin-là n'a
+-- jamais été éprouvé sur un appareil.
+--
+-- Le gain abandonné est quasi nul : sans `auth.uid()`, la fonction rend NULL.
+-- Mesuré avant et après. L'avertissement de l'analyseur Supabase
+-- (`anon_security_definer_function_executable`) est donc **accepté en
+-- connaissance de cause**, et non ignoré.
+--
+-- Le correctif propre, si on veut un jour le faire disparaître pour de bon :
+-- déplacer la fonction hors du schéma `public`, que PostgREST est seul à
+-- exposer. Il faut alors réécrire les valeurs par défaut de huit tables et
+-- onze politiques — un chantier à mener à froid.
+--
+-- Ce que 0013 verrouille et qui reste acquis : la vue `membres_du_foyer`,
+-- seul objet du schéma sans filet RLS, refuse désormais `anon` explicitement.
+
+grant execute on function public.mon_foyer() to anon;

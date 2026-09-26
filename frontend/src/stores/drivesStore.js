@@ -5,14 +5,17 @@ import { useUIStore } from './uiStore.js';
 export const useDrivesStore = create((set) => ({
   configs: [],
   loading: false,
+  loaded: false,
+  error: null,
   testResult: null,
 
   load: async () => {
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
       const configs = await DrivesAPI.configs();
-      set({ configs });
+      set({ configs, loaded: true });
     } catch (err) {
+      set({ error: 'Impossible de charger les données. Réessaie dans un instant.' });
       useUIStore.getState().notifyError(err);
     } finally {
       set({ loading: false });

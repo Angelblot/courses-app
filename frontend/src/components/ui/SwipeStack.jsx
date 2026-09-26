@@ -8,6 +8,8 @@ export function SwipeStack({
   onReject,
   renderCard,
   emptyState,
+  acceptLabel = 'Choisir',
+  rejectLabel = 'Passer',
   getId = (item) => item.id,
 }) {
   const [idx, setIdx] = useState(0);
@@ -118,10 +120,10 @@ export function SwipeStack({
                 {isTop && (
                   <>
                     <div className="swipe-badge swipe-badge--accept" style={{ opacity: acceptOpacity }}>
-                      Garder
+                      {acceptLabel}
                     </div>
                     <div className="swipe-badge swipe-badge--reject" style={{ opacity: rejectOpacity }}>
-                      Passer
+                      {rejectLabel}
                     </div>
                   </>
                 )}
@@ -129,6 +131,7 @@ export function SwipeStack({
             );
           })}
       </div>
+      <div className="swipe-actions"><button className="btn btn--secondary" disabled={!!exit} onClick={() => commitSwipe('left')}>{rejectLabel}</button><button className="btn" disabled={!!exit} onClick={() => commitSwipe('right')}>{acceptLabel}</button></div>
     </div>
   );
 }

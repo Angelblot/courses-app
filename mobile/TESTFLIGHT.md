@@ -1,0 +1,110 @@
+# Publier sur TestFlight
+
+Toutes les commandes de ce document partent du dossier `mobile/` du projet.
+Si tu ouvres un terminal neuf, il démarre dans ton dossier personnel : les
+chemins sont donc donnés en entier, pour pouvoir être copiés tels quels.
+
+Le projet est prêt : `expo-doctor` passe ses 21 contrôles, l'icône et
+l'identifiant de bundle sont en place, `eas.json` définit les profils.
+
+Il reste deux étapes que **tu dois faire toi-même** : elles demandent des
+identifiants — compte Expo, puis compte Apple — et personne d'autre que toi
+n'a à les saisir.
+
+## 1. Se connecter à Expo
+
+```bash
+cd /Users/angel-assistant/app-saas/courses-app/mobile && npx eas-cli login
+```
+
+Crée un compte sur expo.dev si tu n'en as pas. Le niveau gratuit suffit pour
+des compilations occasionnelles ; elles passent par une file d'attente qui
+peut durer un moment aux heures chargées.
+
+## 2. Compiler et envoyer
+
+```bash
+cd /Users/angel-assistant/app-saas/courses-app/mobile && npx eas-cli build --platform ios --profile production
+```
+
+EAS demande alors tes identifiants Apple et génère lui-même le certificat de
+distribution et le profil de provisionnement. Réponds oui quand il propose de
+les gérer pour toi — c'est le chemin le plus simple, et les clés restent chez
+Expo, pas dans le dépôt.
+
+La compilation dure une quinzaine de minutes. Ensuite :
+
+```bash
+cd /Users/angel-assistant/app-saas/courses-app/mobile && npx eas-cli submit --platform ios --latest
+```
+
+L'application apparaît dans App Store Connect au bout de quelques minutes de
+traitement, puis dans TestFlight.
+
+## Ce qui est déjà réglé
+
+| Réglage | Valeur |
+|---|---|
+| Nom | Courses |
+| Identifiant de bundle | `com.coursesapp.mobile` |
+| Version | 1.0.0, numéro de build incrémenté automatiquement |
+| Icône | panier, 1024×1024, aux couleurs du thème |
+| Écran de lancement | fond crème `#FAFAF8` |
+| Apparence | claire forcée — sans quoi la barre d'état devient illisible sur un iPhone en mode sombre |
+| Permission caméra | « L'appareil photo sert à scanner le code-barres de tes produits. » |
+
+## Version d'Xcode : contrainte vérifiée le 20/08/2026
+
+**App Store Connect refuse les envois compilés avec un Xcode bêta.** Le message
+d'erreur est explicite : *« you need to use the latest Release Candidates (RC)
+for SDKs and Xcode to submit the app »* (validation 409, Unsupported SDK or
+Xcode version).
+
+Une bêta suffit pour **compiler**, pas pour **envoyer**. La nuance a coûté une
+compilation complète ici : l'`.ipa` est produit, signé, valide, et rejeté au
+téléversement.
+
+Version requise à ce jour : **Xcode 26.6, build 17F113** (25 juin 2026), la
+dernière stable. Xcode 27 est en bêta 5 et ne passe pas.
+
+Vérifier ce qui est actif :
+
+```bash
+xcodebuild -version && xcode-select -p
+```
+
+Si `xcode-select` pointe sur une bêta, l'installer depuis le Mac App Store puis
+basculer dessus :
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
+
+## À savoir avant de lancer
+
+**L'identifiant de bundle est définitif.** `com.coursesapp.mobile` est un
+choix par défaut : change-le maintenant si tu préfères autre chose, il devient
+difficile à modifier une fois l'application déposée.
+
+**Les variables d'environnement doivent être fournies à EAS.** `mobile/.env`
+n'est pas versionné, donc la compilation dans le nuage ne le verra pas.
+Déclare-les avant la première compilation :
+
+Une commande par variable, après s'être connecté :
+
+```bash
+cd /Users/angel-assistant/app-saas/courses-app/mobile && npx eas-cli env:create --name EXPO_PUBLIC_SUPABASE_URL --value https://qmymwicsgilhoihtfdjm.supabase.co --environment production --visibility plaintext
+```
+
+```bash
+cd /Users/angel-assistant/app-saas/courses-app/mobile && npx eas-cli env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value sb_publishable_PueJWmalqhZO0ctPu95GKQ_EaAgVulr --environment production --visibility plaintext
+```
+
+Ces commandes exigent d'être déjà connecté (étape 1) : sans session, elles
+échouent sans rien créer.
+
+Ces deux valeurs sont publiques par conception — elles partent de toute façon
+dans le paquet iOS, et le cloisonnement repose sur RLS, pas sur leur secret.
+
+**Vérifie d'abord dans Expo Go.** Une compilation ratée coûte quinze minutes ;
+`npx expo start` en coûte zéro.

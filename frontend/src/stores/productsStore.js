@@ -5,12 +5,13 @@ import { useUIStore } from './uiStore.js';
 export const useProductsStore = create((set, get) => ({
   items: [],
   loading: false,
+  error: null,
   loaded: false,
   categories: [],
   activeCategory: null,
 
   load: async () => {
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
       const [items, categories] = await Promise.all([
         ProductsAPI.list(),
@@ -18,6 +19,7 @@ export const useProductsStore = create((set, get) => ({
       ]);
       set({ items, categories, loaded: true });
     } catch (err) {
+      set({ error: 'Impossible de charger les données. Réessaie dans un instant.' });
       useUIStore.getState().notifyError(err);
     } finally {
       set({ loading: false });
