@@ -47,7 +47,6 @@ function emptyForm() {
     image_url: '',
     category: '',
     servings_default: 2,
-    image_url: null,
     ingredients: [emptyIngredient()],
   };
 }
@@ -69,7 +68,6 @@ function normalizeIncoming(value) {
     image_url: value.image_url || '',
     category: value.category || '',
     servings_default: value.servings_default || 2,
-    image_url: value.image_url || null,
     ingredients: ingredients.length ? ingredients : [emptyIngredient()],
   };
 }
@@ -143,10 +141,9 @@ export function RecipeForm({ onSubmit, onCancel, initialValue, title }) {
       const cleaned = {
         name: form.name.trim(),
         description: form.description,
-        image_url: form.image_url.trim() || null,
+        image_url: form.image_url?.trim() || null,
         category: form.category,
         servings_default: form.servings_default,
-        image_url: form.image_url,
         ingredients: form.ingredients
           .filter((ing) => ing.name.trim())
           .map((ing) => ({
