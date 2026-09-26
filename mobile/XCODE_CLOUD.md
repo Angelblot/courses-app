@@ -27,9 +27,10 @@ La configuration du workflow vit chez Apple, pas dans le dépôt — comme pour
 
 1. **App Store Connect → Xcode Cloud → Créer un workflow**, en le rattachant au
    dépôt GitHub `Angelblot/courses-app`.
-2. **Démarrage** : branche `mobile/expo-scan` (ou `main` après fusion), en
-   restreignant aux fichiers de `mobile/` pour ne pas compiler à chaque
-   changement de l'extension ou du backend.
+2. **Démarrage** : branche `main`, en restreignant aux fichiers de `mobile/`
+   pour ne pas compiler à chaque changement de l'extension ou de `supabase/`.
+   Le workflow « Default » surveillait `mobile/expo-scan` jusqu'au 26/09/2026 ;
+   il est passé sur `main` une fois cette branche fusionnée.
 3. **Action** : Archive, plateforme iOS, schéma **`Courses`**.
 4. **Post-action** : TestFlight Internal Testing, groupe interne.
 5. **Variables d'environnement du workflow** — l'étape à ne pas manquer :
@@ -101,6 +102,20 @@ est de lancer la compilation soi-même :
 ```bash
 node scripts/asc.mjs "/v1/ciBuildRuns" '{"data":{"type":"ciBuildRuns","relationships":{"workflow":{"data":{"type":"ciWorkflows","id":"DE20A812-6D9E-4789-903C-8F067C2B13EF"}}}}}'
 ```
+
+Pour compiler une autre branche que celle surveillée, ajouter la relation
+`sourceBranchOrTag`. Les identifiants de branche se listent par
+`/v1/scmRepositories/e7ade96e-ff1a-4d00-b1e5-7f691970cc62/gitReferences` ;
+celui de `main` est `dfa0470d-14d9-412c-bf9d-b1d443ac09ee` :
+
+```bash
+node scripts/asc.mjs "/v1/ciBuildRuns" '{"data":{"type":"ciBuildRuns","relationships":{"workflow":{"data":{"type":"ciWorkflows","id":"DE20A812-6D9E-4789-903C-8F067C2B13EF"}},"sourceBranchOrTag":{"data":{"type":"scmGitReferences","id":"dfa0470d-14d9-412c-bf9d-b1d443ac09ee"}}}}}'
+```
+
+La branche surveillée se change par un `PATCH` sur
+`/v1/ciWorkflows/DE20A812-6D9E-4789-903C-8F067C2B13EF`, attribut
+`branchStartCondition`. `asc.mjs` ne fait que `GET` et `POST` : ce `PATCH` a
+été envoyé le 26/09 par un script ponctuel, avec la même signature.
 
 L'identifiant du workflow se retrouve par :
 
