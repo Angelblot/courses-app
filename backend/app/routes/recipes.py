@@ -1,7 +1,7 @@
-"""Routes CRUD et import automatique pour les recettes."""
+"""Routes CRUD pour les recettes."""
 from typing import List
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,12 +10,9 @@ from app.models.recipe import Recipe, RecipeIngredient
 from app.schemas.recipe import (
     RecipeCreate,
     RecipeDetail,
-    RecipeDraft,
-    RecipeImportUrlRequest,
     RecipeOut,
     RecipeUpdate,
 )
-from app.services.recipe_import import RecipeImportError, import_from_photo, import_from_url
 
 router = APIRouter()
 
@@ -77,47 +74,6 @@ def create_recipe(payload: RecipeCreate, db: Session = Depends(get_db)) -> Recip
     db.commit()
     db.refresh(recipe)
     return recipe
-
-
-@router.post("/import/url", response_model=RecipeDraft)
-def import_recipe_from_url(payload: RecipeImportUrlRequest) -> RecipeDraft:
-    """Prépare un brouillon de recette depuis un lien (Marmiton, Jow, blog…).
-
-    Le brouillon n'est pas enregistré : l'utilisateur le vérifie puis le
-    soumet via ``POST /api/recipes/``.
-
-    Args:
-        payload: Lien de la recette.
-
-    Returns:
-        Le brouillon pré-rempli.
-
-    Raises:
-        HTTPException: 422 avec un message lisible si l'import échoue.
-    """
-    try:
-        return import_from_url(payload.url)
-    except RecipeImportError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
-
-
-@router.post("/import/photo", response_model=RecipeDraft)
-def import_recipe_from_photo(file: UploadFile = File(...)) -> RecipeDraft:
-    """Prépare un brouillon de recette depuis la photo d'une fiche recette.
-
-    Args:
-        file: Image (JPEG, PNG, WebP) envoyée en multipart.
-
-    Returns:
-        Le brouillon pré-rempli.
-
-    Raises:
-        HTTPException: 422 avec un message lisible si l'import échoue.
-    """
-    try:
-        return import_from_photo(file.file.read(), file.content_type or "")
-    except RecipeImportError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
 
 @router.get("/{recipe_id}", response_model=RecipeDetail)

@@ -1,6 +1,6 @@
 """Schémas Pydantic pour les recettes."""
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
@@ -77,17 +77,3 @@ class RecipeOut(RecipeBase):
 
 class RecipeDetail(RecipeOut):
     """Détail complet d'une recette (alias sémantique de ``RecipeOut``)."""
-
-
-class RecipeImportUrlRequest(BaseModel):
-    """Payload d'import d'une recette depuis un lien."""
-
-    url: str = Field(..., min_length=4, max_length=2000)
-
-
-class RecipeDraft(RecipeCreate):
-    """Recette pré-remplie issue d'un import, à valider par l'utilisateur (non enregistrée)."""
-
-    source: Literal["url", "photo"]
-    source_url: Optional[str] = None
-    warnings: List[str] = Field(default_factory=list)

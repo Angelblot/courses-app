@@ -141,7 +141,7 @@ export function RecipeForm({ onSubmit, onCancel, initialValue, title }) {
       const cleaned = {
         name: form.name.trim(),
         description: form.description,
-        image_url: form.image_url?.trim() || null,
+        image_url: form.image_url.trim() || null,
         category: form.category,
         servings_default: form.servings_default,
         ingredients: form.ingredients
@@ -166,10 +166,6 @@ export function RecipeForm({ onSubmit, onCancel, initialValue, title }) {
   return (
     <Card size="lg">
       {title && <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>{title}</div>}
-      {initialValue?.source && <ImportBanner draft={initialValue} />}
-      {initialValue?.source && form.image_url && (
-        <img className="import-banner__cover" src={form.image_url} alt="" loading="lazy" />
-      )}
       <form onSubmit={handleSubmit} className="stack">
         <Input
           placeholder="Nom de la recette *"
@@ -251,22 +247,6 @@ export function RecipeForm({ onSubmit, onCancel, initialValue, title }) {
   );
 }
 
-function ImportBanner({ draft }) {
-  const site = draft.source_url ? new URL(draft.source_url).hostname.replace(/^www\./, '') : null;
-  return (
-    <div className="import-banner" role="note">
-      <i className="hgi-stroke hgi-alert-circle" aria-hidden="true" />
-      <div>
-        {draft.source === 'photo' ? 'Recette lue sur ta photo. ' : (
-          <>Importée depuis <a href={draft.source_url} target="_blank" rel="noreferrer">{site}</a>. </>
-        )}
-        {draft.ingredients?.length || 0} ingrédient{draft.ingredients?.length > 1 ? 's' : ''} détecté{draft.ingredients?.length > 1 ? 's' : ''}
-        {' '}— quantités ramenées par personne. Vérifie avant d’enregistrer.
-      </div>
-    </div>
-  );
-}
-
 function IngredientRow({
   index,
   ingredient,
@@ -335,7 +315,7 @@ function IngredientRow({
           <Input
             type="number"
             min="0"
-            step="any"
+            step="0.1"
             placeholder="Qté / pers."
             value={ingredient.quantity_per_serving}
             onChange={(e) => onChange({ quantity_per_serving: parseFloat(e.target.value) || 0 })}

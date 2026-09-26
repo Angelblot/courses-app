@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -20,10 +20,6 @@ class Settings(BaseSettings):
     frontend_dist: Path = Path.home() / "courses-app" / "frontend" / "dist"
 
     playwright_headless: bool = True
-
-    # Import de recettes (photo / sites sans données structurées)
-    anthropic_api_key: Optional[str] = None
-    anthropic_model: str = "claude-opus-5"
 
     model_config = SettingsConfigDict(
         env_file=".env",
