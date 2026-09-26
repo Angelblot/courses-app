@@ -78,6 +78,14 @@ export const RecipesAPI = {
   create: (data) => api('/api/recipes/', { method: 'POST', body: data }),
   update: (id, data) => api(`/api/recipes/${id}`, { method: 'PUT', body: data }),
   delete: (id) => api(`/api/recipes/${id}`, { method: 'DELETE' }),
+  importFromUrl: (url) => api('/api/recipes/import/url', { method: 'POST', body: { url } }),
+  importFromPhoto: async (blob) => {
+    const form = new FormData();
+    form.append('file', blob, 'recette.jpg');
+    const res = await fetch(`${API_URL}/api/recipes/import/photo`, { method: 'POST', body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
 };
 
 // TODO backend — endpoints à créer pour le wizard "Phase de courses" :
