@@ -41,6 +41,36 @@ export async function choisirPhoto(
 }
 
 /**
+ * Photographie une fiche recette pour la faire lire par `lire-fiche`.
+ *
+ * Pas de recadrage : sur iOS il impose un carré, qui couperait la colonne des
+ * ingrédients. Qualité 0.5 : le texte reste net, et la photo passe sous le
+ * plafond de 5 Mo par image de l'API.
+ */
+export async function choisirFiche(
+  source: 'appareil' | 'bibliotheque',
+): Promise<{ base64: string } | null> {
+  const permission = source === 'appareil'
+    ? await ImagePicker.requestCameraPermissionsAsync()
+    : await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) return null;
+
+  const options: ImagePicker.ImagePickerOptions = {
+    mediaTypes: ['images'],
+    allowsEditing: false,
+    quality: 0.5,
+    base64: true,
+  };
+
+  const r = source === 'appareil'
+    ? await ImagePicker.launchCameraAsync(options)
+    : await ImagePicker.launchImageLibraryAsync(options);
+
+  if (r.canceled || !r.assets?.[0]?.base64) return null;
+  return { base64: r.assets[0].base64 };
+}
+
+/**
  * Dépose une photo dans le bucket et rend son adresse publique.
  *
  * Le chemin commence par l'identifiant de l'utilisateur : la politique

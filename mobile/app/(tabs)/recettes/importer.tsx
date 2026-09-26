@@ -6,12 +6,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useProducts } from '../../../stores/products';
-import { creerRecette, recupererRecette } from '../../../stores/recipes';
+import { creerRecette, lireFicheRecette, recupererRecette } from '../../../stores/recipes';
 import {
   UNITES, produitPropose, rayonPropose, valideBrouillon,
   type Brouillon, type IngredientBrouillon,
 } from '../../../lib/recette-brouillon.ts';
-import { analyserLigne } from '../../../lib/import-recette.ts';
+import { analyserLigne, type RecetteImportee } from '../../../lib/import-recette.ts';
+import { choisirFiche } from '../../../lib/photo-recette';
 import { libelleRayon } from '../../../lib/rayons.ts';
 import { colors, radius, spacing } from '../../../lib/theme';
 
@@ -33,6 +34,7 @@ export default function ImporterRecette() {
 
   const [adresse, setAdresse] = useState('');
   const [enRecuperation, setEnRecuperation] = useState(false);
+  const [enLecture, setEnLecture] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
   const [nom, setNom] = useState('');
@@ -45,29 +47,19 @@ export default function ImporterRecette() {
   const [lignes, setLignes] = useState<LigneApercu[] | null>(null);
   const [enCours, setEnCours] = useState(false);
 
-  const importer = async () => {
-    if (enRecuperation || !adresse.trim()) return;
-    setErreur(null);
-    setEnRecuperation(true);
-    const r = await recupererRecette(adresse);
-    setEnRecuperation(false);
-
-    if (!r.ok || !r.recette) {
-      setErreur(r.erreur ?? "La recette n'a pas pu être lue.");
-      return;
-    }
-
-    const nbParts = r.recette.parts;
-    setNom(r.recette.nom);
+  /** Montre ce qui a été compris, que la recette vienne d'une page ou d'une photo. */
+  const appliquer = (recette: RecetteImportee) => {
+    const nbParts = recette.parts;
+    setNom(recette.nom);
     setParts(String(nbParts));
-    setImage(r.recette.image);
+    setImage(recette.image);
     setTemps({
-      prep_minutes: r.recette.preparationMin,
-      cook_minutes: r.recette.cuissonMin,
-      kcal_per_serving: r.recette.kcalParPart,
+      prep_minutes: recette.preparationMin,
+      cook_minutes: recette.cuissonMin,
+      kcal_per_serving: recette.kcalParPart,
     });
     setLignes(
-      r.recette.ingredients.map((origine) => {
+      recette.ingredients.map((origine) => {
         const a = analyserLigne(origine);
         const produit = produitPropose(a.nom, produits);
         return {
@@ -84,6 +76,38 @@ export default function ImporterRecette() {
         };
       }),
     );
+  };
+
+  const importer = async () => {
+    if (enRecuperation || enLecture || !adresse.trim()) return;
+    setErreur(null);
+    setEnRecuperation(true);
+    const r = await recupererRecette(adresse);
+    setEnRecuperation(false);
+
+    if (!r.ok || !r.recette) {
+      setErreur(r.erreur ?? "La recette n'a pas pu être lue.");
+      return;
+    }
+    appliquer(r.recette);
+  };
+
+  const photographier = async (source: 'appareil' | 'bibliotheque') => {
+    if (enRecuperation || enLecture) return;
+    setErreur(null);
+    const photo = await choisirFiche(source);
+    // Refus d'autorisation ou annulation : rien à signaler.
+    if (!photo) return;
+
+    setEnLecture(true);
+    const r = await lireFicheRecette(photo.base64);
+    setEnLecture(false);
+
+    if (!r.ok || !r.recette) {
+      setErreur(r.erreur ?? "La photo n'a pas pu être lue.");
+      return;
+    }
+    appliquer(r.recette);
   };
 
   const maj = (i: number, champ: Partial<LigneApercu>) =>
@@ -123,7 +147,35 @@ export default function ImporterRecette() {
         </View>
 
         <ScrollView contentContainerStyle={s.corps} keyboardShouldPersistTaps="handled">
-          <Text style={s.label}>Adresse de la recette</Text>
+          <Text style={s.label}>Fiche recette papier</Text>
+          <View style={s.rangee}>
+            <Pressable
+              style={[s.ajouter, s.moitie]}
+              onPress={() => photographier('appareil')}
+              disabled={enLecture || enRecuperation}
+            >
+              <Text style={s.ajouterTexte}>Prendre en photo</Text>
+            </Pressable>
+            <Pressable
+              style={[s.ajouter, s.moitie]}
+              onPress={() => photographier('bibliotheque')}
+              disabled={enLecture || enRecuperation}
+            >
+              <Text style={s.ajouterTexte}>Photothèque</Text>
+            </Pressable>
+          </View>
+          {enLecture ? (
+            <View style={s.lecture}>
+              <ActivityIndicator color={colors.accent} />
+              <Text style={s.aide}>Lecture de la fiche, une vingtaine de secondes…</Text>
+            </View>
+          ) : (
+            <Text style={s.aide}>
+              HelloFresh, livre, carnet : cadre la liste des ingrédients, bien à plat et éclairée.
+            </Text>
+          )}
+
+          <Text style={[s.label, s.separe]}>Adresse de la recette</Text>
           <TextInput
             style={s.champ}
             value={adresse}
@@ -141,7 +193,7 @@ export default function ImporterRecette() {
             en a été compris avant de valider.
           </Text>
 
-          <Pressable style={s.ajouter} onPress={importer} disabled={enRecuperation}>
+          <Pressable style={s.ajouter} onPress={importer} disabled={enRecuperation || enLecture}>
             {enRecuperation
               ? <ActivityIndicator color={colors.accent} />
               : <Text style={s.ajouterTexte}>Importer</Text>}
@@ -314,6 +366,8 @@ const s = StyleSheet.create({
   },
   ajouterTexte: { color: colors.accent, fontWeight: '700', fontSize: 14 },
   erreur: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
+  lecture: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
+  separe: { marginTop: spacing.xl },
   bouton: {
     backgroundColor: colors.accent, borderRadius: radius.md, padding: spacing.lg,
     alignItems: 'center', marginTop: spacing.lg,

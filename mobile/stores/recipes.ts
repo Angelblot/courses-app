@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { Brouillon } from '../lib/recette-brouillon.ts';
 import type { CleRayon } from '../lib/rayons.ts';
 import { extraireRecette, type RecetteImportee } from '../lib/import-recette.ts';
+import { lireFiche } from '../lib/fiche-recette.ts';
 
 const ERREUR_CHARGEMENT =
   'Impossible de charger tes recettes. Vérifie ta connexion et réessaie.';
@@ -312,4 +313,44 @@ export async function rattacherIngredient(
     return { ok: false, erreur: "Impossible de rattacher cet ingrédient pour le moment." };
   }
   return { ok: true };
+}
+
+/**
+ * Fait lire la photo d'une fiche recette par la fonction Edge `lire-fiche`.
+ *
+ * Comme pour l'import par lien, rien n'est enregistré : la recette rendue
+ * passe par le même aperçu, où chaque ligne se vérifie avant validation.
+ */
+export async function lireFicheRecette(
+  base64: string,
+): Promise<{ ok: boolean; recette?: RecetteImportee; erreur?: string }> {
+  const { data, error } = await supabase.functions.invoke('lire-fiche', {
+    body: { image: base64, type: 'image/jpeg' },
+  });
+
+  if (error) {
+    let message: string | undefined;
+    const contexte = (error as { context?: unknown }).context;
+    if (contexte instanceof Response) {
+      try {
+        message = (await contexte.json())?.erreur;
+      } catch {
+        message = undefined;
+      }
+    }
+    if (!message) console.error('[lireFicheRecette]', error);
+    return { ok: false, erreur: message ?? "La photo n'a pas pu être lue." };
+  }
+
+  const r = data as { ok?: boolean; fiche?: unknown; erreur?: string } | null;
+  if (!r?.ok) return { ok: false, erreur: r?.erreur ?? "La photo n'a pas pu être lue." };
+
+  const recette = lireFiche(r.fiche);
+  if (!recette) {
+    return {
+      ok: false,
+      erreur: "Aucune liste d'ingrédients lisible sur cette photo. Cadre la partie « Ingrédients » et réessaie.",
+    };
+  }
+  return { ok: true, recette };
 }
