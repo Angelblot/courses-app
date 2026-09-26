@@ -30,6 +30,7 @@ build/
 
 # SQLite databases
 *.db
+*.db.bak
 *.db.bak.*
 *.sqlite
 *.sqlite3
@@ -41,6 +42,7 @@ build/
 
 # Editor / OS
 .DS_Store
+.claude/
 Thumbs.db
 .idea/
 .vscode/
@@ -62,3 +64,21 @@ htmlcov/
 # Local data
 data.db
 claude-brief-*.md
+
+# Suivi d'exécution des plans (scratch)
+.superpowers/
+
+# Expo
+mobile/.expo/
+mobile/node_modules/
+# Le projet iOS est versionné : Xcode Cloud compile un vrai projet Xcode et
+# ne peut pas exécuter `expo prebuild` avant de connaître le workspace.
+# Seuls les dossiers régénérés par ci_post_clone.sh restent exclus.
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/ios/.xcode.env.local
+mobile/android/
+mobile/.env
+
+# Artefacts de compilation locale EAS
+mobile/build-*.ipa

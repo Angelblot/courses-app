@@ -79,6 +79,5 @@ Deno.serve(async (req) => {
       erreur: "L'invitation a été envoyée, mais le rattachement au foyer a échoué. Contacte l'administrateur.",
     }, 500);
   }
-
   return reponse({ ok: true });
 });

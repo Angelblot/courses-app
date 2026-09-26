@@ -4,10 +4,21 @@
 Application mobile-first de gestion de courses pour la famille. Permet de générer automatiquement des paniers drive (Carrefour, Leclerc) depuis des recettes et une checklist hebdomadaire.
 
 ## Stack
-- **Backend** : FastAPI + SQLite (app.db) — port 8000
-- **Frontend** : React + Vite + Tailwind — port 5174
-- **Base données** : SQLite avec 65 produits Carrefour, table `purchase_lines`, `product_drives`, `drive_configs`
-- **Objectif migration** : Supabase (auth + DB) + Vercel (deploy) + GitHub (versionning)
+- **Application** : Expo SDK 57 / React Native / expo-router / TypeScript — `mobile/`
+- **Données et authentification** : Supabase (Postgres, RLS, Realtime, Storage, Edge Functions)
+- **Extension Chrome** : Manifest V3, remplit les paniers drive — `extension/`
+- **Livraison iOS** : Xcode Cloud vers TestFlight (voir `mobile/XCODE_CLOUD.md`)
+
+Le backend FastAPI et le front web React ont été retirés le 22/08/2026, une fois
+toutes leurs données reprises dans Supabase. L'application mobile et l'extension
+parlent directement à Supabase. Leur code reste consultable dans l'historique
+git ; `DESIGN.md` en décrit l'architecture.
+
+Le projet Vercel « courses » est **en pause depuis le 24/08/2026**. Il construisait
+le front web par `cd frontend && npm install`, et échouait donc à chaque push
+depuis son retrait. La pause est réversible : rien n'est supprimé, ni
+l'historique ni les adresses `frontend-*.vercel.app`. Il n'y a aujourd'hui aucun
+livrable web — l'application est distribuée par TestFlight.
 
 ## Workflow agents (RESPECTER CET ORDRE)
 
@@ -62,17 +73,13 @@ Après validation PM + UX :
 
 ## Commandes utiles
 ```bash
-# Backend
-cd ~/courses-app/backend && uvicorn app.main:app --reload --port 8000
+# Application mobile
+cd mobile && npx expo start
 
-# Frontend  
-cd ~/courses-app/frontend && npm run dev
-
-# Build frontend
-cd ~/courses-app/frontend && npm run build
-
-# DB shell
-sqlite3 ~/courses-app/backend/app.db
+# Tests de l'app mobile — EXIGE Node >= 22
+# Node 20 échoue sur ERR_UNKNOWN_FILE_EXTENSION : il ne charge pas les .ts.
+# La version par défaut de la machine est la 20, d'où le `nvm use`.
+cd mobile && nvm use 22 && node --test lib/*.test.mjs
 ```
 
 ## Workflow d'autonomie
@@ -81,16 +88,15 @@ sqlite3 ~/courses-app/backend/app.db
 - Ne pas hésiter à explorer, itérer, et utiliser `/compact` si le contexte est plein
 - En cas de blocage technique, chercher une solution par soi-même avant de demander
 
-## Validation par Hermes
-- Après chaque session, Hermes exécute les tests (`pytest`)
-- Hermes vérifie l'UX (build frontend + screenshot)
-- Le résultat est consigné dans Obsidian/Projets/Courses/Avancement.md
-
 ## Fichiers clés
-- `backend/app/main.py` — FastAPI app, routes enregistrées
-- `backend/app/models/` — SQLAlchemy models
-- `backend/app/routes/` — endpoints API
-- `frontend/src/pages/` — pages principales
-- `frontend/src/components/` — composants réutilisables
+- `mobile/app/` — écrans, routés par expo-router
+- `mobile/lib/` — logique pure et testée : rayons, unités, consolidation, typologie,
+  analyse des recettes importées. Aucun import de Supabase ni de React Native,
+  pour rester exécutable sous `node --test`.
+- `mobile/stores/` — accès aux données Supabase
+- `extension/` — extension Chrome, et `extension/test-matching.mjs`
+- `supabase/migrations/` — schéma, numérotées et jouées dans l'ordre
+- `supabase/functions/` — fonctions Edge
 - `PRODUCT_BRIEF.md` — brief produit complet (source de vérité)
-- `DESIGN.md` — architecture et propositions fonctionnelles
+- `DESIGN.md` — architecture du front web retiré, conservée pour référence
+- `docs/superpowers/specs/` et `docs/superpowers/plans/` — conceptions courantes

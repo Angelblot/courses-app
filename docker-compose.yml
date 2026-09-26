@@ -13,7 +13,10 @@ services:
       FRONTEND_DIST: /app/frontend/dist
       PLAYWRIGHT_HEADLESS: "true"
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in .env}
-      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      AUTH_ENABLED: ${AUTH_ENABLED:-true}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173","http://localhost:5174"]}
       DEBUG: ${DEBUG:-false}
     volumes:
       - courses-data:/data
