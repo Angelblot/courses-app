@@ -7,6 +7,7 @@ import { RecipesAPI } from '../api.js';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { RecipeCard } from '../components/recipes/RecipeCard.jsx';
 import { RecipeForm } from '../components/recipes/RecipeForm.jsx';
+import { RecipeImportSheet } from '../components/recipes/RecipeImportSheet.jsx';
 
 const FAB_BASE = {
   position: 'fixed',
@@ -58,12 +59,21 @@ export function RecipesPage() {
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => { load(); }, [load]);
 
-  function handleOpenCreate() { setEditing(null); setShowForm(true); }
-  function handleCloseForm() { setShowForm(false); setEditing(null); }
-  function handleEdit(recipe) { setEditing(recipe); setShowForm(true); }
+  function handleOpenCreate() { setEditing(null); setDraft(null); setImportOpen(true); }
+  function handleCloseForm() { setShowForm(false); setEditing(null); setDraft(null); }
+  function handleEdit(recipe) { setDraft(null); setEditing(recipe); setShowForm(true); }
+  function handleManual() { setImportOpen(false); setDraft(null); setShowForm(true); }
+  function handleDraft(imported) {
+    setImportOpen(false);
+    setDraft(imported);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   async function handleSubmit(payload) {
     if (editing) {
@@ -109,9 +119,9 @@ export function RecipesPage() {
 
       {formOpen && (
         <RecipeForm
-          key={editing?.id || 'new'}
-          initialValue={editing}
-          title={editing ? `Éditer « ${editing.name} »` : 'Nouvelle recette'}
+          key={editing?.id || (draft ? `draft-${draft.source_url || draft.name}` : 'new')}
+          initialValue={editing || draft}
+          title={editing ? `Éditer « ${editing.name} »` : draft ? 'Recette importée' : 'Nouvelle recette'}
           onSubmit={handleSubmit}
           onCancel={handleCloseForm}
         />
@@ -135,6 +145,13 @@ export function RecipesPage() {
           ))}
         </div>
       )}
+
+      <RecipeImportSheet
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onDraft={handleDraft}
+        onManual={handleManual}
+      />
 
       <button
         type="button"
