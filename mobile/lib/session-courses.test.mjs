@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { manquesDuBrouillon, manquesAValider, doublonsPossibles } from './session-courses.ts';
+import { manquesDuBrouillon, manquesAPreciser, doublonsPossibles } from './session-courses.ts';
 import { listeMaison } from './liste-maison.ts';
 import { importerAjouts } from './widget-products.ts';
 const base={selectedRecipes:{},quotidien:{},quotidienQty:{},extras:[],choixProduits:{},drives:[],ligneQuantites:{},lignePossedees:{}};
@@ -9,12 +9,18 @@ test('migration garde les manques historiques sans inventer une provenance widge
  const e={...base,quotidien:{p:'needed',h:'needed'},habitudesVues:{h:true},extras:[{id:'siri-a',name:'Pain',quantity:1}]};
  assert.deepEqual(Object.keys(manquesDuBrouillon(e)),['produit:p','extra:siri-a']);
  assert.equal(manquesDuBrouillon(e)['produit:p'].source,'precedent');
- assert.equal(manquesAValider({...e,ligneQuantites:{'produit:p':0}}).length,1);
+ assert.deepEqual(manquesAPreciser({...e,ligneQuantites:{'produit:p':0}},[]).map(([k])=>k),['extra:siri-a']);
 });
-test('une arrivée widget pendant la session demande une nouvelle validation sans perdre les autres',()=>{
+test('un produit du catalogue arrivé par le widget est prêt sans validation',()=>{
  const key=`produit:${p.id}`,e={...base,sessionEtape:'recap',manques:{[key]:{name:p.name,source:'widget',valide:true}}};
  const next=importerAjouts(e,[{id:'new',name:p.name,source:'widget',productID:p.id,quantity:1,createdAt:'2026-09-14'}]);
- assert.equal(next.sessionEtape,'recap');assert.equal(manquesAValider(next).length,1);
+ assert.equal(next.sessionEtape,'recap');assert.equal(manquesAPreciser(next,[p.id]).length,0);
+});
+test('seuls un libellé libre et un produit sorti du catalogue restent à préciser',()=>{
+ const e={...base,quotidien:{ok:'needed',parti:'needed'},manques:{'produit:ok':{name:'Œufs',source:'widget'},'produit:parti':{name:'Lait',source:'siri'},'extra:x':{name:'lessive',source:'manuel'}},extras:[{id:'x',name:'lessive',quantity:1}]};
+ assert.deepEqual(manquesAPreciser(e,['ok']).map(([k])=>k),['produit:parti','extra:x']);
+ const valide={...e,manques:{...e.manques,'extra:x':{name:'lessive',source:'manuel',valide:true}}};
+ assert.deepEqual(manquesAPreciser(valide,['ok']).map(([k])=>k),['produit:parti']);
 });
 test('recette, widget et ajout au même nom ne créent qu’une ligne avec toutes les origines',()=>{
  const e={...base,selectedRecipes:{r:2},quotidien:{[p.id]:'needed'},quotidienQty:{[p.id]:2},manques:{[`produit:${p.id}`]:{name:p.name,source:'widget'}},extras:[{id:'x',name:'  Pommes de terre ',quantity:1,unit:'unité',rayon:'fruits_legumes'}]};
@@ -30,7 +36,7 @@ test('les formats différents restent distincts et les doublons possibles néces
 });
 test('un manque déjà possédé ou retiré ne bloque pas la suite',()=>{
  const e={...base,quotidien:{p:'needed'},manques:{'produit:p':{name:'Pain',source:'widget'}},lignePossedees:{'produit:p':true}};
- assert.equal(manquesAValider(e).length,0);
+ assert.equal(manquesAPreciser(e,[]).length,0);
 });
 test('retirer une ligne fusionnée ne fait pas réapparaître son ajout manuel',()=>{
  const e={...base,quotidien:{[p.id]:'needed'},extras:[{id:'x',name:p.name,quantity:1,unit:'unité',rayon:'fruits_legumes'}]};

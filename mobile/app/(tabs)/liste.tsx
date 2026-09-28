@@ -1,23 +1,30 @@
 import { ProductSuggestions, productSuggestion } from '../../components/ProductSuggestions';
-import { doublonsPossibles, manquesAValider } from '../../lib/session-courses';
+import { doublonsPossibles, manquesAPreciser } from '../../lib/session-courses';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useMaison } from '../../contexts/useMaison';
-import { Action, Head, Photo, ui } from '../../components/MaisonUI';
+import { Action, Head, Photo, Raison, ui } from '../../components/MaisonUI';
 import { RAYONS } from '../../lib/rayons';
 import { colors } from '../../lib/theme';
 export default function Liste({session=false}:{session?:boolean}){
  const {w,p,r,lignes,acheter,loading,erreur,stale}=useMaison();
  const [owned,setOwned]=useState(false),[nom,setNom]=useState(''),[ouverte,setOuverte]=useState<string|null>(null);
- const doublons=doublonsPossibles(acheter,w.doublonsValides),manques=manquesAValider(w);
+ const doublons=doublonsPossibles(acheter,w.doublonsValides),manques=manquesAPreciser(w,p.produits.map(x=>x.id));
  const visibles=lignes.filter(l=>l.owned===owned);
+ const aPreciser=acheter.filter(l=>l.aPreciser).length;
+ // Ce qui bloque l'envoi au drive, dit sous le bouton avec le geste qui le débloque.
+ const blocage=!acheter.length?{texte:'Ta liste est vide.'}
+  :stale?{texte:'Une recette de ta liste n’est plus disponible.'}
+  :manques.length?{texte:`${manques.length} manque${manques.length>1?'s':''} à préciser.`,action:'Les préciser',onPress:()=>router.push('/wizard/manques')}
+  :doublons.length?{texte:`${doublons.length} doublon${doublons.length>1?'s':''} possible${doublons.length>1?'s':''} à trancher, plus haut.`}
+  :aPreciser?{texte:`${aPreciser} conditionnement${aPreciser>1?'s':''} à préciser, plus haut.`}
+  :null;
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}>
- <Head title={session?"Le bilan de mes courses":"Ma liste"} back={!session}/><Text style={ui.subtitle}>{acheter.length} article{acheter.length > 1 ? 's' : ''} à acheter</Text>
- {session&&<Text style={ui.subtitle}>Recettes, manques, habitudes et achats exceptionnels : une seule liste. Les besoins d’un même produit sont regroupés ; ajuste ici la quantité finale à acheter.</Text>}
- {manques.length>0&&<View style={ui.notice}><Text style={ui.productName}>{manques.length} manque{manques.length>1?'s':''} à vérifier</Text><Action secondary onPress={()=>router.push('/wizard/manques')}>Vérifier les produits et les quantités</Action></View>}
+ <Head title={session?"Le bilan de mes courses":"Ma liste"} back={!session} avatar={!session}/><Text style={ui.subtitle}>{acheter.length} article{acheter.length > 1 ? 's' : ''} à acheter</Text>
+ {manques.length>0&&<View style={ui.notice}><Text style={ui.productName}>{manques.length} manque{manques.length>1?'s':''} à préciser</Text><Action secondary onPress={()=>router.push('/wizard/manques')}>Préciser mes manques</Action></View>}
  {doublons.length>0?<View style={{gap:12}}><Text style={ui.section}>Des doublons possibles</Text><Text style={ui.subtitle}>Ces produits se ressemblent. Retire une ligne si elle fait double emploi, ou confirme que tu veux bien les deux.</Text>{doublons.map(d=><View key={d.id} style={[ui.notice,{gap:8}]}><Text style={ui.productName}>{d.a.name} × {d.a.totalQuantity} · {d.a.unit}</Text><Text style={ui.productName}>{d.b.name} × {d.b.totalQuantity} · {d.b.unit}</Text><Action secondary onPress={()=>w.modifierLigne(d.a.key,0)}>Retirer {d.a.name}</Action><Action secondary onPress={()=>w.modifierLigne(d.b.key,0)}>Retirer {d.b.name}</Action><Action onPress={()=>w.accepterDoublon(d.id)}>Ce sont deux achats distincts</Action></View>)}</View>:!loading&&!erreur&&<Text style={ui.detail}>Aucun doublon possible restant à vérifier.</Text>}
  <View style={ui.row}>{[false,true].map(v=><Pressable key={String(v)} accessibilityRole="tab" accessibilityState={{selected:owned===v}} onPress={()=>setOwned(v)} style={{flex:1,minHeight:48,justifyContent:'center',borderBottomWidth:owned===v?3:1,borderBottomColor:owned===v?colors.accent:colors.border}}><Text style={{textAlign:'center',color:owned===v?colors.accent:colors.textMuted,fontWeight:owned===v?'700':'400'}}>{v?'Déjà chez moi':'À acheter'} ({lignes.filter(l=>l.owned===v).length})</Text></Pressable>)}</View>
  {loading&&<ActivityIndicator color={colors.accent}/>}{erreur&&<><Text style={ui.error}>{erreur}</Text><Action secondary onPress={()=>{p.recharger();r.recharger();}}>Réessayer</Action></>}
@@ -30,9 +37,9 @@ export default function Liste({session=false}:{session?:boolean}){
  {l.choixKey&&<><Pressable accessibilityRole="button" style={{minHeight:44,justifyContent:'center'}} onPress={()=>setOuverte(ouverte===l.key?null:l.key)}><Text style={ui.link}>{ouverte===l.key?'Masquer les détails':'Recettes et choix du produit'}</Text></Pressable>{ouverte===l.key&&<View style={{gap:8}}><Text style={ui.detail}>{l.besoin} · {[...new Set(l.sources.map(s=>s.label))].join(', ')}</Text><ProductSuggestions items={l.candidats.map(productSuggestion)} selectedId={l.product_id} onSelect={id=>w.choisirProduit(l.choixKey!,id)}/>{!l.candidats.length&&<Text style={ui.detail}>Aucun produit associé. Scanne ce produit pour le retrouver dans ton catalogue.</Text>}</View>}</>}
  </View>})}</View>)}
  {!loading&&!erreur&&!visibles.length&&<Text style={ui.subtitle}>{owned?'Les produits que tu possèdes déjà apparaîtront ici.':'Ta liste est vide. Ajoute un favori, un repas ou un produit ci-dessous.'}</Text>}
- <View style={ui.row}><View style={{flex:1}}><Action secondary onPress={()=>router.push(session?'/wizard/habitudes':'/favoris')}>Mes favoris</Action></View><View style={{flex:1}}><Action secondary onPress={()=>router.push(session?'/wizard/recettes':'/recettes')}>Mes repas</Action></View></View>
- <Action secondary onPress={()=>router.push(session?'/wizard/exceptions':'/ajout')}>Rechercher un produit ou scanner</Action>
+ {!session&&<><View style={ui.row}><View style={{flex:1}}><Action secondary onPress={()=>router.push('/favoris')}>Mes favoris</Action></View><View style={{flex:1}}><Action secondary onPress={()=>router.push('/recettes')}>Mes repas</Action></View></View>
+ <Action secondary onPress={()=>router.push('/ajout')}>Rechercher un produit ou scanner</Action></>}
  <TextInput value={nom} onChangeText={setNom} placeholder="Ajouter un produit à la main…" accessibilityLabel="Nom du produit à ajouter" style={ui.input}/><Action disabled={!nom.trim()} secondary onPress={()=>{w.ajouterExtra({name:nom.trim(),quantity:1,unit:'unité',rayon:'autre'});setNom('');setOwned(false);}}>Ajouter à ma liste</Action>
  <Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>Alert.alert('Vider cette liste ?','Les recettes et les favoris de ton catalogue seront conservés.',[{text:'Annuler',style:'cancel'},{text:'Vider la liste',style:'destructive',onPress:w.reinitialiser}])}><Text style={ui.detail}>Vider la liste</Text></Pressable>
- </ScrollView><View style={ui.footer}><Action disabled={!acheter.length||loading||!!erreur||stale||acheter.some(l=>l.aPreciser)||doublons.length>0||manques.length>0} onPress={()=>router.push('/wizard/generation')}>Choisir mon drive</Action>{acheter.some(l=>l.aPreciser)&&<Text style={ui.error}>Précise les conditionnements signalés avant l’envoi.</Text>}</View></SafeAreaView>
+ </ScrollView><View style={ui.footer}><Action disabled={!!blocage||loading||!!erreur} onPress={()=>router.push('/wizard/generation')}>Choisir mon drive</Action>{!!blocage&&!loading&&!erreur&&<Raison action={blocage.action} onPress={blocage.onPress}>{blocage.texte}</Raison>}</View></SafeAreaView>
 }

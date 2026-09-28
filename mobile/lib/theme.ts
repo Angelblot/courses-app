@@ -19,6 +19,14 @@ export const colors = {
   accent: '#48613A',
   accentSoft: '#E4EBDC',
   accentContrast: '#FFFFFF',
+  // Bouton désactivé : gris neutre, sans la teinte verte. À 50 % d'opacité,
+  // le vert plein devenait un sauge qu'on prenait pour un bouton secondaire.
+  off: '#ECEEE9',
+  offText: '#6B7266',
+  // Ce qui attend un geste sans être une erreur : un manque noté à la main.
+  attention: '#C9A227',
+  attentionSoft: '#FBF1D3',
+  attentionText: '#7A5D00',
   danger: '#B3261E',
   // Fond d'alerte, assez pâle pour porter le texte sombre du thème.
   dangerSoft: '#FBEAE9',

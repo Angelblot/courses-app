@@ -1,4 +1,4 @@
-import { doublonsPossibles, manquesAValider } from '../../lib/session-courses';
+import { doublonsPossibles, manquesAPreciser } from '../../lib/session-courses';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -9,7 +9,7 @@ import { Action, ui } from '../MaisonUI';
 export function EtapeGeneration(){
  const {w,acheter,loading,erreur:loadError,stale,p,r}=useMaison();
  const [sending,setSending]=useState(false),[error,setError]=useState<string|null>(null);const lock=useRef(false);
- const aVerifier=doublonsPossibles(acheter,w.doublonsValides).length>0||manquesAValider(w).length>0;
+ const aVerifier=doublonsPossibles(acheter,w.doublonsValides).length>0||manquesAPreciser(w,p.produits.map(x=>x.id)).length>0;
  const disabled=aVerifier||loading||!!loadError||stale||!acheter.length||acheter.some(l=>l.aPreciser)||!w.drives.length||sending;
  async function send(){if(disabled||lock.current)return;lock.current=true;setSending(true);setError(null);try{const result=await envoyerListe(construireItems(acheter),w.drives);if(result.ok&&result.id){w.reinitialiser();router.replace(`/suivi/${result.id}`);}else setError(result.erreur??'L’envoi n’a pas abouti. Réessaie.');}catch{setError('Connexion interrompue. Vérifie le suivi avant de réessayer.');}finally{lock.current=false;setSending(false);}}
  return <ScrollView contentContainerStyle={ui.content}><Text style={ui.heading}>Où fait-on les courses ?</Text><Text style={ui.subtitle}>{acheter.length} articles à acheter</Text>

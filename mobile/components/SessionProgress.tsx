@@ -1,13 +1,27 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SESSION_STEPS, type SessionStep } from '../lib/session-courses';
 import { ui } from './MaisonUI';
 import { colors } from '../lib/theme';
+/**
+ * En-tête de session : une ligne d'étape, une pause, une barre en cinq
+ * segments. Les segments déjà atteints ramènent à leur étape.
+ */
 export function SessionProgress({step}:{step:SessionStep}) {
  const index=SESSION_STEPS.findIndex(s=>s.cle===step);
- return <SafeAreaView edges={['top']} style={{backgroundColor:colors.bg}}>
- <View style={{paddingHorizontal:20,paddingTop:8,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={ui.detail}>Session de courses · {index+1} sur 5</Text><Pressable accessibilityRole="button" onPress={()=>router.replace('/')} style={{minHeight:44,justifyContent:'center'}}><Text style={ui.link}>Faire une pause</Text></Pressable></View>
- <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:20,gap:14,paddingBottom:8}}>{SESSION_STEPS.map((s,i)=><Pressable key={s.cle} accessibilityRole="button" accessibilityState={{selected:s.cle===step,disabled:i>index}} disabled={i>index} onPress={()=>router.replace(`/wizard/${s.cle}`)} style={{minHeight:44,justifyContent:'center',borderBottomWidth:s.cle===step?2:0,borderBottomColor:colors.accent}}><Text style={{color:i<=index?colors.accent:colors.textMuted,fontWeight:s.cle===step?'700':'400'}}>{s.label}</Text></Pressable>)}</ScrollView>
+ return <SafeAreaView edges={['top']} style={{backgroundColor:colors.bg,paddingHorizontal:20,paddingBottom:4}}>
+ <View style={[ui.sectionRow,{minHeight:52}]}>
+  <Text accessibilityRole="header" style={[ui.detail,{marginTop:0,fontVariant:['tabular-nums']}]}>Étape {index+1} sur {SESSION_STEPS.length} · {SESSION_STEPS[index].label}</Text>
+  <Pressable accessibilityRole="button" accessibilityLabel="Faire une pause" onPress={()=>router.replace('/')} style={({pressed})=>[s.pause,pressed&&{opacity:.7}]}><Feather name="pause" size={20} color={colors.accent}/></Pressable>
+ </View>
+ <View style={s.barre}>{SESSION_STEPS.map((e,i)=><Pressable key={e.cle} accessibilityRole="button" accessibilityLabel={`Étape ${i+1} sur ${SESSION_STEPS.length} : ${e.label}`} accessibilityState={{selected:i===index,disabled:i>=index}} disabled={i>=index} hitSlop={{top:14,bottom:14}} onPress={()=>router.replace(`/wizard/${e.cle}`)} style={s.segment}><View style={[s.trait,i<=index&&{backgroundColor:colors.accent}]}/></Pressable>)}</View>
  </SafeAreaView>;
 }
+const s=StyleSheet.create({
+ pause:{width:44,height:44,borderRadius:22,alignItems:'center',justifyContent:'center',backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},
+ barre:{flexDirection:'row',gap:4,paddingVertical:6},
+ segment:{flex:1,justifyContent:'center'},
+ trait:{height:4,borderRadius:2,backgroundColor:colors.border},
+});

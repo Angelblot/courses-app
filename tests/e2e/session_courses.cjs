@@ -7,29 +7,52 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
 (async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{
  const page=await b.newPage({viewport:{width:390,height:844},serviceWorkers:'block'}),errors=[];page.on('pageerror',e=>errors.push(e.message));let sent;
  await page.route('https://qmymwicsgilhoihtfdjm.supabase.co/**',async route=>{const req=route.request(),url=req.url();let data=[];if(url.includes('/auth/v1/user'))data=user;else if(url.includes('/auth/v1/token'))data=session;else if(url.includes('/rest/v1/products'))data=products;else if(url.includes('/rest/v1/recipes'))data=recipes;else if(url.includes('/rest/v1/cart_jobs')&&req.method()==='POST'){sent=req.postDataJSON();data={id:'job-demo'};}await route.fulfill({json:data});});
- await page.addInitScript(({session,id})=>{localStorage.setItem('sb-qmymwicsgilhoihtfdjm-auth-token',JSON.stringify(session));if(!localStorage.getItem('seeded-session')){localStorage.setItem('tablee-maison-v1:'+id,JSON.stringify({quotidien:{oeufs:'needed',patates:'needed'},quotidienQty:{oeufs:1,patates:2},manques:{'produit:oeufs':{name:'Œufs Plein Air',source:'widget'},'produit:patates':{name:'Pommes de terre',source:'widget'}}}));localStorage.setItem('seeded-session','yes');}}, {session,id:user.id});
- fs.mkdirSync('.impeccable/review/session-courses',{recursive:true});
+ await page.addInitScript(({session,id})=>{localStorage.setItem('sb-qmymwicsgilhoihtfdjm-auth-token',JSON.stringify(session));if(!localStorage.getItem('seeded-session')){localStorage.setItem('tablee-maison-v1:'+id,JSON.stringify({quotidien:{oeufs:'needed',patates:'needed'},quotidienQty:{oeufs:1,patates:2},extras:[{id:'siri-lessive',name:'lessive',quantity:1,unit:'unité',rayon:'autre'}],manques:{'produit:oeufs':{name:'Œufs Plein Air',source:'widget'},'produit:patates':{name:'Pommes de terre',source:'widget'},'extra:siri-lessive':{name:'lessive',source:'siri'}}}));localStorage.setItem('seeded-session','yes');}}, {session,id:user.id});
+ const dir=process.env.CAPTURES||'.impeccable/review/session-courses';fs.mkdirSync(dir,{recursive:true});const shot=n=>page.screenshot({path:`${dir}/${n}.png`});
+ const btn=(name)=>page.getByRole('button',{name,exact:true});
+ const visible=async(loc,msg)=>{const b=await loc.boundingBox();if(!b||b.y<0||b.y+b.height>844)throw Error(msg+' '+JSON.stringify(b));};
  await page.goto('http://localhost:8082');await page.getByText('Les courses, à ton rythme.',{exact:true}).waitFor({timeout:60000});
- if(await page.getByText('À reprendre d’habitude',{exact:true}).count())throw Error('Old favourites section remains');
- await page.screenshot({path:'.impeccable/review/session-courses/home-phone.png'});
- await page.getByRole('button',{name:'Commencer une session',exact:true}).click();await page.getByRole('button',{name:'+ Choisir',exact:true}).click();
- await page.getByRole('button',{name:'Vérifier mes manques',exact:true}).click();await page.getByText('Vérifier mes manques',{exact:true}).last().waitFor();
- if(await page.getByRole('button',{name:'Continuer avec mes habitudes',exact:true}).isEnabled())throw Error('Unvalidated missing products can continue');
- await page.screenshot({path:'.impeccable/review/session-courses/missing-phone.png'});
- await page.getByRole('button',{name:'Confirmer 1 × Œufs Plein Air',exact:true}).click();await page.getByRole('button',{name:'Confirmer 2 × Pommes de terre',exact:true}).click();
- await page.getByRole('button',{name:'Faire une pause',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Reprendre ma session',exact:true}).click();
- await page.getByRole('button',{name:'Continuer avec mes habitudes',exact:true}).click();
- await page.getByRole('tab',{name:'Fruits & légumes'}).click();
- await page.getByRole('button',{name:'Il m’en faut 1 →',exact:true}).click();
- await page.getByRole('button',{name:'Continuer avec les achats exceptionnels',exact:true}).click();
- await page.getByRole('textbox',{name:'Produit manquant',exact:true}).fill('Pommes de terre bio');await page.getByRole('button',{name:'Noter Pommes de terre bio dans ma liste',exact:true}).click();
- await page.getByRole('button',{name:'Faire le bilan de ma liste',exact:true}).click();await page.getByText('Des doublons possibles',{exact:true}).waitFor();
- if(await page.getByRole('button',{name:'Choisir mon drive',exact:true}).isEnabled())throw Error('Duplicates can reach drive');
- await page.screenshot({path:'.impeccable/review/session-courses/recap-phone.png'});
- await page.getByRole('button',{name:'Retirer Pommes de terre bio',exact:true}).click();
- await page.setViewportSize({width:1024,height:1366});await page.screenshot({path:'.impeccable/review/session-courses/recap-tablet.png'});
+ // Accueil A1 : lignes touchables, « Tout voir » en titre, plus de boutons sous la liste.
+ if(await btn('Voir mes manques').count())throw Error('Duplicate home button remains');
+ await btn('Tout voir, 3 produits').waitFor();await btn('Noter un produit…').waitFor();
+ await shot('0-accueil');
+ await btn('Commencer une session').click();await btn('+ Choisir').click();
+ // En-tête E1, sans barre d'onglets ni avatar.
+ await page.getByText('Étape 1 sur 5 · Repas',{exact:true}).waitFor();
+ if(await page.getByRole('tab',{name:/Réglages/}).count()||await btn('Réglages').count())throw Error('Tab bar or avatar visible in session');
+ if(await btn('Revoir mes choix').count())throw Error('Duplicate review button remains');
+ await btn('1 repas choisi, les revoir').waitFor();
+ await shot('1-repas');
+ await btn('Vérifier mes manques').click();await page.getByText('Mes manques',{exact:true}).waitFor();
+ // Manques M : les produits du catalogue sont prêts, seule « lessive » attend.
+ await page.getByText('« lessive » reste à préciser, maintenant ou au bilan.',{exact:true}).waitFor();
+ if(!await btn('Tout est bon (2)').isEnabled())throw Error('Ready missing products block the session');
+ await shot('2-manques');
+ await btn('Faire une pause').click();await page.reload();await btn('Reprendre ma session').click();
+ await btn('Tout est bon (2)').click();
+ // Habitudes H3 : la décision est dans le pied, visible sans défiler.
+ const oui=btn('Oignons jaunes : il m’en faut 1');await oui.waitFor();
+ await visible(oui,'Decision button hidden');await visible(btn('Oignons jaunes : j’en ai déjà'),'Decision button hidden');
+ if(await btn('Continuer vers les extras').count())throw Error('Continue shown before every aisle is reviewed');
+ await shot('3-habitudes');
+ await oui.click();await page.getByText('Ce rayon est prêt.',{exact:true}).waitFor();
+ await btn('Continuer vers les extras').click();
+ await page.getByRole('textbox',{name:'Produit manquant',exact:true}).fill('Pommes de terre bio');await btn('Noter Pommes de terre bio dans ma liste').click();
+ await shot('4-extras');
+ await btn('Faire le bilan de ma liste').click();await page.getByText('Des doublons possibles',{exact:true}).waitFor();
+ // Bilan : bouton gris neutre et raison cliquable.
+ if(await btn('Choisir mon drive').isEnabled())throw Error('Blocked list can reach drive');
+ await page.getByText('1 manque à préciser.',{exact:true}).waitFor();
+ const style=await btn('Choisir mon drive').evaluate(el=>{const c=getComputedStyle(el);return [c.backgroundColor,c.opacity].join(' ');});
+ if(style!=='rgb(236, 238, 233) 1')throw Error('Disabled button style '+style);
+ await shot('5-bilan');
+ await btn('Les préciser').click();await btn('Garder 1 × lessive').click();
+ await btn('Tout est bon (3)').click();await btn('Continuer vers les extras').click();await btn('Faire le bilan de ma liste').click();
+ await page.getByText('1 doublon possible à trancher, plus haut.',{exact:true}).last().waitFor();
+ await btn('Retirer Pommes de terre bio').click();
+ await page.setViewportSize({width:1024,height:1366});await shot('5-bilan-tablette');
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow');
- await page.getByRole('button',{name:'Choisir mon drive',exact:true}).click();await page.getByRole('button',{name:'Envoyer à mon ordinateur',exact:true}).click();
- await page.waitForTimeout(600);if(!sent||sent.items.length!==3||sent.items.find(x=>x.product_id==='patates')?.quantity!==2)throw Error('Incorrect consolidated payload '+JSON.stringify(sent));
- if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true,items:sent.items,errors}));
+ await btn('Choisir mon drive').click();await btn('Envoyer à mon ordinateur').click();
+ await page.waitForTimeout(600);if(!sent||sent.items.length!==4||sent.items.find(x=>x.product_id==='patates')?.quantity!==2)throw Error('Incorrect consolidated payload '+JSON.stringify(sent));
+ if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true,items:sent.items.length,errors}));
  }catch(e){console.error(e);process.exitCode=1}finally{await b.close()}})();

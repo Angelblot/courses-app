@@ -3,8 +3,8 @@ import type { LigneMaison } from './liste-maison';
 import { normalizeProductType } from './typology.ts';
 
 export const SESSION_STEPS = [
- { cle: 'recettes', label: 'Recettes' }, { cle: 'manques', label: 'Manques' },
- { cle: 'habitudes', label: 'Habitudes' }, { cle: 'exceptions', label: 'En plus' },
+ { cle: 'recettes', label: 'Repas' }, { cle: 'manques', label: 'Manques' },
+ { cle: 'habitudes', label: 'Habitudes' }, { cle: 'exceptions', label: 'Extras' },
  { cle: 'recap', label: 'Bilan' },
 ] as const;
 export type SessionStep = typeof SESSION_STEPS[number]['cle'];
@@ -24,8 +24,14 @@ export function manqueActif(e: Etat, key: string) {
  if (e.lignePossedees[key] || e.ligneQuantites[key] === 0) return false;
  return key.startsWith('produit:') ? e.quotidien[key.slice(8)] === 'needed' : e.extras.some(x=>`extra:${x.id}`===key);
 }
-export function manquesAValider(e: Etat) {
- return Object.entries(manquesDuBrouillon(e)).filter(([key,m])=>manqueActif(e,key)&&!m.valide);
+/**
+ * Manques qui demandent un geste avant l'envoi au drive. Un produit du
+ * catalogue est prêt d'office, d'où qu'il vienne : seuls un libellé libre
+ * et un produit sorti du catalogue restent à préciser.
+ */
+export function manquesAPreciser(e: Etat, produitIds: Iterable<string>) {
+ const catalogue = new Set(produitIds);
+ return Object.entries(manquesDuBrouillon(e)).filter(([key,m])=>manqueActif(e,key)&&!m.valide&&!(key.startsWith('produit:')&&catalogue.has(key.slice(8))));
 }
 export function doublonsPossibles(lignes: LigneMaison[], acceptes: string[] = []) {
  const actifs=lignes.filter(l=>!l.owned), result: {id:string;a:LigneMaison;b:LigneMaison}[]=[];

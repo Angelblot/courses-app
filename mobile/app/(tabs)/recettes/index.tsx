@@ -19,10 +19,10 @@ function ChoixRepas({session=false}:{session?:boolean}){
  const recettes=r.recettes.filter(r=>(tab==='choisir'||w.selectedRecipes[r.id]!=null)&&r.name.toLowerCase().includes(query.toLowerCase())&&(!rapides||((r.prep_minutes??0)+(r.cook_minutes??0)>0&&(r.prep_minutes??0)+(r.cook_minutes??0)<=30)));
  const columns=width>=360&&fontScale<1.4&&tab==='choisir'&&recettes.length>1?2:1;
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}>
- <Head title="On mange quoi ?"/><Text style={ui.subtitle}>Choisis tes repas. Les ingrédients rejoignent ta liste déjà commencée.</Text>
+ <Head title="On mange quoi ?" avatar={false}/>
  <View style={ui.row}>{(['choisir','menu'] as const).map(t=><Pressable key={t} accessibilityRole="tab" accessibilityState={{selected:tab===t}} onPress={()=>{setTab(t);setQuery('');setRapides(false);}} style={{flex:1,minHeight:48,borderBottomWidth:tab===t?3:1,borderBottomColor:tab===t?'#48613A':'#DCE1D6',justifyContent:'center'}}><Text style={[ui.link,{textAlign:'center'}]}>{t==='choisir'?'Choisir des recettes':`Mes repas (${choisis.length})`}</Text></Pressable>)}</View>
  <TextInput value={query} onChangeText={setQuery} style={ui.input} placeholder="Une recette, une envie…" accessibilityLabel="Chercher une recette"/>
- {tab==='choisir'&&<View style={ui.sectionRow}><Pressable accessibilityRole="checkbox" accessibilityState={{checked:rapides}} onPress={()=>setRapides(!rapides)} style={{minHeight:44,padding:12,borderRadius:22,backgroundColor:rapides?'#48613A':'#E4EBDC'}}><Text style={{color:rapides?'white':'#48613A'}}>30 min ou moins</Text></Pressable><Text style={ui.detail}>{recettes.length} recettes</Text></View>}
+ {tab==='choisir'&&<View style={ui.sectionRow}><Pressable accessibilityRole="checkbox" accessibilityState={{checked:rapides}} onPress={()=>setRapides(!rapides)} style={{minHeight:44,padding:12,borderRadius:22,backgroundColor:rapides?'#48613A':'#E4EBDC'}}><Text style={{color:rapides?'white':'#48613A'}}>30 min ou moins</Text></Pressable><Text style={ui.detail}>{recettes.length} recette{recettes.length>1?'s':''}</Text></View>}
  {r.chargement&&<ActivityIndicator/>}{r.erreur&&<><Text style={ui.error}>{r.erreur}</Text><Action secondary onPress={r.recharger}>Réessayer</Action></>}
  <View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}>{recettes.map(rec=>{const parts=w.selectedRecipes[rec.id],temps=(rec.prep_minutes??0)+(rec.cook_minutes??0);return <View key={rec.id} style={{width:columns===2?'48%':'100%',backgroundColor:'white',borderRadius:14,overflow:'hidden'}}>
  <Pressable accessibilityRole="button" accessibilityLabel={`Voir la recette ${rec.name}`} onPress={()=>router.push(`/recettes/${rec.id}`)}><Photo recipe name={rec.name} url={rec.image_url} style={{width:'100%',height:columns===2?135:175,borderRadius:0}}/></Pressable>
@@ -31,7 +31,9 @@ function ChoixRepas({session=false}:{session?:boolean}){
  </View>})}</View>
  {!r.chargement&&!r.erreur&&!recettes.length&&<View style={ui.notice}><Text style={ui.productName}>{tab==='menu'?'Ton menu est encore ouvert.':'Aucune recette trouvée.'}</Text><Text style={ui.subtitle}>{tab==='menu'?'Choisis quelques repas, ou passe directement aux produits habituels.':'Essaie un autre nom ou enlève le filtre de durée.'}</Text>{tab==='menu'&&<Action secondary onPress={()=>setTab('choisir')}>Choisir mes repas</Action>}</View>}
  <View style={ui.sectionRow}><Text style={ui.detail}>Compléter ma collection</Text><Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>router.push('/recettes/nouvelle')}><Text style={ui.link}>Créer</Text></Pressable><Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>router.push('/recettes/importer')}><Text style={ui.link}>Importer</Text></Pressable></View>
- </ScrollView><View style={ui.footer}><Text accessibilityLiveRegion="polite" style={ui.detail}>{choisis.length} repas choisi{choisis.length>1?'s':''} · tes ajouts quotidiens restent dans la liste</Text><Action onPress={()=>router.push(session?'/wizard/manques':'/wizard/recettes')}>{session?'Vérifier mes manques':'Préparer ma session de courses'}</Action><Pressable accessibilityRole="button" style={{minHeight:44,justifyContent:'center'}} onPress={()=>setTab(tab==='menu'?'choisir':'menu')}><Text style={[ui.link,{textAlign:'center'}]}>Revoir mes choix</Text></Pressable></View></SafeAreaView>
+ </ScrollView><View style={[ui.footer,ui.row,{gap:8}]}>
+ {choisis.length>0&&<Pressable accessibilityRole="button" accessibilityLabel={`${choisis.length} repas choisi${choisis.length>1?'s':''}, les revoir`} onPress={()=>setTab('menu')} style={({pressed})=>[f.pastille,pressed&&{opacity:.7}]}><View style={ui.row}>{choisis.slice(0,2).map((rec,i)=><Photo key={rec.id} recipe name={rec.name} url={rec.image_url} style={[f.vignette,i>0&&{marginLeft:-18}]}/>)}</View><Text style={ui.link}>{choisis.length} repas</Text></Pressable>}
+ <View style={{flex:1}}><Action onPress={()=>router.push(session?'/wizard/manques':'/wizard/recettes')}>{session?'Vérifier mes manques':'Préparer ma session de courses'}</Action></View></View></SafeAreaView>
 }
 
 /**
@@ -67,6 +69,12 @@ function Collection(){
 export default function Recettes({session=false}:{session?:boolean}){
  return session?<ChoixRepas session/>:<Collection/>;
 }
+
+/** Pied de l'étape Repas : la pastille des repas choisis, puis l'étape suivante. */
+const f=StyleSheet.create({
+ pastille:{minHeight:48,flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:12,borderRadius:12,borderWidth:1.5,borderColor:colors.accent},
+ vignette:{width:26,height:26,borderRadius:13,borderWidth:2,borderColor:colors.surface},
+});
 
 const c=StyleSheet.create({
  recherche:{flexDirection:'row',alignItems:'center',gap:8},
