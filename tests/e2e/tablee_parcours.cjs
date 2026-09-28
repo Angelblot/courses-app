@@ -8,38 +8,43 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
 await page.route('https://qmymwicsgilhoihtfdjm.supabase.co/**',async route=>{const req=route.request(),url=req.url();let data=[];if(url.includes('/auth/v1/user'))data=user;else if(url.includes('/auth/v1/token'))data=session;else if(url.includes('/rest/v1/products')){if(req.method()==='POST'){inserted=req.postDataJSON();data={...inserted,id:'off1'};products.push(data);}else if(url.includes('ean13=eq.'))data=null;else data=products;}else if(url.includes('/rest/v1/recipes'))data=recipes;else if(url.includes('/rest/v1/cart_jobs')&&req.method()==='POST'){sent=req.postDataJSON();data={id:'job-demo'};}await route.fulfill({json:data});});
 await page.route('https://world.openfoodfacts.org/**',r=>r.fulfill({json:{products:[{code:'3017620422003',product_name:'Crème de noisettes',brands:'Démo',quantity:'400 g',categories_tags:['en:groceries']}]}}));
 await page.addInitScript(({session,id})=>{localStorage.setItem('sb-qmymwicsgilhoihtfdjm-auth-token',JSON.stringify(session));if(!localStorage.getItem('seeded')){localStorage.setItem('tablee-maison-v1:'+id,JSON.stringify({quotidien:{oeufs:'needed',patates:'needed'},quotidienQty:{oeufs:1,patates:1}}));localStorage.setItem('seeded','yes');}}, {session,id:user.id});
+const btn=name=>page.getByRole('button',{name,exact:true});
 await page.goto('http://localhost:8082/ajout');
 await page.getByLabel('Produit manquant').fill('Pain du boulanger');
-await page.getByRole('button',{name:'Augmenter la quantité',exact:true}).click();
-await page.getByRole('button',{name:'Noter Pain du boulanger dans ma liste',exact:true}).click();
+await btn('Augmenter la quantité').click();
+await btn('Noter Pain du boulanger dans ma liste').click();
 await page.getByText('2 × Pain du boulanger ajoutés à ta liste.',{exact:true}).waitFor();
 await page.goto('http://localhost:8082/wizard/recettes');
-await page.getByRole('button',{name:'+ Choisir',exact:true}).click();
+await btn('+ Choisir').click();
 await page.getByRole('button',{name:'Plus de portions pour Poulet rôti aux légumes'}).click({clickCount:3});
 await page.screenshot({path:'/tmp/tablee-recettes.png'});
-await page.getByRole('button',{name:'Continuer avec mes habitudes',exact:true}).click();
-await page.getByRole('button',{name:'Il m’en faut 2 →',exact:true}).waitFor();
-const carte=await page.getByText('Pommes de terre',{exact:true}).boundingBox();
+await btn('Vérifier mes manques').click();
+// Les œufs du catalogue sont prêts : on ouvre la ligne seulement pour changer la quantité.
+await btn('Œufs Plein Air, 1 article, prêt. Modifier').click();
+await btn('Augmenter Œufs Plein Air').click();await btn('Enregistrer').click();
+// Le pain noté à la main demande un geste avant le drive.
+await btn('Garder 2 × Pain du boulanger').click();
+await btn('Tout est bon (3)').click();
+// Habitudes : on fait glisser la carte vers la droite, donc « il m'en faut ».
+await page.getByText('Oignons jaunes',{exact:true}).last().waitFor();
+const carte=await page.getByText('Oignons jaunes',{exact:true}).last().boundingBox();
 await page.mouse.move(100,carte.y-60);await page.mouse.down();await page.mouse.move(245,carte.y-55,{steps:12});await page.mouse.up();
-await page.getByText('Oignons jaunes',{exact:true}).waitFor();
-await page.getByRole('tab',{name:'Produits laitiers',exact:true}).click();
-await page.getByRole('button',{name:'Augmenter la quantité',exact:true}).click();
+await page.getByText('Ce rayon est prêt.',{exact:true}).last().waitFor();
 await page.screenshot({path:'/tmp/tablee-habitudes.png'});
-await page.getByRole('button',{name:'Il m’en faut 2 →',exact:true}).click();
-await page.getByText('Ce rayon est prêt.',{exact:true}).waitFor();
-await page.getByRole('button',{name:'Chercher un produit exceptionnel',exact:true}).click();
-await page.getByLabel('Produit manquant').fill('Noisettes');
-await page.getByRole('button',{name:'Chercher sur Open Food Facts',exact:true}).click();
+await btn('Continuer vers les extras').click();
+await page.getByLabel('Produit manquant').last().fill('Noisettes');
+await btn('Chercher sur Open Food Facts').click();
 await page.getByText('Crème de noisettes',{exact:true}).click();
-await page.getByRole('button',{name:'Confirmer l’ajout à ma liste',exact:true}).click();
+await btn('Confirmer l’ajout à ma liste').click();
 await page.getByText('1 × Crème de noisettes ajouté à ta liste.',{exact:true}).waitFor();
 if(inserted.ean13!=='3017620422003'||inserted.favorite!==false)throw Error('OFF identity/favorite mismatch');
-await page.getByRole('button',{name:'Voir ma liste',exact:true}).click();
-await page.reload();await page.getByText('Pain du boulanger',{exact:true}).waitFor();
+await btn('Faire le bilan de ma liste').click();
+await page.reload();await page.getByText('Pain du boulanger',{exact:true}).last().waitFor();
 const draft=await page.evaluate(id=>JSON.parse(localStorage.getItem('tablee-maison-v1:'+id)),user.id);
-if(draft.selectedRecipes.rec1!==5||draft.ligneQuantites['produit:patates']!==2||draft.quotidienQty.oeufs!==2||draft.extras[0].quantity!==2||draft.quotidien.off1!=='needed')throw Error('Draft mismatch '+JSON.stringify(draft));
+if(draft.selectedRecipes.rec1!==5||draft.quotidienQty.oeufs!==2||draft.quotidien.oignons!=='needed'||draft.extras[0].quantity!==2||draft.quotidien.off1!=='needed')throw Error('Draft mismatch '+JSON.stringify(draft));
 if(errors.length)throw Error(errors.join('\n'));
 await page.screenshot({path:'/tmp/tablee-parcours-liste.png'});
 console.log(JSON.stringify({success:true,draft,inserted,overflow:await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)}));
+
 
 }catch(e){console.error(e);process.exitCode=1}finally{await b.close()}})();
