@@ -13,7 +13,7 @@ await page.getByLabel('Produit manquant').fill('Pain du boulanger');
 await page.getByRole('button',{name:'Augmenter la quantité',exact:true}).click();
 await page.getByRole('button',{name:'Noter Pain du boulanger dans ma liste',exact:true}).click();
 await page.getByText('2 × Pain du boulanger ajoutés à ta liste.',{exact:true}).waitFor();
-await page.goto('http://localhost:8082/recettes');
+await page.goto('http://localhost:8082/wizard/recettes');
 await page.getByRole('button',{name:'+ Choisir',exact:true}).click();
 await page.getByRole('button',{name:'Plus de portions pour Poulet rôti aux légumes'}).click({clickCount:3});
 await page.screenshot({path:'/tmp/tablee-recettes.png'});

@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useProducts } from '../../../stores/products';
 import { creerRecette, lireFicheRecette, recupererRecette } from '../../../stores/recipes';
 import {
@@ -30,6 +30,11 @@ const arrondi = (n: number) => Math.round(n * 100) / 100;
 
 export default function ImporterRecette() {
   const router = useRouter();
+  // Le panneau « Ajouter une recette » précise le chemin choisi : l'écran
+  // n'affiche alors que celui-là. Sans précision, les deux sont proposés.
+  const { source } = useLocalSearchParams<{ source?: 'photo' | 'lien' }>();
+  const avecPhoto = source !== 'lien';
+  const avecLien = source !== 'photo';
   const { produits } = useProducts();
 
   const [adresse, setAdresse] = useState('');
@@ -110,6 +115,14 @@ export default function ImporterRecette() {
     appliquer(r.recette);
   };
 
+  // « Photographier une fiche » ouvre l'appareil photo sans tap supplémentaire.
+  const cameraOuverte = useRef(false);
+  useEffect(() => {
+    if (source !== 'photo' || cameraOuverte.current) return;
+    cameraOuverte.current = true;
+    photographier('appareil');
+  }, [source]);
+
   const maj = (i: number, champ: Partial<LigneApercu>) =>
     setLignes((l) => l?.map((ing, k) => (k === i ? { ...ing, ...champ } : ing)) ?? null);
 
@@ -142,68 +155,84 @@ export default function ImporterRecette() {
           <Pressable onPress={() => router.back()} hitSlop={8}>
             <Text style={s.retour}>Annuler</Text>
           </Pressable>
-          <Text style={s.titre}>Importer une recette</Text>
+          <Text style={s.titre}>
+            {source === 'photo' ? 'Fiche recette' : source === 'lien' ? 'Recette en ligne' : 'Importer une recette'}
+          </Text>
           <View style={s.equilibre} />
         </View>
 
         <ScrollView contentContainerStyle={s.corps} keyboardShouldPersistTaps="handled">
-          <Text style={s.label}>Fiche recette papier</Text>
-          <View style={s.rangee}>
-            <Pressable
-              style={[s.ajouter, s.moitie]}
-              onPress={() => photographier('appareil')}
-              disabled={enLecture || enRecuperation}
-            >
-              <Text style={s.ajouterTexte}>Prendre en photo</Text>
-            </Pressable>
-            <Pressable
-              style={[s.ajouter, s.moitie]}
-              onPress={() => photographier('bibliotheque')}
-              disabled={enLecture || enRecuperation}
-            >
-              <Text style={s.ajouterTexte}>Photothèque</Text>
-            </Pressable>
-          </View>
-          {enLecture ? (
-            <View style={s.lecture}>
-              <ActivityIndicator color={colors.accent} />
-              <Text style={s.aide}>Lecture de la fiche, une vingtaine de secondes…</Text>
-            </View>
-          ) : (
-            <Text style={s.aide}>
-              HelloFresh, livre, carnet : cadre la liste des ingrédients, bien à plat et éclairée.
-            </Text>
+          {!lignes && avecPhoto && (
+            <>
+              <Text style={s.label}>Fiche recette papier</Text>
+              <View style={s.rangee}>
+                <Pressable
+                  style={[s.ajouter, s.moitie]}
+                  onPress={() => photographier('appareil')}
+                  disabled={enLecture || enRecuperation}
+                >
+                  <Text style={s.ajouterTexte}>Prendre en photo</Text>
+                </Pressable>
+                <Pressable
+                  style={[s.ajouter, s.moitie]}
+                  onPress={() => photographier('bibliotheque')}
+                  disabled={enLecture || enRecuperation}
+                >
+                  <Text style={s.ajouterTexte}>Photothèque</Text>
+                </Pressable>
+              </View>
+              {enLecture ? (
+                <View style={s.lecture}>
+                  <ActivityIndicator color={colors.accent} />
+                  <Text style={s.aide}>Lecture de la fiche, une vingtaine de secondes…</Text>
+                </View>
+              ) : (
+                <Text style={s.aide}>
+                  HelloFresh, livre, carnet : cadre la liste des ingrédients, bien à plat et éclairée.
+                </Text>
+              )}
+            </>
           )}
 
-          <Text style={[s.label, s.separe]}>Adresse de la recette</Text>
-          <TextInput
-            style={s.champ}
-            value={adresse}
-            onChangeText={setAdresse}
-            placeholder="https://www.marmiton.org/recettes/..."
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            onSubmitEditing={importer}
-            returnKeyType="go"
-          />
-          <Text style={s.aide}>
-            Colle l'adresse d'une recette. Elle sera lue, pas enregistrée : tu verras ce qui
-            en a été compris avant de valider.
-          </Text>
+          {!lignes && avecLien && (
+            <>
+              <Text style={[s.label, avecPhoto && s.separe]}>Adresse de la recette</Text>
+              <TextInput
+                style={s.champ}
+                value={adresse}
+                onChangeText={setAdresse}
+                placeholder="https://www.marmiton.org/recettes/..."
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                onSubmitEditing={importer}
+                returnKeyType="go"
+                autoFocus={source === 'lien'}
+              />
+              <Text style={s.aide}>
+                Colle l'adresse d'une recette. Elle sera lue, pas enregistrée : tu verras ce qui
+                en a été compris avant de valider.
+              </Text>
 
-          <Pressable style={s.ajouter} onPress={importer} disabled={enRecuperation || enLecture}>
-            {enRecuperation
-              ? <ActivityIndicator color={colors.accent} />
-              : <Text style={s.ajouterTexte}>Importer</Text>}
-          </Pressable>
+              <Pressable style={s.ajouter} onPress={importer} disabled={enRecuperation || enLecture}>
+                {enRecuperation
+                  ? <ActivityIndicator color={colors.accent} />
+                  : <Text style={s.ajouterTexte}>Importer</Text>}
+              </Pressable>
+            </>
+          )}
 
           {erreur && <Text style={s.erreur}>{erreur}</Text>}
 
           {lignes && (
             <>
-              <Text style={s.section}>Ce qui a été compris</Text>
+              <View style={s.rangeeTitre}>
+                <Text style={[s.section, { marginTop: 0 }]}>Ce qui a été compris</Text>
+                <Pressable onPress={() => { setLignes(null); setErreur(null); }} hitSlop={8}>
+                  <Text style={s.recommencer}>Recommencer</Text>
+                </Pressable>
+              </View>
 
               {image && <Image source={{ uri: image }} style={s.photo} resizeMode="cover" />}
 
@@ -368,6 +397,11 @@ const s = StyleSheet.create({
   erreur: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
   lecture: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
   separe: { marginTop: spacing.xl },
+  rangeeTitre: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: spacing.md, marginBottom: spacing.xs,
+  },
+  recommencer: { color: colors.accent, fontWeight: '600', fontSize: 14 },
   bouton: {
     backgroundColor: colors.accent, borderRadius: radius.md, padding: spacing.lg,
     alignItems: 'center', marginTop: spacing.lg,
