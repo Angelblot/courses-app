@@ -14,7 +14,9 @@ export const colors = {
   // disparaît sous l'image au lieu de l'encadrer.
   traitPastille: '#E9E9E9',
   text: '#263320',
-  textMuted: '#656D60',
+  // Assez sombre pour 4,5:1 aussi sur les encarts vert pâle (accentSoft) ;
+  // #656D60 n'y tenait que 4,4:1.
+  textMuted: '#5E665A',
   // Vert profond : le nôtre, plus clair, manquait d'assise sur le crème.
   accent: '#48613A',
   accentSoft: '#E4EBDC',

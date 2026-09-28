@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useMaison } from '../../contexts/useMaison';
-import { Action, Head, Photo, Raison, ui } from '../../components/MaisonUI';
+import { Action, Head, Photo, Raison, ui, useAnnulation } from '../../components/MaisonUI';
 import { ReglerSheet } from '../../components/ReglerSheet';
 import { RAYONS } from '../../lib/rayons';
 import { colors } from '../../lib/theme';
@@ -23,6 +23,7 @@ export default function Liste({session=false}:{session?:boolean}){
  const doublons=doublonsPossibles(acheter,w.doublonsValides),manques=manquesAPreciser(w,p.produits.map(x=>x.id));
  const visibles=lignes.filter(l=>l.owned===owned);
  const aPreciser=acheter.filter(l=>l.aPreciser).length,points=manques.length+doublons.length;
+ const annulation=useAnnulation();
  useEffect(()=>{if(!points)setRegler(false);},[points]);
  // Ce qui bloque l'envoi au drive, dit sous le bouton avec le geste qui le débloque.
  const blocage=!acheter.length?{texte:'Ta liste est vide.'}
@@ -35,7 +36,7 @@ export default function Liste({session=false}:{session?:boolean}){
  const detailPoints=[manques.length&&pluriel(manques.length,'manque'),doublons.length&&pluriel(doublons.length,'doublon')].filter(Boolean).join(', ');
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}>
  {session?<>
-  <View style={b.hero}><Text style={b.nombre} accessibilityElementsHidden importantForAccessibility="no">{acheter.length}</Text><View style={{flex:1}}><Text accessibilityRole="header" style={b.pret}>{acheter.length>1?'articles':'article'} {blocage?'à acheter':acheter.length>1?'prêts':'prêt'}</Text><Text style={ui.detail}>{resumeBilan(w).join(' · ')}</Text></View></View>
+  <View style={b.hero} accessible accessibilityRole="header" accessibilityLabel={`${pluriel(acheter.length,'article')} ${blocage?'à acheter':acheter.length>1?'prêts':'prêt'}. ${resumeBilan(w).join(', ')}`}><Text style={b.nombre}>{acheter.length}</Text><View style={{flex:1}}><Text style={b.pret}>{acheter.length>1?'articles':'article'} {blocage?'à acheter':acheter.length>1?'prêts':'prêt'}</Text><Text style={ui.detail}>{resumeBilan(w).join(' · ')}</Text></View></View>
   {vignettes.length>0&&<View style={[ui.row,{gap:0,paddingLeft:6}]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>{vignettes.map((l,i)=><Photo key={l.key} name={l.name} url={p.produits.find(x=>x.id===l.product_id)?.image_url} style={[b.vignette,i>0&&{marginLeft:-10}]}/>)}</View>}
   <Pressable accessibilityRole="button" accessibilityLabel={detail?'Masquer la liste':'Voir et ajuster la liste'} accessibilityHint="Par rayon, quantités, déjà chez moi" accessibilityState={{expanded:detail}} onPress={()=>setDetail(!detail)} style={({pressed})=>[ui.product,{minHeight:60,paddingLeft:16},pressed&&{opacity:.85}]}><View style={{flex:1}}><Text style={ui.productName}>{detail?'Masquer la liste':'Voir et ajuster la liste'}</Text><Text style={[ui.detail,{marginTop:2}]}>Par rayon, quantités, déjà chez moi</Text></View><Feather name={detail?'chevron-up':'chevron-down'} size={20} color={colors.textMuted}/></Pressable>
  </>:<><Head title="Ma liste" back/><Text style={ui.subtitle}>{pluriel(acheter.length,'article')} à acheter</Text></>}
@@ -57,9 +58,10 @@ export default function Liste({session=false}:{session?:boolean}){
  <Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>Alert.alert('Vider cette liste ?','Les recettes et les favoris de ton catalogue seront conservés.',[{text:'Annuler',style:'cancel'},{text:'Vider la liste',style:'destructive',onPress:w.reinitialiser}])}><Text style={ui.detail}>Vider la liste</Text></Pressable>
  </>}
  </ScrollView>
+ <View>{annulation.toast}
  {points>0&&!loading&&<Pressable accessibilityRole="button" accessibilityLabel={`${pluriel(points,'point')} à régler : ${detailPoints}. Régler`} onPress={()=>setRegler(true)} style={({pressed})=>[b.bandeau,pressed&&{opacity:.9}]}><Text style={b.bandeauTexte}><Text style={{fontWeight:'700'}}>{pluriel(points,'point')} à régler</Text> · {detailPoints}</Text><Text style={[b.bandeauTexte,{fontWeight:'700'}]}>Régler</Text></Pressable>}
- <View style={ui.footer}><Action disabled={!!blocage||loading||!!erreur} onPress={()=>router.push('/wizard/generation')}>Choisir mon drive</Action>{!!blocage&&!points&&!loading&&!erreur&&<Raison action={blocage.action} onPress={blocage.onPress}>{blocage.texte}</Raison>}</View>
- <ReglerSheet visible={regler} onFermer={()=>setRegler(false)} manques={manques} doublons={doublons} products={p.produits}/>
+ <View style={ui.footer}><Action disabled={!!blocage||loading||!!erreur} onPress={()=>router.push('/wizard/generation')}>Choisir mon drive</Action>{!!blocage&&!points&&!loading&&!erreur&&<Raison action={blocage.action} onPress={blocage.onPress}>{blocage.texte}</Raison>}</View></View>
+ <ReglerSheet visible={regler} onFermer={()=>setRegler(false)} manques={manques} doublons={doublons} products={p.produits} onRetrait={annulation.proposer} toast={annulation.toast}/>
  </SafeAreaView>
 }
 const b=StyleSheet.create({

@@ -54,6 +54,8 @@ type Contexte = Etat & {
   accepterDoublon: (id: string) => void;
   pret: boolean; sauvegardeErreur: string | null;
   modifierLigne: (key: string, n: number) => void;
+  /** Remet la quantité d'une ligne telle qu'elle était, pour annuler un retrait. */
+  restaurerLigne: (key: string, avant: number | undefined) => void;
   possederLigne: (key: string, owned: boolean) => void;
   ajouterProduitListe: (id: string, quantite?: number, manque?: boolean) => void;
   deciderHabituel: (id: string, quantite: number, acheter: boolean) => void;
@@ -129,6 +131,7 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
     return () => { actif = false; listener.remove(); };
   }, [userId, stockagePret]);
   const modifierLigne = useCallback((key: string, n: number) => setEtat(e => ({ ...e, ligneQuantites: { ...e.ligneQuantites, [key]: Math.max(0, Math.ceil(n)) } })), []);
+  const restaurerLigne = useCallback((key: string, avant: number | undefined) => setEtat(e => { const ligneQuantites = { ...e.ligneQuantites }; if (avant === undefined) delete ligneQuantites[key]; else ligneQuantites[key] = avant; return { ...e, ligneQuantites }; }), []);
   const possederLigne = useCallback((key: string, owned: boolean) => setEtat(e => ({ ...e, lignePossedees: { ...e.lignePossedees, [key]: owned } })), []);
   const ajouterProduitListe = useCallback((id: string, quantite = 1, manque?: boolean) => setEtat(e => ({ ...e,
     manques: !(manque ?? !e.sessionEtape) ? e.manques : { ...manquesDuBrouillon(e), [`produit:${id}`]: { name: 'Produit enregistré', source: 'manuel', valide: false } },
@@ -235,11 +238,11 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   }),[]);
 
   const valeur = useMemo<Contexte>(() => ({
-    ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes,
+    ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes,
     toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
   }), [
-    etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
+    etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
   ]);
 

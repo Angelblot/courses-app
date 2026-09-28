@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWizard } from '../contexts/WizardContext';
@@ -15,24 +16,26 @@ type Doublon = { id: string; a: LigneMaison; b: LigneMaison };
  * possibles, réglés sans quitter le bilan. Le bilan ferme la feuille
  * dès qu'il ne reste plus rien.
  */
-export function ReglerSheet({ visible, onFermer, manques, doublons, products }: { visible: boolean; onFermer: () => void; manques: [string, Manque][]; doublons: Doublon[]; products: Product[] }) {
+export function ReglerSheet({ visible, onFermer, manques, doublons, products, onRetrait, toast }: { visible: boolean; onFermer: () => void; manques: [string, Manque][]; doublons: Doublon[]; products: Product[]; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode }) {
  const insets = useSafeAreaInsets(), { height } = useWindowDimensions(), w = useWizard();
+ const retirer = (l: LigneMaison) => { const avant = w.ligneQuantites[l.key]; w.modifierLigne(l.key, 0); onRetrait(`${l.name} retiré de ta liste`, () => w.restaurerLigne(l.key, avant)); };
  const lien = (label: string, onPress: () => void) => <Pressable key={label} accessibilityRole="button" onPress={onPress} hitSlop={6} style={s.lien}><Text style={ui.link}>{label}</Text></Pressable>;
  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
   <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.fond}>
    <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} />
-   <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal>
+   <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="À régler avant le drive">
     <View style={s.poignee} />
     <Text style={s.titre} accessibilityRole="header">À régler avant le drive</Text>
     <ScrollView style={{ maxHeight: height * 0.72 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 12, paddingBottom: 8 }}>
-     {manques.map(([key, m]) => <ManqueRow key={key} lineKey={key} manque={m} products={products} aPreciser />)}
+     {manques.map(([key, m]) => <ManqueRow key={key} lineKey={key} manque={m} products={products} aPreciser onRetrait={onRetrait} />)}
      {doublons.map(d => <View key={d.id} style={s.doublon}>
       <Text style={s.etiquette}>Doublon possible</Text>
       <Text style={ui.productName}>{d.a.name} × {d.a.totalQuantity}</Text>
       <Text style={ui.productName}>{d.b.name} × {d.b.totalQuantity}</Text>
-      <View style={s.liens}>{[lien('Garder les deux', () => w.accepterDoublon(d.id)), lien(`Retirer ${d.a.name}`, () => w.modifierLigne(d.a.key, 0)), lien(`Retirer ${d.b.name}`, () => w.modifierLigne(d.b.key, 0))]}</View>
+      <View style={s.liens}>{[lien('Garder les deux', () => w.accepterDoublon(d.id)), lien(`Retirer ${d.a.name}`, () => retirer(d.a)), lien(`Retirer ${d.b.name}`, () => retirer(d.b))]}</View>
      </View>)}
     </ScrollView>
+    <View>{toast}</View>
    </View>
   </KeyboardAvoidingView>
  </Modal>;

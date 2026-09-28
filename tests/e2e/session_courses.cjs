@@ -26,10 +26,10 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await btn('Vérifier mes manques').click();await page.getByText('Mes manques',{exact:true}).waitFor();
  // Manques M : les produits du catalogue sont prêts, seule « lessive » attend.
  await page.getByText('« lessive » reste à préciser, maintenant ou au bilan.',{exact:true}).waitFor();
- if(!await btn('Tout est bon (2)').isEnabled())throw Error('Ready missing products block the session');
+ if(!await btn('Continuer · 2 prêts, 1 à préciser').isEnabled())throw Error('Ready missing products block the session');
  await shot('2-manques');
  await btn('Faire une pause').click();await page.reload();await btn('Reprendre ma session').click();
- await btn('Tout est bon (2)').click();
+ await btn('Continuer · 2 prêts, 1 à préciser').click();
  // Habitudes H3 : la décision est dans le pied, visible sans défiler.
  const oui=btn('Oignons jaunes : il m’en faut 1');await oui.waitFor();
  await visible(oui,'Decision button hidden');await visible(btn('Oignons jaunes : j’en ai déjà'),'Decision button hidden');
@@ -47,6 +47,8 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  if(await btn('Noter « »').count())throw Error('Empty note button shown');
  await page.getByRole('textbox',{name:'Produit manquant',exact:true}).last().fill('Pommes de terre bio');await btn('Noter « Pommes de terre bio »').click();
  await page.getByText('1 × Pommes de terre bio',{exact:true}).waitFor();
+ // Un retrait s'annule depuis le toast.
+ await btn('Retirer Pommes de terre bio').click();await btn('Annuler : Pommes de terre bio retiré de ta liste').click();await page.getByText('1 × Pommes de terre bio',{exact:true}).waitFor();
  await shot('4-extras');
  await btn('Faire le bilan de ma liste').click();
  // Z2 + R2 : le bilan annonce, un bandeau ouvre la feuille « À régler ».
@@ -57,7 +59,8 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await shot('5-bilan');
  await regler.click();await page.getByText('À régler avant le drive',{exact:true}).waitFor();
  await page.waitForTimeout(700);await shot('5b-regler');
- await btn('Garder 1 × lessive').click();await btn('Retirer Pommes de terre bio').click();
+ await btn('Garder 1 × lessive').click();await btn('Retirer Pommes de terre bio').last().click();
+ await btn('Annuler : Pommes de terre bio retiré de ta liste').last().waitFor();
  await page.getByText('À régler avant le drive',{exact:true}).waitFor({state:'detached'});
  await page.getByText('articles prêts',{exact:true}).last().waitFor();
  if(!await btn('Choisir mon drive').last().isEnabled())throw Error('Settled list still blocked');

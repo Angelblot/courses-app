@@ -1,10 +1,10 @@
 import { ProductSuggestions, productSuggestion } from '../../components/ProductSuggestions';
 import { useState, useRef } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Head, Action, ui } from '../../components/MaisonUI';
+import { Head, Action, ui, useAnnulation } from '../../components/MaisonUI';
 import { useProducts, ajouterProduit, basculerFavori } from '../../stores/products';
 import { useWizard } from '../../contexts/WizardContext';
 import { type FicheProduit } from '../../lib/openfoodfacts';
@@ -21,13 +21,13 @@ type Ajoute = { key: string; name: string; qty: number };
 export default function Ajout({session=false}:{session?:boolean}){
  const params=useLocalSearchParams<{name?:string}>();const [nom,setNom]=useState(typeof params.name==='string'?params.name:'');
  const [qty,setQty]=useState(1),[busy,setBusy]=useState(false),[erreur,setErreur]=useState(''),[fiche,setFiche]=useState<FicheProduit|null>(null),[habituel,setHabituel]=useState(false),[ajoutes,setAjoutes]=useState<Ajoute[]>([]);
- const p=useProducts(),w=useWizard(),lock=useRef(false);
+ const p=useProducts(),w=useWizard(),lock=useRef(false),annulation=useAnnulation(),insets=useSafeAreaInsets();
  const off=useRechercheOff(),resultats=off.resultats,saisie=nom.trim();
  function confirme(key:string,name:string,q:number,productId?:string){w.retenirExtra({name,productId});setAjoutes(a=>[{key,name,qty:q},...a.filter(x=>x.key!==key)]);setNom('');setFiche(null);off.reinitialiser();setQty(1);setHabituel(false);setErreur('');}
  function noterLibre(name:string,q=qty){const id=w.ajouterExtra({name,quantity:q,unit:'unité',rayon:'autre'},!session);confirme(`extra:${id}`,name,q);}
  function ajouterCatalogue(id:string,name:string,q=qty){w.ajouterProduitListe(id,q,!session);confirme(`produit:${id}`,name,q,id);}
  function choisirFrequent(f:Frequent){const produit=f.productId?p.produits.find(x=>x.id===f.productId):undefined;if(produit)ajouterCatalogue(produit.id,produit.name,1);else noterLibre(f.name,1);}
- function retirer(x:Ajoute){if(x.key.startsWith('extra:'))w.retirerExtra(x.key.slice(6));else w.modifierLigne(x.key,0);setAjoutes(a=>a.filter(y=>y.key!==x.key));}
+ function retirer(x:Ajoute){const avant=w.ligneQuantites[x.key];w.modifierLigne(x.key,0);setAjoutes(a=>a.filter(y=>y.key!==x.key));annulation.proposer(`${x.name} retiré de ta liste`,()=>{w.restaurerLigne(x.key,avant);setAjoutes(a=>[x,...a]);});}
  function search(){if(busy)return;setErreur('');setFiche(null);void off.chercher(nom);}
  async function importer(){if(!fiche||lock.current)return;lock.current=true;setBusy(true);setErreur('');try{const res=await ajouterProduit(fiche,habituel);const produit=res.produit??res.doublon;if(produit){if(habituel&&!produit.favorite){const fav=await basculerFavori(produit.id,true);if(!fav.ok){setErreur('Impossible d’enregistrer ce produit habituel. Réessaie.');return;}}ajouterCatalogue(produit.id,produit.name);p.recharger();}else setErreur(res.reseau?'Connexion indisponible. La fiche est conservée à l’écran pour réessayer.':res.erreur??'Impossible d’enregistrer ce produit.');}catch{setErreur('Enregistrement impossible. Réessaie.');}finally{lock.current=false;setBusy(false);}}
  const locaux=p.produits.filter(p=>saisie.length>0&&p.name.toLowerCase().includes(saisie.toLowerCase())).slice(0,5);
@@ -54,11 +54,11 @@ export default function Ajout({session=false}:{session?:boolean}){
  </>}
  {!!erreur&&<Text accessibilityLiveRegion="polite" style={ui.error}>{erreur}</Text>}
  {ajoutes.length>0&&<View style={{gap:2,marginTop:4}}><Text accessibilityLiveRegion="polite" style={ui.detail}>Ajouté à ta liste</Text>{ajoutes.map(x=><View key={x.key} style={ui.sectionRow}><View style={[ui.row,{flex:1,gap:8}]}><Feather name="check" size={18} color={colors.accent}/><Text style={a.ajoute}>{x.qty} × {x.name}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${x.name}`} onPress={()=>retirer(x)} style={ui.iconButton}><Text style={ui.link}>Retirer</Text></Pressable></View>)}</View>}
- </ScrollView>{session&&<View style={ui.footer}><Action onPress={()=>router.push('/wizard/recap')}>Faire le bilan de ma liste</Action></View>}</SafeAreaView>
+ </ScrollView>{session?<View style={ui.footer}>{annulation.toast}<Action onPress={()=>router.push('/wizard/recap')}>Faire le bilan de ma liste</Action></View>:<View style={{marginBottom:insets.bottom+8}}>{annulation.toast}</View>}</SafeAreaView>
 }
 const a=StyleSheet.create({
  champ:{flex:1,flexDirection:'row',alignItems:'center',gap:8,minHeight:48,paddingHorizontal:14,borderRadius:12,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},
- saisie:{flex:1,fontSize:16,color:colors.text,paddingVertical:10},
+ saisie:{flex:1,minHeight:48,fontSize:16,color:colors.text},
  scan:{width:48,height:48,borderRadius:12,borderWidth:1.5,borderColor:colors.accent,alignItems:'center',justifyContent:'center'},
  puces:{flexDirection:'row',flexWrap:'wrap',gap:8},
  puce:{minHeight:44,flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:14,borderRadius:22,borderWidth:1.5,borderColor:colors.accent},
