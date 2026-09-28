@@ -16,7 +16,7 @@ const sources={widget:'Widget',siri:'Siri',manuel:'Noté dans l’app',precedent
  * touche seulement pour changer la quantité ou le format. Un libellé libre
  * ou un produit disparu s'ouvre directement pour être précisé.
  */
-function ManqueRow({lineKey,manque,products,aPreciser}:{lineKey:string;manque:Manque;products:Product[];aPreciser:boolean}) {
+export function ManqueRow({lineKey,manque,products,aPreciser}:{lineKey:string;manque:Manque;products:Product[];aPreciser:boolean}) {
  const w=useWizard(),id=lineKey.startsWith('produit:')?lineKey.slice(8):undefined;
  const product=products.find(p=>p.id===id),extra=w.extras.find(x=>`extra:${x.id}`===lineKey);
  const [qty,setQty]=useState(id?w.quotidienQty[id]??1:extra?.quantity??1),[chosen,setChosen]=useState(id),[search,setSearch]=useState(''),[edit,setEdit]=useState(false);
@@ -49,7 +49,7 @@ export function Manques({session=false}:{session?:boolean}) {
  {!loading&&entries.length>0&&<Text style={ui.detail}>Touche un produit pour changer son format ou sa quantité.</Text>}
  {!entries.length&&!loading&&!erreur&&<View style={ui.notice}><Text style={ui.productName}>Rien ne manque pour le moment.</Text><Text style={ui.subtitle}>Ajoute un produit dès que tu remarques qu’il manque à la maison.</Text></View>}
  {!session&&<Action secondary onPress={()=>router.push('/ajout')}>Noter un manque</Action>}
- </ScrollView><View style={ui.footer}>{session?<><Action disabled={loading||!!erreur} onPress={()=>router.replace('/wizard/habitudes')}>{prets>0?`Tout est bon (${prets})`:'Passer à mes habitudes'}</Action>{pending.length>0&&!loading&&<Raison>{pending.length>1?`${pending.length} produits restent à préciser, maintenant ou au bilan.`:`« ${pending[0][1].name} » reste à préciser, maintenant ou au bilan.`}</Raison>}</>:<Action onPress={()=>{w.demarrerSession();router.push(`/wizard/${w.sessionEtape??'recettes'}`);}}>{w.sessionEtape?'Reprendre ma session':'Préparer mes courses'}</Action>}</View></SafeAreaView>;
+ </ScrollView><View style={ui.footer}>{session?<><Action disabled={loading||!!erreur} onPress={()=>router.push('/wizard/habitudes')}>{prets>0?`Tout est bon (${prets})`:'Passer à mes habitudes'}</Action>{pending.length>0&&!loading&&<Raison>{pending.length>1?`${pending.length} produits restent à préciser, maintenant ou au bilan.`:`« ${pending[0][1].name} » reste à préciser, maintenant ou au bilan.`}</Raison>}</>:<Action onPress={()=>{w.demarrerSession();router.navigate(`/wizard/${w.sessionEtape??'recettes'}`);}}>{w.sessionEtape?'Reprendre ma session':'Préparer mes courses'}</Action>}</View></SafeAreaView>;
 }
 const m=StyleSheet.create({
  carte:{backgroundColor:colors.surface,padding:12,borderRadius:12,gap:10},

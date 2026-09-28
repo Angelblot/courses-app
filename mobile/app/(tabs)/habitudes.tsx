@@ -1,4 +1,4 @@
-import { manqueActif } from '../../lib/session-courses';
+import { instantaneHabitude, manqueActif, type InstantaneHabitude } from '../../lib/session-courses';
 import { useRecipes } from '../../stores/recipes';
 import { listeMaison } from '../../lib/liste-maison';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,7 +15,7 @@ import { nombreArticles } from '../../lib/ajouts-quotidiens';
 export default function Habitudes({session=false}:{session?:boolean}){
  const p=useProducts(),r=useRecipes(),w=useWizard();useFocusEffect(useCallback(()=>{p.recharger();},[p.recharger]));
  const categories=RAYONS.filter(c=>p.produits.some(p=>p.favorite&&rayonDepuisLibelle(p.category)===c.cle));
- const [rayon,setRayon]=useState(''),[qty,setQty]=useState(1),[notice,setNotice]=useState(''),[reduce,setReduce]=useState(false);
+ const [rayon,setRayon]=useState(''),[qty,setQty]=useState(1),[derniere,setDerniere]=useState<{id:string;texte:string;avant:InstantaneHabitude}|null>(null),[reduce,setReduce]=useState(false);
  const cat=categories.find(c=>c.cle===rayon)??categories[0];
  const itemsDe=(cle:string)=>p.produits.filter(x=>x.favorite&&rayonDepuisLibelle(x.category)===cle&&!(session&&w.manques?.[`produit:${x.id}`]&&manqueActif(w,`produit:${x.id}`)));
  const items=cat?itemsDe(cat.cle):[];
@@ -23,27 +23,28 @@ export default function Habitudes({session=false}:{session?:boolean}){
  const ligne=produit?listeMaison(w,r.recettes,p.produits).find(l=>l.product_id===produit.id):undefined;
  const quantiteInitiale=ligne?.totalQuantity??(produit?w.quotidienQty[produit.id]??1:1);
  const x=useRef(new Animated.Value(0)).current,lock=useRef(false),action=useRef((acheter:boolean)=>{});
+ useEffect(()=>{if(!derniere)return;const t=setTimeout(()=>setDerniere(null),5000);return()=>clearTimeout(t);},[derniere]);
  useEffect(()=>{AccessibilityInfo.isReduceMotionEnabled().then(setReduce);const sub=AccessibilityInfo.addEventListener('reduceMotionChanged',setReduce);return()=>sub.remove();},[]);
  useEffect(()=>{setQty(nombreArticles(quantiteInitiale));x.setValue(0);lock.current=false;},[produit?.id,quantiteInitiale,x]);
- action.current=(acheter)=>{if(!produit||lock.current)return;lock.current=true;const fin=()=>{w.deciderHabituel(produit.id,qty,acheter);setNotice(acheter?`${qty} × ${produit.name} retenu${qty>1?'s':''}`:`${produit.name} : déjà chez moi`);x.setValue(0);lock.current=false;};if(reduce)fin();else Animated.timing(x,{toValue:acheter?450:-450,duration:180,useNativeDriver:true}).start(({finished})=>{if(finished)fin();else lock.current=false;});};
+ action.current=(acheter)=>{if(!produit||lock.current)return;lock.current=true;const avant=instantaneHabitude(w,produit.id);const fin=()=>{w.deciderHabituel(produit.id,qty,acheter);setDerniere({id:produit.id,avant,texte:acheter?`${qty} × ${produit.name} retenu${qty>1?'s':''}`:`${produit.name} : déjà chez moi`});x.setValue(0);lock.current=false;};if(reduce)fin();else Animated.timing(x,{toValue:acheter?450:-450,duration:180,useNativeDriver:true}).start(({finished})=>{if(finished)fin();else lock.current=false;});};
  const pan=useRef(PanResponder.create({onMoveShouldSetPanResponder:(_,g)=>Math.abs(g.dx)>14&&Math.abs(g.dx)>Math.abs(g.dy)*1.5,onPanResponderMove:(_,g)=>{if(!lock.current)x.setValue(g.dx);},onPanResponderRelease:(_,g)=>{if(Math.abs(g.dx)>85)action.current(g.dx>0);else Animated.spring(x,{toValue:0,useNativeDriver:true}).start();},onPanResponderTerminate:()=>Animated.spring(x,{toValue:0,useNativeDriver:true}).start()})).current;
  // Rayon suivant encore à passer, sinon le premier resté en arrière.
  const index=categories.findIndex(c=>c.cle===cat?.cle),aPasser=categories.filter(c=>c.cle!==cat?.cle&&itemsDe(c.cle).some(x=>!w.habitudesVues?.[x.id]));
  const suivant=aPasser.find(c=>categories.indexOf(c)>index)??aPasser[0];
  const terminer=()=>router.push(session?'/wizard/exceptions':'/liste'),sortie=session?'Passer aux extras':'Voir ma liste';
- const allerA=(cle:string)=>{setRayon(cle);setNotice('');};
+ const allerA=(cle:string)=>{setRayon(cle);setDerniere(null);};
+ const annuler=()=>{if(!derniere)return;w.annulerHabituel(derniere.id,derniere.avant);setDerniere(null);};
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}>{!session&&<View style={{padding:20,paddingBottom:8}}><Head title="Mes habitudes" back/></View>}
  <View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8,paddingHorizontal:20,paddingTop:session?8:0,paddingBottom:8}}>{categories.map(c=><Pressable key={c.cle} accessibilityRole="tab" accessibilityState={{selected:cat?.cle===c.cle}} onPress={()=>allerA(c.cle)} style={[h.rayon,cat?.cle===c.cle&&{backgroundColor:colors.accent}]}><Text style={{color:cat?.cle===c.cle?colors.accentContrast:colors.accent,fontWeight:'600'}}>{c.label}</Text></Pressable>)}</ScrollView></View>
  <ScrollView contentContainerStyle={[ui.content,{paddingTop:4,flexGrow:1}]}>
  {p.chargement&&<ActivityIndicator/>}{p.erreur&&<><Text style={ui.error}>{p.erreur}</Text><Action secondary onPress={p.recharger}>Réessayer</Action></>}
  {cat&&produit&&<Text style={[ui.detail,{fontVariant:['tabular-nums']}]}>{faits+1} sur {items.length} dans ce rayon</Text>}
- {!!notice&&<Text accessibilityLiveRegion="polite" style={ui.link}>{notice}</Text>}
  {produit?<><Animated.View {...pan.panHandlers} style={{backgroundColor:colors.surface,borderRadius:20,padding:20,gap:8,transform:[{translateX:x},{rotate:x.interpolate({inputRange:[-400,0,400],outputRange:['-8deg','0deg','8deg']})}]}}><Photo name={produit.name} url={produit.image_url} style={{width:'100%',height:180}}/><Text style={[ui.heading,{fontSize:24}]}>{produit.name}</Text><Text style={ui.subtitle}>{[produit.brand,produit.grammage_g?`${produit.grammage_g} g`:produit.volume_ml?`${produit.volume_ml} ml`:null].filter(Boolean).join(' · ')}</Text>{ligne?.besoin&&<Text style={ui.detail}>{ligne.besoin}</Text>}{w.quotidien[produit.id]==='needed'&&<Text style={ui.link}>Déjà noté dans ta liste : {quantiteInitiale}</Text>}</Animated.View>
  <Pressable accessibilityRole="button" onPress={()=>suivant?allerA(suivant.cle):terminer()} style={[ui.iconButton,{marginTop:'auto'}]}><Text style={ui.link}>{suivant?'Passer ce rayon':sortie}</Text></Pressable></>
  :cat?<><Text style={ui.heading}>Ce rayon est prêt.</Text><Text style={ui.subtitle}>Tes choix sont conservés.</Text><Action secondary onPress={()=>w.revoirHabitudes(items.map(x=>x.id))}>Revoir ce rayon</Action>{!!suivant&&<Pressable accessibilityRole="button" onPress={terminer} style={ui.iconButton}><Text style={ui.link}>{sortie}</Text></Pressable>}</>
  :!p.chargement&&!p.erreur?<><Text style={ui.heading}>Tes habitudes commencent ici.</Text><Text style={ui.subtitle}>Enregistre tes produits préférés avec le scanner.</Text><Action secondary onPress={()=>router.push('/scan')}>Scanner un premier favori</Action></>:null}
  </ScrollView>
- <View style={ui.footer}>{produit?<View style={h.decision}>
+ <View style={ui.footer}>{!!derniere&&<View style={h.toast}><Text accessibilityLiveRegion="polite" style={h.toastTexte} numberOfLines={2}>{derniere.texte}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Annuler : ${derniere.texte}`} onPress={annuler} hitSlop={8} style={{minHeight:44,justifyContent:'center'}}><Text style={[h.toastTexte,{fontWeight:'700'}]}>Annuler</Text></Pressable></View>}{produit?<View style={h.decision}>
   <Pressable accessibilityRole="button" accessibilityLabel={`${produit.name} : j’en ai déjà`} onPress={()=>action.current(false)} style={h.choix}>{({pressed})=><><View style={[h.rond,h.non,pressed&&{opacity:.7}]}><Feather name="x" size={28} color={colors.accent}/></View><Text style={h.legende}>J’en ai déjà</Text></>}</Pressable>
   <View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel="Diminuer la quantité" style={ui.iconButton} onPress={()=>setQty(nombreArticles(qty-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{qty}</Text><Pressable accessibilityRole="button" accessibilityLabel="Augmenter la quantité" style={ui.iconButton} onPress={()=>setQty(nombreArticles(qty+1))}><Text style={ui.title}>+</Text></Pressable></View>
   <Pressable accessibilityRole="button" accessibilityLabel={`${produit.name} : il m’en faut ${qty}`} onPress={()=>action.current(true)} style={h.choix}>{({pressed})=><><View style={[h.rond,h.oui,pressed&&{opacity:.85}]}><Feather name="check" size={28} color={colors.accentContrast}/></View><Text style={h.legende}>Il m’en faut</Text></>}</Pressable>
@@ -58,4 +59,7 @@ const h=StyleSheet.create({
  non:{borderWidth:1.5,borderColor:colors.accent},
  oui:{backgroundColor:colors.accent},
  legende:{fontSize:12,fontWeight:'600',color:colors.accent},
+ // Toast d'annulation, posé au-dessus du pied le temps de revenir sur une décision.
+ toast:{position:'absolute',left:16,right:16,bottom:'100%',marginBottom:8,borderRadius:14,backgroundColor:colors.text,paddingLeft:16,paddingRight:12,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,shadowColor:colors.text,shadowOpacity:.25,shadowRadius:14,shadowOffset:{width:0,height:6},elevation:6},
+ toastTexte:{color:colors.accentContrast,fontSize:14,flexShrink:1},
 });

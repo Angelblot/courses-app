@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { manquesDuBrouillon, manquesAPreciser, doublonsPossibles } from './session-courses.ts';
+import { manquesDuBrouillon, manquesAPreciser, doublonsPossibles, instantaneHabitude, restaurerHabitude, resumeBilan } from './session-courses.ts';
 import { listeMaison } from './liste-maison.ts';
 import { importerAjouts } from './widget-products.ts';
 const base={selectedRecipes:{},quotidien:{},quotidienQty:{},extras:[],choixProduits:{},drives:[],ligneQuantites:{},lignePossedees:{}};
@@ -42,4 +42,19 @@ test('retirer une ligne fusionnée ne fait pas réapparaître son ajout manuel',
  const e={...base,quotidien:{[p.id]:'needed'},extras:[{id:'x',name:p.name,quantity:1,unit:'unité',rayon:'fruits_legumes'}]};
  const lines=listeMaison(e,[],[p]);assert.equal(lines.length,1);
  assert.deepEqual(listeMaison({...e,ligneQuantites:{[lines[0].key]:0}},[],[p]),[]);
+});
+test('annuler une décision Habitudes rend exactement l’état d’avant',()=>{
+ const e={...base,quotidien:{o:'needed'},quotidienQty:{o:3},habitudesVues:{}};
+ const avant=instantaneHabitude(e,'o');
+ const apres={...e,habitudesVues:{o:true},quotidien:{o:'have'},quotidienQty:{o:1},ligneQuantites:{'produit:o':1},lignePossedees:{'produit:o':true}};
+ assert.deepEqual(restaurerHabitude(apres,'o',avant),{...e,habitudesVues:{}});
+});
+test('le résumé du bilan compte repas, manques, habitudes et extras',()=>{
+ const e={...base,selectedRecipes:{a:2,b:4},quotidien:{m:'needed',h:'needed',x:'have'},habitudesVues:{h:true,x:true},manques:{'produit:m':{name:'M',source:'widget'},'extra:s':{name:'S',source:'siri'}},extras:[{id:'s',name:'S',quantity:1},{id:'z',name:'Z',quantity:1}]};
+ assert.deepEqual(resumeBilan(e),['2 repas','2 manques','1 habitude','1 extra']);
+ assert.deepEqual(resumeBilan(base),[]);
+});
+test('le résumé du bilan ignore les lignes retirées ou déjà possédées',()=>{
+ const e={...base,manques:{},quotidien:{h:'needed'},habitudesVues:{h:true},extras:[{id:'z',name:'Z',quantity:1},{id:'y',name:'Y',quantity:1}],ligneQuantites:{'extra:z':0},lignePossedees:{'produit:h':true}};
+ assert.deepEqual(resumeBilan(e),['1 extra']);
 });

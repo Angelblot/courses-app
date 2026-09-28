@@ -1,4 +1,5 @@
-import { manquesDuBrouillon, type Manque, type SessionStep } from '../lib/session-courses';
+import { manquesDuBrouillon, restaurerHabitude, type InstantaneHabitude, type Manque, type SessionStep } from '../lib/session-courses';
+import { retenirFrequent, type Frequent } from '../lib/extras-frequents';
 import { WidgetSync } from '../components/WidgetSync';
 import { importerAjouts } from '../lib/widget-products';
 import { nativeInbox } from '../lib/native-inbox';
@@ -22,6 +23,8 @@ export type Etat = {
   manques?: Record<string, Manque>;
   doublonsValides?: string[];
   importsExternes?: string[];
+  /** Extras déjà notés, proposés en un tap. Survit à la remise à zéro de la liste. */
+  extrasFrequents?: Record<string, Frequent>;
   habitudesVues?: Record<string, boolean>;
   ligneQuantites: Record<string, number>;
   lignePossedees: Record<string, boolean>;
@@ -54,12 +57,15 @@ type Contexte = Etat & {
   possederLigne: (key: string, owned: boolean) => void;
   ajouterProduitListe: (id: string, quantite?: number, manque?: boolean) => void;
   deciderHabituel: (id: string, quantite: number, acheter: boolean) => void;
+  annulerHabituel: (id: string, avant: InstantaneHabitude) => void;
+  retenirExtra: (ajout: { name: string; productId?: string }) => void;
   revoirHabitudes: (ids: string[]) => void;
   toggleRecette: (id: string, partsParDefaut: number) => void;
   setParts: (id: string, n: number) => void;
   marquerProduit: (id: string, statut: 'needed' | 'have' | null) => void;
   setQuantite: (id: string, n: number) => void;
-  ajouterExtra: (e: Omit<LigneExtra, 'id'>, manque?: boolean) => void;
+  /** Renvoie l'identifiant de l'extra créé. */
+  ajouterExtra: (e: Omit<LigneExtra, 'id'>, manque?: boolean) => string;
   retirerExtra: (id: string) => void;
   choisirProduit: (cleGroupe: string, produitId: string) => void;
   basculerDrive: (nom: string) => void;
@@ -138,6 +144,8 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
     ligneQuantites: { ...e.ligneQuantites, [`produit:${id}`]: Math.max(1, Math.round(quantite)) },
     lignePossedees: { ...e.lignePossedees, [`produit:${id}`]: !acheter },
   })), []);
+  const annulerHabituel = useCallback((id: string, avant: InstantaneHabitude) => setEtat(e => restaurerHabitude(e, id, avant)), []);
+  const retenirExtra = useCallback((ajout: { name: string; productId?: string }) => setEtat(e => ({ ...e, extrasFrequents: retenirFrequent(e.extrasFrequents ?? {}, ajout) })), []);
   const revoirHabitudes = useCallback((ids: string[]) => setEtat(e=>({...e, habitudesVues: Object.fromEntries(Object.entries(e.habitudesVues??{}).filter(([id])=>!ids.includes(id)))})), []);
   // Compteur monotone pour les identifiants d'ajouts manuels : `Date.now()`
   // seul peut se répéter si deux ajouts tombent dans la même milliseconde.
@@ -183,6 +191,7 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
       extras: [...e.extras, { ...extra, id: extraId }],
       manques: !(manque ?? !e.sessionEtape) ? e.manques : { ...manquesDuBrouillon(e), [`extra:${extraId}`]: { name: extra.name, source: 'manuel' } },
     }));
+    return extraId;
   }, [compteur]);
 
   const retirerExtra = useCallback((id: string) => {
@@ -200,7 +209,7 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
     }));
   }, []);
 
-  const reinitialiser = useCallback(() => setEtat(e => ({ ...INITIAL, importsExternes: e.importsExternes })), []);
+  const reinitialiser = useCallback(() => setEtat(e => ({ ...INITIAL, importsExternes: e.importsExternes, extrasFrequents: e.extrasFrequents })), []);
 
   const demarrerSession = useCallback(() => setEtat(e => e.sessionEtape ? e : { ...e,
     manques: manquesDuBrouillon(e), sessionEtape: 'recettes', habitudesVues: {}, doublonsValides: [],
@@ -226,11 +235,11 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   }),[]);
 
   const valeur = useMemo<Contexte>(() => ({
-    ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, deciderHabituel, revoirHabitudes,
+    ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes,
     toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
   }), [
-    etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, deciderHabituel, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
+    etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
   ]);
 

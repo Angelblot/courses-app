@@ -35,24 +35,37 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await visible(oui,'Decision button hidden');await visible(btn('Oignons jaunes : j’en ai déjà'),'Decision button hidden');
  if(await btn('Continuer vers les extras').count())throw Error('Continue shown before every aisle is reviewed');
  await shot('3-habitudes');
- await oui.click();await page.getByText('Ce rayon est prêt.',{exact:true}).waitFor();
+ // N1 : un toast permet d'annuler la décision, et la carte revient.
+ await oui.click();await btn('Annuler : 1 × Oignons jaunes retenu').click();
+ await oui.waitFor();await oui.click();await page.getByText('Ce rayon est prêt.',{exact:true}).last().waitFor();
+ await shot('3b-habitudes-annuler');
  await btn('Continuer vers les extras').click();
- await page.getByRole('textbox',{name:'Produit manquant',exact:true}).fill('Pommes de terre bio');await btn('Noter Pommes de terre bio dans ma liste').click();
+ // Le retour mène à l'étape d'avant, jamais plus loin.
+ await page.goBack();await page.getByText('Étape 3 sur 5 · Habitudes',{exact:true}).last().waitFor();
+ await btn('Continuer vers les extras').last().click();await page.getByText('Étape 4 sur 5 · Extras',{exact:true}).last().waitFor();
+ // X2 : un champ, le reste apparaît avec la saisie.
+ if(await btn('Noter « »').count())throw Error('Empty note button shown');
+ await page.getByRole('textbox',{name:'Produit manquant',exact:true}).last().fill('Pommes de terre bio');await btn('Noter « Pommes de terre bio »').click();
+ await page.getByText('1 × Pommes de terre bio',{exact:true}).waitFor();
  await shot('4-extras');
- await btn('Faire le bilan de ma liste').click();await page.getByText('Des doublons possibles',{exact:true}).waitFor();
- // Bilan : bouton gris neutre et raison cliquable.
- if(await btn('Choisir mon drive').isEnabled())throw Error('Blocked list can reach drive');
- await page.getByText('1 manque à préciser.',{exact:true}).waitFor();
- const style=await btn('Choisir mon drive').evaluate(el=>{const c=getComputedStyle(el);return [c.backgroundColor,c.opacity].join(' ');});
+ await btn('Faire le bilan de ma liste').click();
+ // Z2 + R2 : le bilan annonce, un bandeau ouvre la feuille « À régler ».
+ const regler=btn('2 points à régler : 1 manque, 1 doublon. Régler');await regler.waitFor();
+ if(await btn('Choisir mon drive').last().isEnabled())throw Error('Blocked list can reach drive');
+ const style=await btn('Choisir mon drive').last().evaluate(el=>{const c=getComputedStyle(el);return [c.backgroundColor,c.opacity].join(' ');});
  if(style!=='rgb(236, 238, 233) 1')throw Error('Disabled button style '+style);
  await shot('5-bilan');
- await btn('Les préciser').click();await btn('Garder 1 × lessive').click();
- await btn('Tout est bon (3)').click();await btn('Continuer vers les extras').click();await btn('Faire le bilan de ma liste').click();
- await page.getByText('1 doublon possible à trancher, plus haut.',{exact:true}).last().waitFor();
- await btn('Retirer Pommes de terre bio').click();
+ await regler.click();await page.getByText('À régler avant le drive',{exact:true}).waitFor();
+ await page.waitForTimeout(700);await shot('5b-regler');
+ await btn('Garder 1 × lessive').click();await btn('Retirer Pommes de terre bio').click();
+ await page.getByText('À régler avant le drive',{exact:true}).waitFor({state:'detached'});
+ await page.getByText('articles prêts',{exact:true}).last().waitFor();
+ if(!await btn('Choisir mon drive').last().isEnabled())throw Error('Settled list still blocked');
+ await shot('5c-bilan-pret');
+ await btn('Voir et ajuster la liste').last().click();await page.getByText('Fruits & légumes',{exact:true}).last().waitFor();
  await page.setViewportSize({width:1024,height:1366});await shot('5-bilan-tablette');
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow');
- await btn('Choisir mon drive').click();await btn('Envoyer à mon ordinateur').click();
+ await btn('Choisir mon drive').last().click();await btn('Envoyer à mon ordinateur').click();
  await page.waitForTimeout(600);if(!sent||sent.items.length!==4||sent.items.find(x=>x.product_id==='patates')?.quantity!==2)throw Error('Incorrect consolidated payload '+JSON.stringify(sent));
  if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true,items:sent.items.length,errors}));
  }catch(e){console.error(e);process.exitCode=1}finally{await b.close()}})();

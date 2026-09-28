@@ -44,3 +44,31 @@ export function doublonsPossibles(lignes: LigneMaison[], acceptes: string[] = []
  }
  return result;
 }
+
+/** Ce qu'une décision Habitudes change dans le brouillon, pour pouvoir l'annuler. */
+export type InstantaneHabitude = { vue?: boolean; statut?: 'needed' | 'have'; qty?: number; ligneQty?: number; possedee?: boolean };
+export function instantaneHabitude(e: Etat, id: string): InstantaneHabitude {
+ const key = `produit:${id}`;
+ return { vue: e.habitudesVues?.[id], statut: e.quotidien[id], qty: e.quotidienQty[id], ligneQty: e.ligneQuantites[key], possedee: e.lignePossedees[key] };
+}
+function poser<T>(table: Record<string, T> | undefined, key: string, valeur: T | undefined): Record<string, T> {
+ const suite = { ...table };
+ if (valeur === undefined) delete suite[key]; else suite[key] = valeur;
+ return suite;
+}
+export function restaurerHabitude(e: Etat, id: string, avant: InstantaneHabitude): Etat {
+ const key = `produit:${id}`;
+ return { ...e,
+  habitudesVues: poser(e.habitudesVues, id, avant.vue), quotidien: poser(e.quotidien, id, avant.statut), quotidienQty: poser(e.quotidienQty, id, avant.qty),
+  ligneQuantites: poser(e.ligneQuantites, key, avant.ligneQty), lignePossedees: poser(e.lignePossedees, key, avant.possedee) };
+}
+
+/** D'où viennent les courses, pour l'en-tête du bilan : « 2 repas », « 3 manques »… */
+export function resumeBilan(e: Etat): string[] {
+ const manques = Object.keys(manquesDuBrouillon(e)).filter(key => manqueActif(e, key));
+ const retenue = (key: string) => e.ligneQuantites[key] !== 0 && !e.lignePossedees[key];
+ const habitudes = Object.keys(e.habitudesVues ?? {}).filter(id => e.habitudesVues?.[id] && e.quotidien[id] === 'needed' && retenue(`produit:${id}`) && !manques.includes(`produit:${id}`));
+ const extras = e.extras.filter(x => retenue(`extra:${x.id}`) && !manques.includes(`extra:${x.id}`));
+ const parts: [number, string, string][] = [[Object.keys(e.selectedRecipes).length, 'repas', 'repas'], [manques.length, 'manque', 'manques'], [habitudes.length, 'habitude', 'habitudes'], [extras.length, 'extra', 'extras']];
+ return parts.filter(([n]) => n > 0).map(([n, un, plusieurs]) => `${n} ${n > 1 ? plusieurs : un}`);
+}
