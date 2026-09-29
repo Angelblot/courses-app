@@ -37,7 +37,11 @@ export async function envoyerListe(
  * réessayer. `null` si on ne peut pas le savoir (réseau toujours coupé).
  */
 export async function envoiExiste(id: string): Promise<boolean | null> {
-  const { data, error } = await supabase.from('cart_jobs').select('id').eq('id', id).limit(1);
-  if (error) return null;
-  return (data ?? []).length > 0;
+  // Une seule tentative, bornée : hors ligne, la réponse doit venir vite.
+  const arret = new AbortController(), minuterie = setTimeout(() => arret.abort(), 4000);
+  try {
+    const { data, error } = await supabase.from('cart_jobs').select('id').eq('id', id).limit(1).retry(false).abortSignal(arret.signal);
+    if (error) return null;
+    return (data ?? []).length > 0;
+  } finally { clearTimeout(minuterie); }
 }

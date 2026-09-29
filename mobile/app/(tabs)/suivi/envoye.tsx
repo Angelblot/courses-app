@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -23,6 +23,9 @@ export default function Envoye() {
  const [envoyee, prise, remplie] = etapesEnvoi(travail?.status);
  // L'heure d'envoi vient de la feuille d'envoi ; à défaut, l'heure d'arrivée ici.
  const [heure] = useState(() => heureEnvoi || new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+ // iOS n'a pas de région live : VoiceOver annonce chaque étape franchie.
+ const annonce = remplie === 'fait' ? 'Panier rempli.' : remplie === 'erreur' ? 'Le remplissage n’a pas abouti.' : remplie === 'attention' ? 'Une action t’attend sur l’ordinateur.' : prise === 'fait' ? 'Ton ordinateur a pris la liste.' : null, derniere = useRef<string | null>(null);
+ useEffect(() => { if (Platform.OS === 'ios' && annonce && annonce !== derniere.current) AccessibilityInfo.announceForAccessibility(annonce); derniere.current = annonce; }, [annonce]);
  const drivesTexte = noms.length ? noms.join(' et ') : 'le drive';
  const etapes: { etat: EtapeEnvoi; titre: string; detail: string; aide?: boolean; attente?: boolean }[] = [
   { etat: envoyee, titre: 'Liste envoyée', detail: `${total} produit${total > 1 ? 's' : ''}, à ${heure}` },

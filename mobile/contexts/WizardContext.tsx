@@ -28,6 +28,8 @@ export type Etat = {
   /** Extras déjà notés, proposés en un tap. Survit à la remise à zéro de la liste. */
   extrasFrequents?: Record<string, Frequent>;
   habitudesVues?: Record<string, boolean>;
+  /** Envoi dont on ignore s'il est parti (coupure) : le prochain essai garde cet identifiant. */
+  envoiEnDoute?: string;
   ligneQuantites: Record<string, number>;
   lignePossedees: Record<string, boolean>;
   selectedRecipes: Record<string, number>;
@@ -75,6 +77,8 @@ type Contexte = Etat & {
   choisirProduit: (cleGroupe: string, produitId: string) => void;
   basculerDrive: (nom: string) => void;
   reinitialiser: () => void;
+  /** Retient l'identifiant d'un envoi incertain, ou l'oublie (undefined). */
+  retenirEnvoi: (id?: string) => void;
   /** Abandonne les courses en cours ; les manques notés restent. Annulable. */
   abandonnerSession: () => void;
   abandonEnAttente: boolean;
@@ -225,6 +229,7 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   const demarrerSession = useCallback(() => setEtat(e => e.sessionEtape ? e : { ...e,
     manques: manquesDuBrouillon(e), sessionEtape: 'recettes', habitudesVues: {}, doublonsValides: [],
   }), []);
+  const retenirEnvoi = useCallback((id?: string) => setEtat(e => ({ ...e, envoiEnDoute: id })), []);
   const allerEtape = useCallback((sessionEtape: SessionStep) => setEtat(e => ({ ...e, sessionEtape })), []);
   const declarerDistinct = useCallback((a: string, b: string) => setEtat(e => ({ ...e, distincts: [...(e.distincts ?? []), cleDistinct(a, b)] })), []);
   const accepterDoublon = useCallback((id: string) => setEtat(e=>({...e,doublonsValides:[...(e.doublonsValides??[]),id]})),[]);
@@ -254,11 +259,11 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   const valeur = useMemo<Contexte>(() => ({
     ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes,
     toggleRecette, setParts, marquerProduit, setQuantite,
-    ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
+    ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser, retenirEnvoi,
     abandonnerSession, abandonEnAttente: avantAbandon !== null, annulerAbandon, oublierAbandon,
   }), [
     etat, demarrerSession, allerEtape, validerManque, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
-    ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
+    ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser, retenirEnvoi,
     abandonnerSession, avantAbandon, annulerAbandon, oublierAbandon,
   ]);
 

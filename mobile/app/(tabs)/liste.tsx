@@ -33,8 +33,10 @@ export default function Liste({session=false}:{session?:boolean}){
  const vide=!acheter.length;
  // Seules les lignes qui ont une vraie photo figurent dans la frise du bilan.
  const vignettes=acheter.filter(l=>p.produits.find(x=>x.id===l.product_id)?.image_url||photoSecours(l.name)).slice(0,6);
- const libres=manques.length;
- const sousTitre=libres?`dont ${pluriel(libres,'produit')} noté${libres>1?'s':''} à la main, envoyé${libres>1?'s':''} tel${libres>1?'s':''} quel${libres>1?'s':''}`:resumeBilan(w).join(' · ');
+ // Tout ce qui est noté à la main (manque ou extra) part par son nom.
+ const libres=acheter.filter(l=>l.key.startsWith('extra:')&&!l.product_id).length,sources=resumeBilan(w);
+ // Les sources se recoupent (un repas et un manque pour le même produit) : on ne les additionne pas.
+ const sousTitre=libres?`dont ${pluriel(libres,'produit')} noté${libres>1?'s':''} à la main, envoyé${libres>1?'s':''} tel${libres>1?'s':''} quel${libres>1?'s':''}`:sources.length?`depuis ${sources.length>1?`${sources.slice(0,-1).join(', ')} et ${sources[sources.length-1]}`:sources[0]}`:'';
  const bouton=<Action disabled={vide||loading||!!erreur} onPress={()=>setEnvoi(true)}>Envoyer au drive</Action>;
  const pied=<>{session?<PiedAvecRetour vers="recettes">{bouton}</PiedAvecRetour>:bouton}{vide&&!loading&&!erreur&&<Raison>Ta liste est vide.</Raison>}</>;
  const entete=session?loading&&vide?<View style={[b.hero,{minHeight:68}]} accessible accessibilityLabel="Préparation de ta liste"><ActivityIndicator color={colors.accent}/><Text style={ui.detail}>Préparation de ta liste…</Text></View>:<>

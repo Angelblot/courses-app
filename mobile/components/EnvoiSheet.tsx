@@ -23,13 +23,17 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
  // la feuille se referme, et elle afficherait « 0 produit ».
  const [total, setTotal] = useState(acheter.length);
  useEffect(() => { if (visible) setTotal(acheter.length); }, [visible]);
- // Un identifiant par ouverture de la feuille : les nouveaux essais le réutilisent.
- const [idEnvoi, setIdEnvoi] = useState(nouvelIdEnvoi);
- useEffect(() => { if (visible) setIdEnvoi(nouvelIdEnvoi()); }, [visible]);
  const [envoi, setEnvoi] = useState(false), [erreur, setErreur] = useState<string | null>(null), [aide, setAide] = useState(false), verrou = useRef(false);
+ useEffect(() => { if (visible) setErreur(null); }, [visible]);
+ // Pendant l'envoi, la feuille reste ouverte : on saura s'il est parti.
+ const fermer = () => { if (!verrou.current) onFermer(); };
  async function envoyer() {
   if (verrou.current || !w.drives.length || !acheter.length) return;
   verrou.current = true; setEnvoi(true); setErreur(null);
+  // Tant qu'on ignore si un envoi est parti, tout nouvel essai reprend son
+  // identifiant, même après fermeture de la feuille ou de l'app.
+  const idEnvoi = w.envoiEnDoute ?? nouvelIdEnvoi();
+  w.retenirEnvoi(idEnvoi);
   const n = acheter.length, drives = w.drives.join(',');
   const aboutir = (id: string) => {
    const heure = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -42,7 +46,7 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
   const echec = async () => {
    const existe = await envoiExiste(idEnvoi).catch(() => null);
    if (existe) aboutir(idEnvoi);
-   else if (existe === false) setErreur('L’envoi n’a pas abouti, rien n’est parti. Réessaie.');
+   else if (existe === false) { w.retenirEnvoi(undefined); setErreur('L’envoi n’a pas abouti, rien n’est parti. Réessaie.'); }
    else setErreur('Pas de réseau pour le moment. Réessaie : la liste ne partira pas deux fois.');
   };
   try {
@@ -51,11 +55,11 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
   } catch { await echec(); }
   finally { verrou.current = false; setEnvoi(false); }
  }
- return <Modal {...nomDialogue('Où fait-on les courses ?')} visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
+ return <Modal {...nomDialogue('Où fait-on les courses ?')} visible={visible} transparent animationType="slide" onRequestClose={fermer}>
   <View style={s.fond}>
-   <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={onFermer} />
-   <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="Où fait-on les courses ?" onAccessibilityEscape={onFermer}>
-    <View style={s.entete}><Text style={[s.titre, { flex: 1, marginBottom: 0 }]} accessibilityRole="header">Où fait-on les courses ?</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} hitSlop={6} style={s.fermer}><Feather name="x" size={22} color={colors.text} /></Pressable></View>
+   <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={fermer} />
+   <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="Où fait-on les courses ?" onAccessibilityEscape={fermer}>
+    <View style={s.entete}><Text style={[s.titre, { flex: 1, marginBottom: 0 }]} accessibilityRole="header">Où fait-on les courses ?</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer" accessibilityState={{ disabled: envoi }} disabled={envoi} onPress={fermer} hitSlop={6} style={[s.fermer, envoi && { opacity: .4 }]}><Feather name="x" size={22} color={colors.text} /></Pressable></View>
     <Text style={[ui.detail, { marginTop: 0, marginBottom: 12, paddingHorizontal: 4 }]}>{total} produit{total > 1 ? 's' : ''} à envoyer, dans un drive ou les deux.</Text>
     <View style={{ gap: 10 }}>
      {DRIVES.map(d => { const coche = w.drives.includes(d.cle); return <Pressable key={d.cle} accessibilityRole="checkbox" accessibilityState={{ checked: coche, disabled: envoi }} aria-checked={coche} accessibilityLabel={d.nom} disabled={envoi} onPress={() => w.basculerDrive(d.cle)} style={({ pressed }) => [s.drive, coche && s.driveCoche, pressed && { opacity: .85 }]}>
@@ -70,7 +74,7 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
      </Pressable>
      {aide && <Text style={[ui.detail, { marginTop: 0, paddingHorizontal: 4 }]}>Ouvre Chrome et connecte l’extension Courses au même compte que sur ton iPhone. Après l’envoi, clique sur « Remplir le panier » dans l’extension. Tu vérifies puis paies sur le site du drive.</Text>}
      {!!erreur && <Text accessibilityLiveRegion="polite" style={ui.error}>{erreur}</Text>}
-     {envoi && <ActivityIndicator color={colors.accent} />}
+     {envoi && <ActivityIndicator color={colors.accent} accessibilityLabel="Envoi en cours" />}
      <Action disabled={envoi || !w.drives.length} onPress={envoyer}>{envoi ? 'Envoi en cours…' : 'Envoyer'}</Action>
      {!w.drives.length && <Raison>Coche au moins un drive.</Raison>}
     </View>
