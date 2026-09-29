@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
-import { AccessibilityInfo, Image, Pressable, Text, View, StyleSheet, type ImageStyle, type StyleProp } from 'react-native';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { AccessibilityInfo, Image, Keyboard, Platform, Pressable, Text, TextInput, View, StyleSheet, type ImageStyle, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollView, type StyleProp } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { colors } from '../lib/theme';
@@ -56,3 +56,28 @@ export const ui=StyleSheet.create({
  retour:{width:48,height:48,borderRadius:12,borderWidth:1.5,borderColor:colors.accent,alignItems:'center',justifyContent:'center'},
  screen:{flex:1,backgroundColor:colors.bg},content:{padding:20,paddingBottom:28,gap:12},header:{flexDirection:'row',alignItems:'center',gap:6,marginBottom:12},title:{fontSize:27,fontWeight:'700',color:colors.text,letterSpacing:-.6},heading:{fontSize:29,lineHeight:33,fontWeight:'700',color:colors.text,letterSpacing:-.6},subtitle:{fontSize:15,lineHeight:22,color:colors.textMuted},section:{fontSize:20,fontWeight:'600',color:colors.text,marginTop:14},avatar:{width:44,height:44,borderRadius:22,backgroundColor:colors.accent,alignItems:'center',justifyContent:'center'},iconButton:{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'},button:{minHeight:48,borderRadius:12,backgroundColor:colors.accent,padding:14,alignItems:'center',justifyContent:'center'},secondary:{backgroundColor:'transparent',borderWidth:1.5,borderColor:colors.accent},disabled:{backgroundColor:colors.off,borderWidth:0},raison:{flexDirection:'row',flexWrap:'wrap',justifyContent:'center',alignItems:'center',columnGap:6},buttonText:{fontSize:15,fontWeight:'600',color:'white'},scan:{minHeight:48,borderRadius:12,borderWidth:1.5,borderColor:colors.accent,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:10},link:{fontSize:14,color:colors.accent,fontWeight:'600'},row:{flexDirection:'row',alignItems:'center',gap:10},sectionRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},product:{backgroundColor:'white',borderRadius:12,padding:10,flexDirection:'row',alignItems:'center',gap:10},photo:{width:60,height:64,borderRadius:8},placeholder:{alignItems:'center',justifyContent:'center',backgroundColor:colors.accentSoft},productName:{fontSize:15,fontWeight:'600',color:colors.text},detail:{fontSize:13,lineHeight:19,color:colors.textMuted,marginTop:3},add:{width:44,height:44,borderRadius:22,backgroundColor:colors.accent,alignItems:'center',justifyContent:'center'},input:{borderWidth:1,borderColor:colors.traitControle,borderRadius:12,minHeight:48,padding:12,backgroundColor:'white',color:colors.text,fontSize:16},notice:{backgroundColor:colors.accentSoft,padding:14,borderRadius:12},error:{color:colors.danger,fontSize:14,lineHeight:20},footer:{padding:16,gap:8,backgroundColor:'white',borderTopWidth:1,borderTopColor:colors.border},counter:{flexDirection:'row',alignItems:'center',backgroundColor:colors.bg,borderRadius:10},num:{minWidth:25,textAlign:'center',fontSize:16,color:colors.text,fontVariant:['tabular-nums']}
 });
+
+/**
+ * Garde le champ en cours de saisie au-dessus du clavier : la liste gagne,
+ * sous son contenu, la hauteur du clavier, puis défile jusqu'au champ.
+ * À brancher sur la ScrollView (ref, onScroll) et sur son padding bas.
+ */
+export function useChampVisible() {
+ const ref = useRef<ScrollView>(null), decalage = useRef(0), [espace, setEspace] = useState(0);
+ useEffect(() => {
+  const ios = Platform.OS === 'ios';
+  const montre = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', e => {
+   const haut = e.endCoordinates.screenY;
+   setEspace(e.endCoordinates.height);
+   // Le temps que l'espace s'ajoute sous la liste avant de défiler.
+   setTimeout(() => {
+    const champ = TextInput.State.currentlyFocusedInput?.() as unknown as View | null;
+    champ?.measureInWindow?.((_x, y, _l, h) => { const bas = y + h + 24; if (bas > haut) ref.current?.scrollTo({ y: decalage.current + bas - haut, animated: true }); });
+   }, 120);
+  });
+  const cache = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setEspace(0));
+  return () => { montre.remove(); cache.remove(); };
+ }, []);
+ const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => { decalage.current = e.nativeEvent.contentOffset.y; }, []);
+ return { ref, espace, onScroll };
+}

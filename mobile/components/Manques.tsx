@@ -9,7 +9,7 @@ import type { Product } from '../stores/products';
 import { Feather } from '@expo/vector-icons';
 import { manquesDuBrouillon, manqueActif, manquesAPreciser, type Manque } from '../lib/session-courses';
 import { colors } from '../lib/theme';
-import { Action, Head, Photo, Raison, ui, useAnnulation } from './MaisonUI';
+import { Action, Head, Photo, Raison, ui, useAnnulation, useChampVisible } from './MaisonUI';
 import { revenirAuBilan } from './SessionProgress';
 export const sources:Record<string,string>={widget:'Widget',siri:'Siri',manuel:'Noté',precedent:'Ajout précédent'};
 /**
@@ -45,9 +45,9 @@ export function ManqueRow({lineKey,manque,products,aPreciser,onRetrait}:{lineKey
 export function Manques({session=false}:{session?:boolean}) {
  const {w,p,r,loading,erreur}=useMaison();
  const entries=Object.entries(manquesDuBrouillon(w)).filter(([key])=>manqueActif(w,key));
- const annulation=useAnnulation();
+ const annulation=useAnnulation(),champ=useChampVisible();
  const pending=manquesAPreciser(w,p.produits.map(x=>x.id)),aPreciser=new Set(pending.map(([key])=>key)),prets=entries.length-pending.length;
- return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}>
+ return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView ref={champ.ref} onScroll={champ.onScroll} scrollEventThrottle={16} keyboardShouldPersistTaps="handled" contentContainerStyle={[ui.content,{paddingBottom:28+champ.espace}]}>
  <Head title="Mes manques" back={!session} avatar={!session}/>{!session&&<Text style={ui.subtitle}>Les produits notés au fil des jours avec le widget, Siri ou dans l’app.</Text>}
  {loading&&<ActivityIndicator/>}{erreur&&<><Text style={ui.error}>{erreur}</Text><Action secondary onPress={()=>{p.recharger();r.recharger();}}>Réessayer</Action></>}{w.sauvegardeErreur&&<Text style={ui.error}>{w.sauvegardeErreur}</Text>}
  {!loading&&entries.map(([key,m])=><ManqueRow key={key} lineKey={key} manque={m} products={p.produits} aPreciser={aPreciser.has(key)} onRetrait={annulation.proposer}/>)}
