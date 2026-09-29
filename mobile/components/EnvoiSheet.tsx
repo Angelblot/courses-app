@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View, findNodeHandle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -25,6 +25,14 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
  useEffect(() => { if (visible) setTotal(acheter.length); }, [visible]);
  const [envoi, setEnvoi] = useState(false), [erreur, setErreur] = useState<string | null>(null), [aide, setAide] = useState(false), verrou = useRef(false);
  useEffect(() => { if (visible) setErreur(null); }, [visible]);
+ // Après un échec, le focus va au message, dans la feuille : sinon il
+ // retombe hors de la feuille quand le bouton redevient actif.
+ const refErreur = useRef<View>(null);
+ useEffect(() => {
+  if (!erreur || !refErreur.current) return;
+  if (Platform.OS === 'web') (refErreur.current as unknown as { focus?: () => void }).focus?.();
+  else { const n = findNodeHandle(refErreur.current); if (n) AccessibilityInfo.setAccessibilityFocus(n); AccessibilityInfo.announceForAccessibility(erreur); }
+ }, [erreur]);
  // Pendant l'envoi, la feuille reste ouverte : on saura s'il est parti.
  const fermer = () => { if (!verrou.current) onFermer(); };
  async function envoyer() {
@@ -73,7 +81,7 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
       <Text style={ui.link}>{aide ? 'Masquer' : 'Comment ?'}</Text>
      </Pressable>
      {aide && <Text style={[ui.detail, { marginTop: 0, paddingHorizontal: 4 }]}>Ouvre Chrome et connecte l’extension Courses au même compte que sur ton iPhone. Après l’envoi, clique sur « Remplir le panier » dans l’extension. Tu vérifies puis paies sur le site du drive.</Text>}
-     {!!erreur && <Text accessibilityLiveRegion="polite" style={ui.error}>{erreur}</Text>}
+     {!!erreur && <View ref={refErreur} tabIndex={-1} accessible accessibilityLabel={erreur}><Text accessibilityLiveRegion="polite" style={ui.error}>{erreur}</Text></View>}
      {envoi && <ActivityIndicator color={colors.accent} accessibilityLabel="Envoi en cours" />}
      <Action disabled={envoi || !w.drives.length} onPress={envoyer}>{envoi ? 'Envoi en cours…' : 'Envoyer'}</Action>
      {!w.drives.length && <Raison>Coche au moins un drive.</Raison>}

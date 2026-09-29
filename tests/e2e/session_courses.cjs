@@ -93,6 +93,7 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  // et l'identifiant survit à la fermeture de la feuille.
  const t0=Date.now();await btn('Envoyer').click();
  await texte('Pas de réseau pour le moment. Réessaie : la liste ne partira pas deux fois.').waitFor();if(Date.now()-t0>5500)throw Error('Offline message too slow: '+(Date.now()-t0));
+ await page.waitForTimeout(200);if(!await page.evaluate(()=>!!document.activeElement?.closest('[role=dialog]')))throw Error('Focus left the send sheet after an error');
  await page.getByRole('dialog',{name:'Où fait-on les courses ?'}).getByRole('button',{name:'Fermer',exact:true}).click();await page.waitForTimeout(500);
  horsLigne=false;await btn('Envoyer au drive').last().click();await page.waitForTimeout(700);
  // Coupure vérifiée : rien n'est parti, le message le dit ; le nouvel essai part.
