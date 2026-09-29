@@ -15,7 +15,7 @@ await btn('Augmenter la quantité de Pain du boulanger').click();
 await btn('Noter « Pain du boulanger »').click();
 await btn('Retirer Pain du boulanger').waitFor();
 await page.goto('http://localhost:8082/wizard/recettes');
-await btn('+ Choisir').click();
+await page.getByRole('checkbox',{name:'Choisir Poulet rôti aux légumes',exact:true}).click();
 await page.getByRole('button',{name:'Plus de portions pour Poulet rôti aux légumes'}).click({clickCount:3});
 await page.screenshot({path:'/tmp/tablee-recettes.png'});
 await btn('Voir le bilan').click();

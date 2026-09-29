@@ -19,8 +19,10 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  // Étape 1 sur 2 : les repas ; la photo ouvre un aperçu sans quitter la session.
  await btn('Préparer mes courses').click();await texte('Étape 1 sur 2 · Repas').waitFor();
  if(await page.getByRole('tab',{name:/Réglages/}).count()||await btn('Réglages').count())throw Error('Tab bar or avatar visible in session');
- await btn('Voir la recette Poulet rôti aux légumes').click();await btn('Choisir ce repas').click();await btn('Retirer de mes repas').waitFor();
- await btn('1 repas choisi, les revoir').waitFor();await shot('1-repas');
+ await btn('Voir la recette Poulet rôti aux légumes').click();await btn('Choisir ce repas').click();
+ // La carte choisie est marquée : case cochée, et plus d'onglet « Mes repas ».
+ const carte=page.getByRole('checkbox',{name:'Choisir Poulet rôti aux légumes',exact:true});await carte.waitFor();if(!await carte.isChecked())throw Error('Chosen recipe not checked');if(await page.getByRole('tab',{name:/Mes repas/}).count())throw Error('Mes repas tab still shown');
+ await btn('1 repas choisi, ne voir qu’eux').click();await texte('1 repas choisi').waitFor();await btn('Tout voir').click();await shot('1-repas');
  await btn('Voir le bilan').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Étape 2 sur 2 : le bilan, avec ses corrections ; rien ne bloque sauf les vrais problèmes.
  await btn('Manques : 3 notés · « lessive » : l’extension cherchera ce nom. Préciser').waitFor();await btn('Habitudes : Pas encore revues · 2 produits. Revoir').waitFor();
