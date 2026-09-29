@@ -11,7 +11,7 @@ import { manquesDuBrouillon, manqueActif, manquesAPreciser, type Manque } from '
 import { colors } from '../lib/theme';
 import { Action, Head, Photo, Raison, ui, useAnnulation } from './MaisonUI';
 import { revenirAuBilan } from './SessionProgress';
-const sources={widget:'Widget',siri:'Siri',manuel:'Noté dans l’app',precedent:'Ajout précédent'};
+const sources={widget:'Widget',siri:'Siri',manuel:'Noté',precedent:'Ajout précédent'};
 /**
  * Un manque. Prêt d'office s'il désigne un produit du catalogue : on le
  * touche seulement pour changer la quantité ou le format. Un libellé libre
@@ -25,12 +25,12 @@ export function ManqueRow({lineKey,manque,products,aPreciser,onRetrait}:{lineKey
  // Un produit prêt garde sa nouvelle quantité tout de suite ; un manque à
  // préciser attend « Garder », puisqu'on peut encore changer de produit.
  const changerQty=(n:number)=>{setQty(n);if(!aPreciser&&chosen===id)w.validerManque(lineKey,n,chosen);};
- const ouvert=aPreciser||edit,format=selected?[selected.brand,selected.volume_ml?`${selected.volume_ml} ml`:selected.grammage_g?`${selected.grammage_g} g`:selected.unit].filter(Boolean).join(' · '):'Noté à la main';
+ const ouvert=aPreciser||edit,format=selected?[selected.brand,selected.volume_ml?`${selected.volume_ml} ml`:selected.grammage_g?`${selected.grammage_g} g`:selected.unit].filter(Boolean).join(' · '):'';
  const quantite=id?w.quotidienQty[id]??1:extra?.quantity??1;
  return <View style={[m.carte,aPreciser&&m.aPreciser]}>
  <Pressable accessibilityRole="button" accessibilityLabel={aPreciser?`${name}, à préciser`:`${name}, ${quantite} article${quantite>1?'s':''}, prêt. Modifier`} accessibilityState={{expanded:ouvert}} disabled={aPreciser} onPress={()=>setEdit(!edit)} style={ui.row}>
   <Photo name={name} url={selected?.image_url}/>
-  <View style={{flex:1}}><Text style={ui.productName}>{name}</Text><Text style={ui.detail}>{sources[manque.source]} · {format}</Text>{aPreciser&&<Text style={m.drapeau}>À préciser</Text>}</View>
+  <View style={{flex:1}}><Text style={ui.productName}>{name}</Text><Text style={ui.detail}>{[sources[manque.source],format].filter(Boolean).join(' · ')}</Text>{aPreciser&&<Text style={m.drapeau}>À préciser</Text>}</View>
   {!aPreciser&&<View style={ui.row}><Text style={ui.num}>× {quantite}</Text><View style={m.pret}><Feather name={edit?'chevron-up':'check'} size={16} color={colors.accent}/></View></View>}
  </Pressable>
  {ouvert&&<><View style={ui.sectionRow}><Text style={ui.detail}>Nombre d’articles</Text><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel={`Diminuer ${name}`} style={ui.iconButton} onPress={()=>changerQty(Math.max(1,qty-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{qty}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Augmenter ${name}`} style={ui.iconButton} onPress={()=>changerQty(Math.min(99,qty+1))}><Text style={ui.title}>+</Text></Pressable></View></View>

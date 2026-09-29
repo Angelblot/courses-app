@@ -279,7 +279,7 @@ export function buildConsolidatedItems({
   });
 
   (extras ?? []).forEach((e) => {
-    push(e, { type: 'extra', label: 'Ajout manuel', qty: e.quantity });
+    push(e, { type: 'extra', label: 'Noté', qty: e.quantity });
   });
 
   // Tri par nom seulement : c'est `groupByRayon` qui impose l'ordre du magasin.

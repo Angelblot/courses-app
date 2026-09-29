@@ -22,7 +22,7 @@ await btn('Voir le bilan').click();
 // Au bilan, le pain noté à la main se précise depuis la ligne Manques (feuille).
 await page.getByRole('button',{name:/^Manques :.*Préciser$/}).last().click();
 await btn('Garder 2 × Pain du boulanger').click();
-await page.getByText('À vérifier avant l’envoi',{exact:true}).waitFor({state:'detached'});
+await page.getByText('Préciser « Pain du boulanger »',{exact:true}).waitFor({state:'detached'});
 // Plus rien à préciser : la ligne ouvre l'écran Manques, où l'on ajuste les œufs.
 await page.getByRole('button',{name:/^Manques :/}).last().click();
 await btn('Œufs Plein Air, 1 article, prêt. Modifier').click();

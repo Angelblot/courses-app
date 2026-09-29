@@ -38,11 +38,11 @@ export default function Liste({session=false}:{session?:boolean}){
  const bouton=<Action disabled={vide||loading||!!erreur} onPress={()=>setEnvoi(true)}>Envoyer au drive</Action>;
  const pied=<>{session?<PiedAvecRetour vers="recettes">{bouton}</PiedAvecRetour>:bouton}{vide&&!loading&&!erreur&&<Raison>Ta liste est vide.</Raison>}</>;
  const entete=session?loading&&vide?<View style={[b.hero,{minHeight:68}]} accessible accessibilityLabel="Préparation de ta liste"><ActivityIndicator color={colors.accent}/><Text style={ui.detail}>Préparation de ta liste…</Text></View>:<>
-  <View style={b.hero} accessible accessibilityRole="header" accessibilityLabel={`${pluriel(acheter.length,'article')} ${acheter.length>1?'prêts':'prêt'}. ${sousTitre}`}><Text style={b.nombre}>{acheter.length}</Text><View style={{flex:1}}><Text style={b.pret}>{acheter.length>1?'articles':'article'} {acheter.length>1?'prêts':'prêt'}</Text><Text style={ui.detail}>{sousTitre}</Text></View></View>
+  <View style={b.hero} accessible accessibilityRole="header" accessibilityLabel={`${pluriel(acheter.length,'produit')} ${acheter.length>1?'prêts':'prêt'}. ${sousTitre}`}><Text style={b.nombre}>{acheter.length}</Text><View style={{flex:1}}><Text style={b.pret}>{acheter.length>1?'produits':'produit'} {acheter.length>1?'prêts':'prêt'}</Text><Text style={ui.detail}>{sousTitre}</Text></View></View>
   {vignettes.length>0&&<View style={[ui.row,{gap:0,paddingLeft:6}]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>{vignettes.map((l,i)=><Photo key={l.key} name={l.name} url={p.produits.find(x=>x.id===l.product_id)?.image_url} style={[b.vignette,i>0&&{marginLeft:-10}]}/>)}</View>}
   <Corrections points={points} doublons={doublons.length} aPreciser={manques.map(([,m])=>m.name)} onVerifier={()=>setRegler(true)}/>
   {!large&&<Pressable accessibilityRole="button" accessibilityLabel={detail?'Masquer la liste':'Voir et ajuster la liste'} accessibilityHint="Par rayon, quantités, déjà chez moi" accessibilityState={{expanded:detail}} onPress={()=>setDetail(!detail)} style={({pressed})=>[ui.product,{minHeight:60,paddingLeft:16},pressed&&{opacity:.85}]}><View style={{flex:1}}><Text style={ui.productName}>{detail?'Masquer la liste':'Voir et ajuster la liste'}</Text><Text style={[ui.detail,{marginTop:2}]}>Par rayon, quantités, déjà chez moi</Text></View><Feather name={detail?'chevron-up':'chevron-down'} size={20} color={colors.textMuted}/></Pressable>}
- </>:<><Head title="Ma liste" back/><Text style={ui.subtitle}>{pluriel(acheter.length,'article')} à acheter</Text></>;
+ </>:<><Head title="Ma liste" back/><Text style={ui.subtitle}>{pluriel(acheter.length,'produit')} à acheter</Text></>;
  const statut=<>
  {loading&&<ActivityIndicator color={colors.accent}/>}{erreur&&<><Text style={ui.error}>{erreur}</Text><Action secondary onPress={()=>{p.recharger();r.recharger();}}>Réessayer</Action></>}
  {w.sauvegardeErreur&&<Text style={ui.error}>{w.sauvegardeErreur}</Text>}
@@ -118,9 +118,9 @@ function Corrections({points,doublons,aPreciser,onVerifier}:{points:number;doubl
  return <View style={{gap:8}}>
   {!repas&&<LigneCorrection etat="rappel" titre="Repas" detail="Aucun repas choisi cette fois" action="Choisir" onPress={()=>router.dismissTo('/wizard/recettes')}/>}
   {/* Ce qui peut être précisé passe par la ligne Manques, qui ouvre la feuille ; rien ne bloque l'envoi. */}
-  {points?<LigneCorrection etat="attention" titre="Manques" detail={[`${pl(prets,'prêt')}`,aPreciser.length===1?`« ${aPreciser[0]} » à préciser si tu veux`:aPreciser.length?`${aPreciser.length} à préciser si tu veux`:'',doublons?`${doublons} doublon${doublons>1?'s':''} possible${doublons>1?'s':''}`:''].filter(Boolean).join(' · ')} action="Préciser" onPress={onVerifier}/>
+  {points?<LigneCorrection etat="attention" titre="Manques" detail={[`${pl(prets,'prêt')}`,aPreciser.length===1?`« ${aPreciser[0]} » : l’extension cherchera ce nom`:aPreciser.length?`${aPreciser.length} produits cherchés par leur nom`:'',doublons?`${doublons} doublon${doublons>1?'s':''} possible${doublons>1?'s':''}`:''].filter(Boolean).join(' · ')} action="Préciser" onPress={onVerifier}/>
   :<LigneCorrection etat={manques.length?'ok':'ajout'} titre="Manques" detail={manques.length?pl(prets,'prêt'):'Rien de noté'} onPress={()=>ouvrir('manques')}/>}
-  {favoris.length>0&&(vus.length?<LigneCorrection etat="ok" titre="Habitudes" detail={`${pl(retenues,'retenue')} sur ${favoris.length}`} onPress={()=>ouvrir('habitudes')}/>:<LigneCorrection etat="rappel" titre="Habitudes" detail={`Pas encore passées · ${pl(favoris.length,'produit')}`} action="Passer" onPress={()=>ouvrir('habitudes')}/>)}
+  {favoris.length>0&&(vus.length?<LigneCorrection etat="ok" titre="Habitudes" detail={`${pl(retenues,'retenue')} sur ${favoris.length}`} onPress={()=>ouvrir('habitudes')}/>:<LigneCorrection etat="rappel" titre="Habitudes" detail={`Pas encore revues · ${pl(favoris.length,'produit')}`} action="Revoir" onPress={()=>ouvrir('habitudes')}/>)}
   <LigneCorrection etat="ajout" titre="Extras" detail={extras?pl(extras,'ajouté'):'Un produit hors habitudes'} onPress={()=>ouvrir('exceptions')}/>
  </View>;
 }

@@ -19,7 +19,7 @@ const DRIVES = [{ cle: 'carrefour', nom: 'Carrefour', site: 'carrefour.fr' }, { 
 export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: () => void }) {
  const insets = useSafeAreaInsets(), { w, acheter } = useMaison();
  // Le nombre affiché est figé à l'ouverture : l'envoi vide la liste pendant que
- // la feuille se referme, et elle afficherait « 0 article ».
+ // la feuille se referme, et elle afficherait « 0 produit ».
  const [total, setTotal] = useState(acheter.length);
  useEffect(() => { if (visible) setTotal(acheter.length); }, [visible]);
  const [envoi, setEnvoi] = useState(false), [erreur, setErreur] = useState<string | null>(null), [aide, setAide] = useState(false), verrou = useRef(false);
@@ -42,7 +42,7 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
    <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={onFermer} />
    <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="Où fait-on les courses ?" onAccessibilityEscape={onFermer}>
     <View style={s.entete}><Text style={[s.titre, { flex: 1, marginBottom: 0 }]} accessibilityRole="header">Où fait-on les courses ?</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} hitSlop={6} style={s.fermer}><Feather name="x" size={22} color={colors.text} /></Pressable></View>
-    <Text style={[ui.detail, { marginTop: 0, marginBottom: 12, paddingHorizontal: 4 }]}>{total} article{total > 1 ? 's' : ''} à envoyer, dans un drive ou les deux.</Text>
+    <Text style={[ui.detail, { marginTop: 0, marginBottom: 12, paddingHorizontal: 4 }]}>{total} produit{total > 1 ? 's' : ''} à envoyer, dans un drive ou les deux.</Text>
     <View style={{ gap: 10 }}>
      {DRIVES.map(d => { const coche = w.drives.includes(d.cle); return <Pressable key={d.cle} accessibilityRole="checkbox" accessibilityState={{ checked: coche, disabled: envoi }} aria-checked={coche} accessibilityLabel={d.nom} disabled={envoi} onPress={() => w.basculerDrive(d.cle)} style={({ pressed }) => [s.drive, coche && s.driveCoche, pressed && { opacity: .85 }]}>
       <View style={s.icone}><Feather name="shopping-bag" size={18} color={colors.accent} /></View>

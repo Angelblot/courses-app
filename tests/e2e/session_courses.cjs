@@ -23,21 +23,21 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await btn('1 repas choisi, les revoir').waitFor();await shot('1-repas');
  await btn('Voir le bilan').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Étape 2 sur 2 : le bilan, avec ses corrections ; rien ne bloque sauf les vrais problèmes.
- await btn('Manques : 2 prêts · « lessive » à préciser si tu veux. Préciser').waitFor();await btn('Habitudes : Pas encore passées · 2 produits. Passer').waitFor();
+ await btn('Manques : 2 prêts · « lessive » : l’extension cherchera ce nom. Préciser').waitFor();await btn('Habitudes : Pas encore revues · 2 produits. Revoir').waitFor();
  await shot('2-bilan');
  // Le retour du pied ramène aux repas, « Voir le bilan » au bilan.
  await btn('Revenir à l’étape Repas').last().click();await texte('Étape 1 sur 2 · Repas').waitFor();await btn('Voir le bilan').last().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Correction Manques : produits du catalogue prêts, « lessive » à préciser plus tard.
  // B1 : la ligne Manques ouvre directement la feuille ; on peut la refermer sans rien trancher.
- await btn('Manques : 2 prêts · « lessive » à préciser si tu veux. Préciser').last().click();await page.getByRole('dialog',{name:'À vérifier avant l’envoi'}).waitFor();await page.waitForTimeout(700);await shot('3-verifier');
- await page.getByRole('dialog',{name:'À vérifier avant l’envoi'}).getByRole('button',{name:'Fermer',exact:true}).click();await page.waitForTimeout(500);
+ await btn('Manques : 2 prêts · « lessive » : l’extension cherchera ce nom. Préciser').last().click();await page.getByRole('dialog',{name:'Préciser « lessive »'}).waitFor();await page.waitForTimeout(700);await shot('3-verifier');
+ await page.getByRole('dialog',{name:'Préciser « lessive »'}).getByRole('button',{name:'Fermer',exact:true}).click();await page.waitForTimeout(500);
  // Pause : abandonner s'annule depuis l'accueil, puis on reprend au bilan.
  await btn('Faire une pause').last().click();await btn('Abandonner ces courses').click();
  await btn('Annuler : Courses abandonnées. Tes manques restent notés.').click();
  await btn('Reprendre mes courses').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  await btn('Faire une pause').last().click();await btn('Finir plus tard').click();await page.reload();await btn('Reprendre mes courses').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Correction Habitudes : liste à cocher par rayon, choix gardés d'un rayon à l'autre, rayon annulable.
- await btn('Habitudes : Pas encore passées · 2 produits. Passer').last().click();
+ await btn('Habitudes : Pas encore revues · 2 produits. Revoir').last().click();
  const oignons=page.getByRole('checkbox',{name:'Oignons jaunes'}).last();await oignons.waitFor();
  await oignons.click();if(!await oignons.isChecked())throw Error('Habit row not checked');
  await page.getByRole('tab',{name:'Produits laitiers'}).last().click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
@@ -65,14 +65,14 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await btn('Revenir au bilan').last().click();await btn('Extras : 1 ajouté').waitFor();
  // Noté à part : pas redemandé comme doublon. Il reste la lessive à préciser.
  // U2 : rien ne bloque l'envoi ; la lessive partirait telle quelle, et la ligne Manques propose de la préciser.
- const preciser=btn('Manques : 2 prêts · « lessive » à préciser si tu veux. Préciser');await preciser.waitFor();
+ const preciser=btn('Manques : 2 prêts · « lessive » : l’extension cherchera ce nom. Préciser');await preciser.waitFor();
  if(!await btn('Envoyer au drive').last().isEnabled())throw Error('Send blocked by a free-label item');
  await texte('dont 1 produit noté à la main, envoyé tel quel').waitFor();
  if(await page.getByText(/chose.? à vérifier/).count())throw Error('Banner still shown');
  await shot('6-bilan');
- await preciser.click();await texte('À vérifier avant l’envoi').waitFor();await page.waitForTimeout(700);await shot('6b-verifier');
- await btn('Garder 1 × lessive').click();await page.getByText('À vérifier avant l’envoi',{exact:true}).waitFor({state:'detached'});
- await texte('articles prêts').waitFor();if(!await btn('Envoyer au drive').last().isEnabled())throw Error('Send button disabled');
+ await preciser.click();await texte('Préciser « lessive »').waitFor();await page.waitForTimeout(700);await shot('6b-verifier');
+ await btn('Garder 1 × lessive').click();await page.getByText('Préciser « lessive »',{exact:true}).waitFor({state:'detached'});
+ await texte('produits prêts').waitFor();if(!await btn('Envoyer au drive').last().isEnabled())throw Error('Send button disabled');
  await shot('6c-bilan-pret');
  await btn('Voir et ajuster la liste').last().click();await texte('Fruits & légumes').waitFor();
  await page.setViewportSize({width:1024,height:1366});await page.waitForTimeout(600);await shot('6-bilan-tablette');
@@ -82,7 +82,7 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await btn('Envoyer au drive').last().click();await page.getByRole('dialog',{name:'Où fait-on les courses ?'}).waitFor();await page.waitForTimeout(700);await shot('7-envoi');
  if(!await page.getByRole('checkbox',{name:'Carrefour'}).isChecked()||await page.getByRole('checkbox',{name:'E.Leclerc'}).isChecked())throw Error('Drive checkbox state not exposed');
  if(await page.getByRole('checkbox',{name:/C’est fait/}).count())throw Error('First send still gated');
- await btn('Envoyer').click();await texte('C’est envoyé.').waitFor();await texte('Ton ordinateur prend la liste').waitFor();const aide=btn('Elle n’est pas installée ?');await aide.waitFor();if((await aide.boundingBox()).height<44)throw Error('Install help link under 44px');
+ await btn('Envoyer').click();await texte('Liste prête pour Carrefour.').waitFor();await texte('En attente de ton ordinateur').waitFor();const aide=btn('Elle n’est pas installée ?');await aide.waitFor();if((await aide.boundingBox()).height<44)throw Error('Install help link under 44px');
  await page.waitForTimeout(800);
  // La feuille d'envoi doit être refermée sur l'écran de clôture.
  if(await page.getByText('Où fait-on les courses ?',{exact:true}).isVisible().catch(()=>false))throw Error('Send sheet still open on closing screen');

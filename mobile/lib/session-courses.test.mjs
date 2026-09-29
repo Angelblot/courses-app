@@ -26,7 +26,7 @@ test('recette, widget et ajout au même nom ne créent qu’une ligne avec toute
  const e={...base,selectedRecipes:{r:2},quotidien:{[p.id]:'needed'},quotidienQty:{[p.id]:2},manques:{[`produit:${p.id}`]:{name:p.name,source:'widget'}},extras:[{id:'x',name:'  Pommes de terre ',quantity:1,unit:'unité',rayon:'fruits_legumes'}]};
  const recettes=[{id:'r',name:'Gratin',ingredients:[{name:p.name,product_id:p.id,unit:'g',quantity_per_serving:300,rayon:'fruits_legumes'}]}];
  const lines=listeMaison(e,recettes,[p]);assert.equal(lines.length,1);assert.equal(lines[0].totalQuantity,2);
- assert.deepEqual(lines[0].sources.map(s=>s.label),['Gratin','Widget','Ajout manuel']);
+ assert.deepEqual(lines[0].sources.map(s=>s.label),['Gratin','Widget','Noté']);
 });
 test('les formats différents restent distincts et les doublons possibles nécessitent une décision',()=>{
  const e={...base,quotidien:{[p.id]:'needed'},extras:[{id:'x',name:'Pommes de terre bio',quantity:500,unit:'g',rayon:'fruits_legumes'}]};

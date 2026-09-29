@@ -13,19 +13,21 @@ import { colors } from '../lib/theme';
 type Doublon = { id: string; a: LigneMaison; b: LigneMaison };
 
 /**
- * « À vérifier avant l’envoi » : les manques à préciser et les doublons
+ * « Préciser … » : les manques notés à la main et les doublons
  * possibles, réglés sans quitter le bilan. Le bilan ferme la feuille
  * dès qu'il ne reste plus rien.
  */
 export function ReglerSheet({ visible, onFermer, manques, doublons, products, onRetrait, toast }: { visible: boolean; onFermer: () => void; manques: [string, Manque][]; doublons: Doublon[]; products: Product[]; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode }) {
  const insets = useSafeAreaInsets(), { height } = useWindowDimensions(), w = useWizard();
+ const nb = manques.length + doublons.length;
+ const titre = manques.length === 1 && !doublons.length ? `Préciser « ${manques[0][1].name} »` : `Préciser ${nb} produit${nb > 1 ? 's' : ''}`;
  const retirer = (l: LigneMaison) => { const avant = w.ligneQuantites[l.key]; w.modifierLigne(l.key, 0); onRetrait(`${l.name} retiré de ta liste`, () => w.restaurerLigne(l.key, avant)); };
  const lien = (label: string, onPress: () => void) => <Pressable key={label} accessibilityRole="button" onPress={onPress} hitSlop={6} style={s.lien}><Text style={ui.link}>{label}</Text></Pressable>;
- return <Modal {...nomDialogue('À vérifier avant l’envoi')} visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
+ return <Modal {...nomDialogue(titre)} visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
   <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.fond}>
    <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={onFermer} />
-   <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="À vérifier avant l’envoi" onAccessibilityEscape={onFermer}>
-    <View style={s.entete}><Text style={[s.titre, { flex: 1, marginBottom: 0 }]} accessibilityRole="header">À vérifier avant l’envoi</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} hitSlop={6} style={s.fermer}><Feather name="x" size={22} color={colors.text} /></Pressable></View>
+   <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel={titre} onAccessibilityEscape={onFermer}>
+    <View style={s.entete}><Text style={[s.titre, { flex: 1, marginBottom: 0 }]} accessibilityRole="header">{titre}</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} hitSlop={6} style={s.fermer}><Feather name="x" size={22} color={colors.text} /></Pressable></View>
     <ScrollView style={{ maxHeight: height * 0.72 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 12, paddingBottom: 8 }}>
      {manques.map(([key, m]) => <ManqueRow key={key} lineKey={key} manque={m} products={products} aPreciser onRetrait={onRetrait} />)}
      {doublons.map(d => <View key={d.id} style={s.doublon}>
