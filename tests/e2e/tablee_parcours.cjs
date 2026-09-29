@@ -18,14 +18,15 @@ await page.goto('http://localhost:8082/wizard/recettes');
 await btn('+ Choisir').click();
 await page.getByRole('button',{name:'Plus de portions pour Poulet rôti aux légumes'}).click({clickCount:3});
 await page.screenshot({path:'/tmp/tablee-recettes.png'});
-await btn('Voir ma liste').click();
-// Au bilan, les manques s'ouvrent comme une correction.
+await btn('Voir le bilan').click();
+// Au bilan, le pain noté à la main se précise depuis la ligne Manques (feuille).
+await page.getByRole('button',{name:/^Manques :.*Préciser$/}).last().click();
+await btn('Garder 2 × Pain du boulanger').click();
+await page.getByText('À vérifier avant l’envoi',{exact:true}).waitFor({state:'detached'});
+// Plus rien à préciser : la ligne ouvre l'écran Manques, où l'on ajuste les œufs.
 await page.getByRole('button',{name:/^Manques :/}).last().click();
-// Les œufs du catalogue sont prêts : on ouvre la ligne seulement pour changer la quantité.
 await btn('Œufs Plein Air, 1 article, prêt. Modifier').click();
 await btn('Augmenter Œufs Plein Air').click();await btn('Enregistrer').click();
-// Le pain noté à la main demande un geste avant le drive.
-await btn('Garder 2 × Pain du boulanger').click();
 await btn('Revenir au bilan').last().click();
 // Habitudes : on coche les oignons, le reste du rayon est « déjà chez moi ».
 await page.getByRole('button',{name:/^Habitudes :/}).last().click();

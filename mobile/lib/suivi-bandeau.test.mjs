@@ -56,7 +56,7 @@ const ilYA = (h) => new Date(MAINTENANT - h * HEURE).toISOString();
 
 test("un travail en attente depuis deux jours n'est plus annoncé", () => {
   // Constaté le 24/08 : un travail « pending » vieux de deux jours affichait
-  // « Ta liste attend sur ton Mac » indéfiniment, alors que l'extension ne
+  // « Ta liste attend sur ton ordinateur » indéfiniment, alors que l'extension ne
   // l'avait jamais ouvert. Le bandeau disait vrai et n'informait plus.
   const vieux = { id: 'a', status: 'pending', created_at: ilYA(51) };
   assert.equal(doitAfficher(vieux, null, MAINTENANT), false);

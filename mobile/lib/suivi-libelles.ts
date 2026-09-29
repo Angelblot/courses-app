@@ -1,7 +1,7 @@
 /** Textes de l'écran de suivi. Aucun code technique ne doit atteindre l'écran. */
 
 const ETATS: Record<string, string> = {
-  pending: 'En attente de ton Mac',
+  pending: 'En attente de ton ordinateur',
   claimed: 'Prise en charge',
   running: 'Remplissage en cours',
   needs_action: 'Ton intervention est nécessaire',
@@ -39,10 +39,10 @@ export function resume(travail: {
     return `${p.fait} sur ${p.total} chez ${libelleDrive(p.drive)}`;
   }
   if (travail.status === 'needs_action') {
-    return travail.error ?? "Ouvre l'extension sur ton Mac pour reprendre.";
+    return travail.error ?? "Ouvre l'extension sur ton ordinateur pour reprendre.";
   }
   if (travail.status === 'pending') {
-    return "Ouvre l'extension sur ton Mac : elle attend ton feu vert.";
+    return "Ouvre l'extension sur ton ordinateur : elle attend ton feu vert.";
   }
   if (travail.status === 'failed') return travail.error ?? "Réessaie depuis l'extension.";
   return libelleEtat(travail.status);

@@ -60,7 +60,7 @@ export function BandeauSuivi() {
     : statut === 'failed'
       ? 'Le remplissage a échoué'
       : enAttente
-        ? 'Ta liste attend sur ton Mac'
+        ? 'Ta liste attend sur ton ordinateur'
         : resume(travail);
 
   const p = travail.progress ?? {};

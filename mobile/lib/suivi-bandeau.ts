@@ -20,7 +20,7 @@ const ETATS_AVANT_DEPART = ['pending', 'claimed'] as const;
  * Douze heures couvrent le parcours normal — composer sa liste le soir, ouvrir
  * le Mac le lendemain matin — sans laisser traîner un bandeau pendant des
  * jours. Constaté le 24/08 : un travail vieux de deux jours annonçait encore
- * « Ta liste attend sur ton Mac ».
+ * « Ta liste attend sur ton ordinateur ».
  */
 const HEURES_AVANT_OUBLI = 12;
 

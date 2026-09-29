@@ -35,7 +35,7 @@ function ChoixRepas({session=false}:{session?:boolean}){
  <View style={ui.sectionRow}><Text style={ui.detail}>Compléter ma collection</Text><Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>router.push('/recettes/nouvelle')}><Text style={ui.link}>Créer</Text></Pressable><Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>router.push('/recettes/importer')}><Text style={ui.link}>Importer</Text></Pressable></View>
  </ScrollView><View style={[ui.footer,ui.row,{gap:8}]}>
  {choisis.length>0&&<Pressable accessibilityRole="button" accessibilityLabel={`${choisis.length} repas choisi${choisis.length>1?'s':''}, les revoir`} onPress={()=>setTab('menu')} style={({pressed})=>[f.pastille,pressed&&{opacity:.7}]}><View style={ui.row}>{choisis.slice(0,2).map((rec,i)=><Photo key={rec.id} recipe name={rec.name} url={rec.image_url} style={[f.vignette,i>0&&{marginLeft:-18}]}/>)}</View><Text style={ui.link}>{choisis.length} repas</Text></Pressable>}
- <View style={{flex:1}}><Action onPress={()=>router.push(session?'/wizard/recap':'/wizard/recettes')}>{session?'Voir ma liste':'Préparer mes courses'}</Action></View></View>
+ <View style={{flex:1}}><Action onPress={()=>router.push(session?'/wizard/recap':'/wizard/recettes')}>{session?'Voir le bilan':'Préparer mes courses'}</Action></View></View>
  <ApercuRecette recette={apercu} parts={apercu?w.selectedRecipes[apercu.id]:undefined} onFermer={()=>setApercu(null)} onBasculer={()=>apercu&&w.toggleRecette(apercu.id,apercu.servings_default)}/></SafeAreaView>
 }
 

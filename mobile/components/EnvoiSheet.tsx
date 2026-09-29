@@ -12,7 +12,7 @@ import { colors } from '../lib/theme';
 const DRIVES = [{ cle: 'carrefour', nom: 'Carrefour', site: 'carrefour.fr' }, { cle: 'leclerc', nom: 'E.Leclerc', site: 'leclercdrive.fr' }];
 
 /**
- * Dernier geste de la session, ouvert par « Choisir mon drive » au bilan :
+ * Dernier geste de la session, ouvert par « Envoyer au drive » au bilan :
  * on coche un ou deux drives et on envoie la liste à l'ordinateur, qui
  * remplit le panier. Le bilan a déjà vérifié que la liste est prête.
  */
@@ -57,7 +57,7 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
      {aide && <Text style={[ui.detail, { marginTop: 0, paddingHorizontal: 4 }]}>Ouvre Chrome et connecte l’extension Courses au même compte que sur ton iPhone. Après l’envoi, clique sur « Remplir le panier » dans l’extension. Tu vérifies puis paies sur le site du drive.</Text>}
      {!!erreur && <Text accessibilityLiveRegion="polite" style={ui.error}>{erreur}</Text>}
      {envoi && <ActivityIndicator color={colors.accent} />}
-     <Action disabled={envoi || !w.drives.length} onPress={envoyer}>{envoi ? 'Envoi en cours…' : 'Envoyer à mon ordinateur'}</Action>
+     <Action disabled={envoi || !w.drives.length} onPress={envoyer}>{envoi ? 'Envoi en cours…' : 'Envoyer'}</Action>
      {!w.drives.length && <Raison>Coche au moins un drive.</Raison>}
     </View>
    </View>
