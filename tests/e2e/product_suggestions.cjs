@@ -20,5 +20,9 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await page.setViewportSize({width:1024,height:1366});await page.screenshot({path:'.impeccable/review/product-suggestions/tablet.png'});
  await page.getByRole('button',{name:/Ajouter × 1 : Oignons jaunes,/}).click();
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Horizontal page overflow');
+ // S1 : un nom tapé sans ligne proche se note en revenant, sans être perdu.
+ await page.setViewportSize({width:390,height:844});await page.getByRole('textbox',{name:'Produit manquant'}).last().fill('Café moulu');
+ await page.getByRole('button',{name:'Noter « Café moulu » et revenir',exact:true}).click();await page.waitForTimeout(600);
+ const apres=await page.evaluate(id=>JSON.parse(localStorage.getItem('tablee-maison-v1:'+id)),user.id);if(!apres.extras.some(x=>x.name==='Café moulu'))throw Error('Typed extra lost on return');
  if(errors.length)throw Error(errors.join('\n'));console.log('PASS photo selection, quantity preservation, replacement and quick add');
  }catch(e){console.error(e);process.exitCode=1}finally{await b.close()}})();
