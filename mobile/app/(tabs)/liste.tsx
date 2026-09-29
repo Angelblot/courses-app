@@ -111,6 +111,8 @@ function Corrections({points,doublons,aPreciser,onVerifier}:{points:number;doubl
  const pending=manquesAPreciser(w,p.produits.map(x=>x.id)).length,prets=manques.length-pending;
  const favoris=p.produits.filter(x=>x.favorite&&rayonDepuisLibelle(x.category)&&!manques.some(([k])=>k===`produit:${x.id}`));
  const vus=favoris.filter(x=>w.habitudesVues?.[x.id]),retenues=vus.filter(x=>w.quotidien[x.id]==='needed').length;
+ // Un rayon est revu quand tous ses produits l'ont été ; tant qu'il en reste, la ligne rappelle au lieu de valider.
+ const rayons=[...new Set(favoris.map(x=>rayonDepuisLibelle(x.category)))],revus=rayons.filter(r=>favoris.filter(x=>rayonDepuisLibelle(x.category)===r).every(x=>w.habitudesVues?.[x.id])).length;
  const extras=w.extras.filter(x=>!manques.some(([k])=>k===`extra:${x.id}`)&&w.ligneQuantites[`extra:${x.id}`]!==0).length;
  const repas=Object.keys(w.selectedRecipes).length;
  const ouvrir=(cle:string)=>router.push(`/wizard/${cle}`);
@@ -120,7 +122,9 @@ function Corrections({points,doublons,aPreciser,onVerifier}:{points:number;doubl
   {/* Ce qui peut être précisé passe par la ligne Manques, qui ouvre la feuille ; rien ne bloque l'envoi. */}
   {points?<LigneCorrection etat="attention" titre="Manques" detail={[`${pl(prets,'prêt')}`,aPreciser.length===1?`« ${aPreciser[0]} » : l’extension cherchera ce nom`:aPreciser.length?`${aPreciser.length} produits cherchés par leur nom`:'',doublons?`${doublons} doublon${doublons>1?'s':''} possible${doublons>1?'s':''}`:''].filter(Boolean).join(' · ')} action="Préciser" onPress={onVerifier}/>
   :<LigneCorrection etat={manques.length?'ok':'ajout'} titre="Manques" detail={manques.length?pl(prets,'prêt'):'Rien de noté'} onPress={()=>ouvrir('manques')}/>}
-  {favoris.length>0&&(vus.length?<LigneCorrection etat="ok" titre="Habitudes" detail={`${pl(retenues,'retenue')} sur ${favoris.length}`} onPress={()=>ouvrir('habitudes')}/>:<LigneCorrection etat="rappel" titre="Habitudes" detail={`Pas encore revues · ${pl(favoris.length,'produit')}`} action="Revoir" onPress={()=>ouvrir('habitudes')}/>)}
+  {favoris.length>0&&(!vus.length?<LigneCorrection etat="rappel" titre="Habitudes" detail={`Pas encore revues · ${pl(favoris.length,'produit')}`} action="Revoir" onPress={()=>ouvrir('habitudes')}/>
+   :revus<rayons.length?<LigneCorrection etat="rappel" titre="Habitudes" detail={`${revus} rayon${revus>1?'s':''} sur ${rayons.length} revu${revus>1?'s':''} · ${pl(retenues,'retenu')}`} action="Continuer" onPress={()=>ouvrir('habitudes')}/>
+   :<LigneCorrection etat="ok" titre="Habitudes" detail={`${pl(retenues,'retenu')} sur ${favoris.length}`} onPress={()=>ouvrir('habitudes')}/>)}
   <LigneCorrection etat="ajout" titre="Extras" detail={extras?pl(extras,'ajouté'):'Un produit hors habitudes'} onPress={()=>ouvrir('exceptions')}/>
  </View>;
 }

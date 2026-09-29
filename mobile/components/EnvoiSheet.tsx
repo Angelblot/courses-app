@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useMaison } from '../contexts/useMaison';
 import { construireItems } from '../lib/consolidation';
-import { envoyerListe } from '../lib/cart-jobs';
+import { envoiRecent, envoyerListe } from '../lib/cart-jobs';
 import { Action, Raison, ui, nomDialogue } from './MaisonUI';
 import { colors } from '../lib/theme';
 
@@ -26,15 +26,26 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
  async function envoyer() {
   if (verrou.current || !w.drives.length || !acheter.length) return;
   verrou.current = true; setEnvoi(true); setErreur(null);
+  // Horodatage pris un peu avant l'insertion, pour retrouver un envoi dont
+  // la réponse se serait perdue en route.
+  const depuis = new Date(Date.now() - 5000).toISOString();
+  const n = acheter.length, drives = w.drives.join(',');
+  const aboutir = (id: string) => {
+   const heure = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+   onFermer(); w.reinitialiser();
+   if (router.canDismiss()) router.dismissAll();
+   router.replace({ pathname: '/suivi/envoye', params: { id, n: String(n), drives, heure } });
+  };
   try {
-   const n = acheter.length, drives = w.drives.join(',');
    const res = await envoyerListe(construireItems(acheter), w.drives);
-   if (res.ok && res.id) {
-    onFermer(); w.reinitialiser();
-    if (router.canDismiss()) router.dismissAll();
-    router.replace({ pathname: '/suivi/envoye', params: { id: res.id, n: String(n), drives } });
-   } else setErreur(res.erreur ?? 'L’envoi n’a pas abouti. Réessaie.');
-  } catch { setErreur('Connexion interrompue. Vérifie le suivi avant de réessayer.'); }
+   if (res.ok && res.id) { aboutir(res.id); return; }
+   const deja = await envoiRecent(depuis);
+   if (deja) aboutir(deja); else setErreur(res.erreur ?? 'L’envoi n’a pas abouti. Réessaie.');
+  } catch {
+   // La connexion a coupé : si la liste est quand même partie, on ne la renvoie pas.
+   const deja = await envoiRecent(depuis).catch(() => null);
+   if (deja) aboutir(deja); else setErreur('Connexion interrompue, rien n’est parti. Réessaie quand le réseau revient.');
+  }
   finally { verrou.current = false; setEnvoi(false); }
  }
  return <Modal {...nomDialogue('Où fait-on les courses ?')} visible={visible} transparent animationType="slide" onRequestClose={onFermer}>

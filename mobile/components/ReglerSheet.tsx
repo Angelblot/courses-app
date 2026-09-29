@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWizard } from '../contexts/WizardContext';
@@ -20,7 +20,11 @@ type Doublon = { id: string; a: LigneMaison; b: LigneMaison };
 export function ReglerSheet({ visible, onFermer, manques, doublons, products, onRetrait, toast }: { visible: boolean; onFermer: () => void; manques: [string, Manque][]; doublons: Doublon[]; products: Product[]; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode }) {
  const insets = useSafeAreaInsets(), { height } = useWindowDimensions(), w = useWizard();
  const nb = manques.length + doublons.length;
- const titre = manques.length === 1 && !doublons.length ? `Préciser « ${manques[0][1].name} »` : `Préciser ${nb} produit${nb > 1 ? 's' : ''}`;
+ const titreCourant = manques.length === 1 && !doublons.length ? `Préciser « ${manques[0][1].name} »` : `Préciser ${nb} produit${nb > 1 ? 's' : ''}`;
+ // Figé tant qu'il reste quelque chose : pendant la fermeture, la feuille
+ // afficherait « Préciser 0 produit ».
+ const [titre, setTitre] = useState(titreCourant);
+ useEffect(() => { if (nb > 0) setTitre(titreCourant); }, [nb, titreCourant]);
  const retirer = (l: LigneMaison) => { const avant = w.ligneQuantites[l.key]; w.modifierLigne(l.key, 0); onRetrait(`${l.name} retiré de ta liste`, () => w.restaurerLigne(l.key, avant)); };
  const lien = (label: string, onPress: () => void) => <Pressable key={label} accessibilityRole="button" onPress={onPress} hitSlop={6} style={s.lien}><Text style={ui.link}>{label}</Text></Pressable>;
  return <Modal {...nomDialogue(titre)} visible={visible} transparent animationType="slide" onRequestClose={onFermer}>

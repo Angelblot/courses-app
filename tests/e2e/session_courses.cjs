@@ -5,8 +5,8 @@ const session={access_token:token,refresh_token:'demo',expires_in:36000,expires_
 const products=[{id:'beurre',name:'Beurre doux',ean13:'1234567890126',unit:'unité',brand:null,category:'pls',favorite:true,image_url:null,grammage_g:250,volume_ml:null,product_type:'beurre'},{id:'oeufs',name:'Œufs Plein Air',ean13:'1234567890123',unit:'unité',brand:'Plein air',category:'pls',favorite:true,image_url:null,grammage_g:null,volume_ml:null,product_type:'oeuf'},{id:'patates',name:'Pommes de terre',ean13:'1234567890124',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:1000,volume_ml:null,product_type:'pomme_de_terre'},{id:'oignons',name:'Oignons jaunes',ean13:'1234567890125',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:500,volume_ml:null,product_type:'oignon'}];
 const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,image_url:null,prep_minutes:15,cook_minutes:40,recipe_ingredients:[{id:'ing',name:'Pommes de terre',quantity_per_serving:300,unit:'g',rayon:'fruits_legumes',product_id:'patates'}]}];
 (async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{
- const page=await b.newPage({viewport:{width:390,height:844},serviceWorkers:'block'}),errors=[];page.on('pageerror',e=>errors.push(e.message));let sent;
- await page.route('https://qmymwicsgilhoihtfdjm.supabase.co/**',async route=>{const req=route.request(),url=req.url();let data=[];if(url.includes('/auth/v1/user'))data=user;else if(url.includes('/auth/v1/token'))data=session;else if(url.includes('/rest/v1/products'))data=products;else if(url.includes('/rest/v1/recipes'))data=recipes;else if(url.includes('/rest/v1/cart_jobs')&&req.method()==='POST'){sent=req.postDataJSON();data={id:'job-demo'};}await route.fulfill({json:data});});
+ const page=await b.newPage({viewport:{width:390,height:844},serviceWorkers:'block'}),errors=[];page.on('pageerror',e=>errors.push(e.message));let sent,perdu=false,envois=0;
+ await page.route('https://qmymwicsgilhoihtfdjm.supabase.co/**',async route=>{const req=route.request(),url=req.url();let data=[];if(url.includes('/auth/v1/user'))data=user;else if(url.includes('/auth/v1/token'))data=session;else if(url.includes('/rest/v1/products'))data=products;else if(url.includes('/rest/v1/recipes'))data=recipes;else if(url.includes('/rest/v1/cart_jobs')&&req.method()==='POST'){sent=req.postDataJSON();envois++;if(!perdu){perdu=true;return route.abort('failed');}data={id:'job-demo'};}else if(url.includes('/rest/v1/cart_jobs')&&url.includes('created_at')&&perdu)data=[{id:'job-demo'}];await route.fulfill({json:data});});
  await page.addInitScript(({session,id})=>{localStorage.setItem('sb-qmymwicsgilhoihtfdjm-auth-token',JSON.stringify(session));if(!localStorage.getItem('seeded-session')){localStorage.setItem('tablee-maison-v1:'+id,JSON.stringify({quotidien:{oeufs:'needed',patates:'needed'},quotidienQty:{oeufs:1,patates:2},extras:[{id:'siri-lessive',name:'lessive',quantity:1,unit:'unité',rayon:'autre'}],manques:{'produit:oeufs':{name:'Œufs Plein Air',source:'widget'},'produit:patates':{name:'Pommes de terre',source:'widget'},'extra:siri-lessive':{name:'lessive',source:'siri'}}}));localStorage.setItem('seeded-session','yes');}}, {session,id:user.id});
  const dir=process.env.CAPTURES||'.impeccable/review/session-courses';fs.mkdirSync(dir,{recursive:true});const shot=n=>page.screenshot({path:`${dir}/${n}.png`});
  const btn=(name)=>page.getByRole('button',{name,exact:true});
@@ -45,7 +45,7 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  // Quitter par « ‹ Bilan » sans valider ne perd pas non plus la coche.
  await btn('Revenir au bilan').first().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Cocher, c'est déjà ajouter à la liste : le bilan compte la coche sans « Rayon suivant ».
- await btn('Habitudes : 1 retenue sur 2').waitFor();
+ await btn('Habitudes : 1 rayon sur 2 revu · 1 retenu. Continuer').waitFor();
  await page.getByRole('button',{name:/^Habitudes :/}).last().click();await oignons.waitFor();if(!await oignons.isChecked())throw Error('Habit choice lost when leaving to the bilan');
  await shot('4-habitudes');
  await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
@@ -53,7 +53,7 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  // Annuler le rayon défait le classement du reste, pas la coche.
  if(!await oignons.isChecked())throw Error('Undo removed the checked habit');
  await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
- await btn('Revenir au bilan').last().click();await btn('Habitudes : 1 retenue sur 2').waitFor();
+ await btn('Revenir au bilan').last().click();await btn('Habitudes : 1 retenu sur 2').waitFor();
  // Correction Extras : une ligne proche existe ; on peut l'augmenter (annulable) ou noter à part.
  await btn('Extras : Un produit hors habitudes').last().click();
  const champ=page.getByRole('textbox',{name:'Produit manquant',exact:true}).last();await champ.fill('Pommes de terre bio');
@@ -87,6 +87,7 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  // La feuille d'envoi doit être refermée sur l'écran de clôture.
  if(await page.getByText('Où fait-on les courses ?',{exact:true}).isVisible().catch(()=>false))throw Error('Send sheet still open on closing screen');
  await shot('8-envoye');
- await page.waitForTimeout(300);if(!sent||sent.items.length!==5||sent.items.find(x=>x.product_id==='patates')?.quantity!==2)throw Error('Incorrect consolidated payload '+JSON.stringify(sent));
+ await page.waitForTimeout(300);if(envois!==1)throw Error('Send went out '+envois+' times');
+ if(!sent||sent.items.length!==5||sent.items.find(x=>x.product_id==='patates')?.quantity!==2)throw Error('Incorrect consolidated payload '+JSON.stringify(sent));
  if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true,items:sent.items.length,errors}));
  }catch(e){console.error(e);process.exitCode=1}finally{await b.close()}})();

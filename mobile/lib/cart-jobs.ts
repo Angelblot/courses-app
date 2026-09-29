@@ -28,3 +28,19 @@ export async function envoyerListe(
   }
   return { ok: true, id: data.id as string };
 }
+
+/**
+ * Un envoi déposé depuis `depuis` (horodatage ISO) existe-t-il déjà ? Après
+ * une coupure réseau, l'insertion a pu réussir sans que la réponse arrive :
+ * on vérifie avant de proposer de réessayer, pour ne pas envoyer deux fois.
+ */
+export async function envoiRecent(depuis: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('cart_jobs')
+    .select('id')
+    .gte('created_at', depuis)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (error) return null;
+  return (data?.[0]?.id as string | undefined) ?? null;
+}

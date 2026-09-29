@@ -17,12 +17,12 @@ const NOMS: Record<string, string> = { carrefour: 'Carrefour', leclerc: 'E.Lecle
  * qu'on voit si l'ordinateur a pris la liste, et qu'on aide sinon.
  */
 export default function Envoye() {
- const { id, n, drives } = useLocalSearchParams<{ id: string; n?: string; drives?: string }>();
+ const { id, n, drives, heure: heureEnvoi } = useLocalSearchParams<{ id: string; n?: string; drives?: string; heure?: string }>();
  const { travail } = useSuiviTravail(id ?? null);
  const total = Number(n) || 0, noms = (drives ?? '').split(',').filter(Boolean).map(d => NOMS[d] ?? d);
  const [envoyee, prise, remplie] = etapesEnvoi(travail?.status);
- // L'heure d'envoi, figée à l'arrivée sur l'écran.
- const [heure] = useState(() => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+ // L'heure d'envoi vient de la feuille d'envoi ; à défaut, l'heure d'arrivée ici.
+ const [heure] = useState(() => heureEnvoi || new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
  const drivesTexte = noms.length ? noms.join(' et ') : 'le drive';
  const etapes: { etat: EtapeEnvoi; titre: string; detail: string; aide?: boolean; attente?: boolean }[] = [
   { etat: envoyee, titre: 'Liste envoyée', detail: `${total} produit${total > 1 ? 's' : ''}, à ${heure}` },
