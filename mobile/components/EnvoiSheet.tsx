@@ -57,7 +57,7 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
       <Text style={ui.productName}>Avant le premier envoi</Text>
       {['Installe l’extension Courses dans Chrome, sur ton ordinateur.', 'Connecte-la au même compte que sur ton iPhone.'].map((t, i) => <View key={t} style={[ui.row, { alignItems: 'flex-start' }]}><Text style={s.num}>{i + 1}.</Text><Text style={[ui.detail, { marginTop: 0, flex: 1, color: colors.text }]}>{t}</Text></View>)}
       <Action secondary onPress={() => { void Share.share({ message: CONSIGNES }); }}>Envoyer les instructions d’installation</Action>
-      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: installee }} aria-checked={installee} onPress={() => setInstallee(!installee)} style={[ui.row, { minHeight: 44 }]}>
+      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: installee }} aria-checked={installee} accessibilityLabel="C’est fait, l’extension est installée" onPress={() => setInstallee(!installee)} style={[ui.row, { minHeight: 44 }]}>
        <View style={[s.case, installee && s.caseCochee]}>{installee && <Feather name="check" size={16} color={colors.accentContrast} />}</View>
        <Text style={[ui.productName, { fontWeight: '400', flex: 1 }]}>C’est fait, l’extension est installée</Text>
       </Pressable>
@@ -88,7 +88,7 @@ const s = StyleSheet.create({
  drive: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, padding: 12, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
  driveCoche: { borderWidth: 2, borderColor: colors.accent },
  icone: { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
- case: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+ case: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.traitControle, alignItems: 'center', justifyContent: 'center' },
  caseCochee: { backgroundColor: colors.accent, borderColor: colors.accent },
  premiere: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, gap: 8 },
  num: { width: 18, color: colors.textMuted, fontVariant: ['tabular-nums'] },

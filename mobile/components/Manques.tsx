@@ -21,6 +21,9 @@ export function ManqueRow({lineKey,manque,products,aPreciser,onRetrait}:{lineKey
  const product=products.find(p=>p.id===id),extra=w.extras.find(x=>`extra:${x.id}`===lineKey);
  const [qty,setQty]=useState(id?w.quotidienQty[id]??1:extra?.quantity??1),[chosen,setChosen]=useState(id),[search,setSearch]=useState(''),[edit,setEdit]=useState(false);
  const selected=products.find(p=>p.id===chosen),name=selected?.name??product?.name??extra?.name??manque.name;
+ // Un produit prêt garde sa nouvelle quantité tout de suite ; un manque à
+ // préciser attend « Garder », puisqu'on peut encore changer de produit.
+ const changerQty=(n:number)=>{setQty(n);if(!aPreciser&&chosen===id)w.validerManque(lineKey,n,chosen);};
  const ouvert=aPreciser||edit,format=selected?[selected.brand,selected.volume_ml?`${selected.volume_ml} ml`:selected.grammage_g?`${selected.grammage_g} g`:selected.unit].filter(Boolean).join(' · '):'Noté à la main';
  const quantite=id?w.quotidienQty[id]??1:extra?.quantity??1;
  return <View style={[m.carte,aPreciser&&m.aPreciser]}>
@@ -29,7 +32,7 @@ export function ManqueRow({lineKey,manque,products,aPreciser,onRetrait}:{lineKey
   <View style={{flex:1}}><Text style={ui.productName}>{name}</Text><Text style={ui.detail}>{sources[manque.source]} · {format}</Text>{aPreciser&&<Text style={m.drapeau}>À préciser</Text>}</View>
   {!aPreciser&&<View style={ui.row}><Text style={ui.num}>× {quantite}</Text><View style={m.pret}><Feather name={edit?'chevron-up':'check'} size={16} color={colors.accent}/></View></View>}
  </Pressable>
- {ouvert&&<><View style={ui.sectionRow}><Text style={ui.detail}>Nombre d’articles</Text><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel={`Diminuer ${name}`} style={ui.iconButton} onPress={()=>setQty(Math.max(1,qty-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{qty}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Augmenter ${name}`} style={ui.iconButton} onPress={()=>setQty(Math.min(99,qty+1))}><Text style={ui.title}>+</Text></Pressable></View></View>
+ {ouvert&&<><View style={ui.sectionRow}><Text style={ui.detail}>Nombre d’articles</Text><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel={`Diminuer ${name}`} style={ui.iconButton} onPress={()=>changerQty(Math.max(1,qty-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{qty}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Augmenter ${name}`} style={ui.iconButton} onPress={()=>changerQty(Math.min(99,qty+1))}><Text style={ui.title}>+</Text></Pressable></View></View>
  <TextInput style={ui.input} value={search} onChangeText={setSearch} placeholder="Changer de produit ou de format…" accessibilityLabel={`Chercher un remplacement pour ${name}`}/>
  {search.trim().length>=2&&<ProductSuggestions items={products.filter(p=>p.name.toLowerCase().includes(search.trim().toLowerCase())).slice(0,20).map(productSuggestion)} selectedId={chosen} onSelect={setChosen}/>}
  {search.trim().length>=2&&!products.some(p=>p.name.toLowerCase().includes(search.trim().toLowerCase()))&&<Text style={ui.detail}>Aucun produit trouvé. Essaie un autre nom.</Text>}

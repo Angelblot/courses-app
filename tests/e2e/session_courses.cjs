@@ -40,6 +40,9 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  const oignons=page.getByRole('checkbox',{name:'Oignons jaunes'}).last();await oignons.waitFor();
  await shot('3-habitudes');
  await oignons.click();if(!await oignons.isChecked())throw Error('Habit row not checked');
+ // Changer de rayon avant de valider ne perd pas la coche.
+ await page.getByRole('tab',{name:'Produits laitiers'}).last().click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
+ await page.getByRole('tab',{name:'Fruits & légumes'}).last().click();if(!await oignons.isChecked())throw Error('Habit choice lost when switching aisle');
  await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
  // Un rayon validé s'annule : on revient au rayon, décisions défaites.
  await btn('Annuler : Fruits & légumes : 1 retenu').click();await oignons.waitFor();

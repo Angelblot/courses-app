@@ -18,16 +18,19 @@ import { nombreArticles } from '../../lib/ajouts-quotidiens';
 export default function Habitudes({session=false}:{session?:boolean}){
  const p=useProducts(),w=useWizard();useFocusEffect(useCallback(()=>{p.recharger();},[p.recharger]));
  const categories=RAYONS.filter(c=>p.produits.some(p=>p.favorite&&rayonDepuisLibelle(p.category)===c.cle));
- const [rayon,setRayon]=useState(''),[choix,setChoix]=useState<Record<string,number>>({});
+ // Les coches sont gardées pour tous les rayons : changer de rayon avant de
+ // valider ne perd rien. `touches` retient ce que l'utilisateur a modifié.
+ const [rayon,setRayon]=useState(''),[choix,setChoix]=useState<Record<string,number>>({}),[touches,setTouches]=useState<Record<string,true>>({});
  const cat=categories.find(c=>c.cle===rayon)??categories[0];
  const itemsDe=(cle:string)=>p.produits.filter(x=>x.favorite&&rayonDepuisLibelle(x.category)===cle&&!(session&&w.manques?.[`produit:${x.id}`]&&manqueActif(w,`produit:${x.id}`)));
  const items=cat?itemsDe(cat.cle):[],cles=items.map(x=>x.id).join(',');
  const fini=(cle:string)=>{const l=itemsDe(cle);return l.length>0&&l.every(x=>w.habitudesVues?.[x.id]);};
  const annulation=useAnnulation();
  // À l'ouverture d'un rayon, on part de ce qui est déjà dans la liste.
- useEffect(()=>{setChoix(Object.fromEntries(items.filter(x=>w.quotidien[x.id]==='needed').map(x=>[x.id,nombreArticles(w.quotidienQty[x.id]??1)])));},[cat?.cle,cles]);
- const basculer=(id:string)=>setChoix(c=>{const suite={...c};if(id in suite)delete suite[id];else suite[id]=nombreArticles(w.quotidienQty[id]??1);return suite;});
- const quantite=(id:string,n:number)=>setChoix(c=>({...c,[id]:nombreArticles(n)}));
+ useEffect(()=>{setChoix(c=>{const suite={...c};for(const x of items){if(touches[x.id])continue;if(w.quotidien[x.id]==='needed')suite[x.id]=nombreArticles(w.quotidienQty[x.id]??1);else delete suite[x.id];}return suite;});},[cat?.cle,cles,touches]);
+ const toucher=(id:string)=>setTouches(t=>({...t,[id]:true}));
+ const basculer=(id:string)=>{toucher(id);setChoix(c=>{const suite={...c};if(id in suite)delete suite[id];else suite[id]=nombreArticles(w.quotidienQty[id]??1);return suite;});};
+ const quantite=(id:string,n:number)=>{toucher(id);setChoix(c=>({...c,[id]:nombreArticles(n)}));};
  // Rayon suivant encore à passer, sinon le premier resté en arrière.
  const index=categories.findIndex(c=>c.cle===cat?.cle),aPasser=categories.filter(c=>c.cle!==cat?.cle&&itemsDe(c.cle).some(x=>!w.habitudesVues?.[x.id]));
  const suivant=aPasser.find(c=>categories.indexOf(c)>index)??aPasser[0];
@@ -38,11 +41,12 @@ export default function Habitudes({session=false}:{session?:boolean}){
   if(cat&&items.length){
    const avant:Record<string,InstantaneHabitude>=Object.fromEntries(items.map(x=>[x.id,instantaneHabitude(w,x.id)]));
    items.forEach(x=>w.deciderHabituel(x.id,choix[x.id]??1,x.id in choix));
+   const oublier=()=>setTouches(t=>{const suite={...t};items.forEach(x=>delete suite[x.id]);return suite;});oublier();
    // Le toast ne vaut que si l'on reste ici ; après le dernier rayon, le
    // retour du pied rouvre la liste, qui reflète les choix faits.
    if(!suivant){terminer();return;}
    allerA(suivant.cle);
-   annulation.proposer(`${cat.label} : ${retenus} retenu${retenus>1?'s':''}`,()=>{items.forEach(x=>w.annulerHabituel(x.id,avant[x.id]));setRayon(cat.cle);});
+   annulation.proposer(`${cat.label} : ${retenus} retenu${retenus>1?'s':''}`,()=>{items.forEach(x=>w.annulerHabituel(x.id,avant[x.id]));oublier();setRayon(cat.cle);});
   }else if(suivant)allerA(suivant.cle);else terminer();
  }
  const libelle=`${suivant?'Rayon suivant':session?'Continuer vers les extras':'Vérifier ma liste'}${retenus?` · ${retenus} retenu${retenus>1?'s':''}`:''}`;
@@ -69,6 +73,6 @@ const h=StyleSheet.create({
  ligne:{flexDirection:'row',alignItems:'center',gap:8,backgroundColor:colors.surface,borderRadius:12,paddingLeft:6,paddingRight:10,borderWidth:1,borderColor:colors.surface},
  ligneOn:{borderWidth:2,borderColor:colors.accent},
  photo:{width:44,height:44,borderRadius:8},
- case:{width:28,height:28,borderRadius:14,borderWidth:1.5,borderColor:colors.border,alignItems:'center',justifyContent:'center'},
+ case:{width:28,height:28,borderRadius:14,borderWidth:1.5,borderColor:colors.traitControle,alignItems:'center',justifyContent:'center'},
  caseOn:{backgroundColor:colors.accent,borderColor:colors.accent,width:32,height:32,borderRadius:16},
 });
