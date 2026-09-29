@@ -4,12 +4,21 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { colors } from '../lib/theme';
 import { photoSecours } from '../lib/photos-maison';
+import { teinteAplat } from '../lib/image-produit';
+import { useImageProduit } from '../stores/images-produits';
 import { SESSION_STEPS, type SessionStep } from '../lib/session-courses';
+/**
+ * Photo d'un produit ou d'une recette. Un produit sans photo reçoit toujours
+ * une image : une vraie photo Open Food Facts ou une illustration générée
+ * (useImageProduit), et un aplat de sa teinte le temps de la trouver.
+ */
 export function Photo({name,url,style,recipe=false}:{name:string;url?:string|null;style?:StyleProp<ImageStyle>;recipe?:boolean}) {
-  const [failed,setFailed] = useState(false);
-  useEffect(()=>setFailed(false),[url,name]);
-  const fallback=photoSecours(name),source=!failed&&url?.trim()?{uri:url}:fallback;
-  return source?<Image source={source} accessibilityLabel={name} style={[ui.photo,style]} resizeMode={recipe?'cover':'contain'} onError={()=>setFailed(true)}/>:<View style={[ui.photo,style as any,ui.placeholder]}><Feather name={recipe?'image':'package'} size={25} color={colors.textMuted}/></View>;
+  const [failed,setFailed] = useState(false),[genereKo,setGenereKo] = useState(false);
+  useEffect(()=>{setFailed(false);setGenereKo(false);},[url,name]);
+  const fallback=photoSecours(name),propre=!failed&&url?.trim()?{uri:url}:fallback;
+  const genere=useImageProduit(name,!recipe&&!propre);
+  const source=propre??(genere&&!genereKo?{uri:genere}:null);
+  return source?<Image source={source} accessibilityLabel={name} style={[ui.photo,style]} resizeMode={recipe?'cover':'contain'} onError={()=>propre?setFailed(true):setGenereKo(true)}/>:<View style={[ui.photo,style as any,ui.placeholder,!recipe&&{backgroundColor:teinteAplat(name)}]}><Feather name={recipe?'image':'package'} size={25} color={colors.textMuted}/></View>;
 }
 /** Principal plein, secondaire à contour, désactivé gris neutre : trois formes qu'on ne confond pas. */
 export function Action({children,onPress,secondary=false,disabled=false}:{children:ReactNode;onPress:()=>void;secondary?:boolean;disabled?:boolean}) {return <Pressable accessibilityRole="button" accessibilityState={{disabled}} disabled={disabled} onPress={onPress} style={[ui.button,secondary&&ui.secondary,disabled&&ui.disabled]}><Text style={[ui.buttonText,secondary&&{color:colors.accent},disabled&&{color:colors.offText}]}>{children}</Text></Pressable>}
