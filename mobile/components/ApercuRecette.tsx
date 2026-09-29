@@ -11,7 +11,7 @@ import { photoSecours } from '../lib/photos-maison';
  * Aperçu d'une recette pendant la session : la photo, la durée et les
  * ingrédients pour le nombre de personnes choisi, sans quitter la session.
  */
-export function ApercuRecette({ recette, parts, onFermer, onBasculer }: { recette: Recipe | null; parts?: number; onFermer: () => void; onBasculer: () => void }) {
+export function ApercuRecette({ recette, parts, onFermer, onBasculer, onParts }: { recette: Recipe | null; parts?: number; onFermer: () => void; onBasculer: () => void; onParts?: (n: number) => void }) {
  const insets = useSafeAreaInsets(), { height } = useWindowDimensions();
  if (!recette) return null;
  const personnes = parts ?? recette.servings_default ?? 2, temps = (recette.prep_minutes ?? 0) + (recette.cook_minutes ?? 0), choisie = parts != null;
@@ -23,6 +23,8 @@ export function ApercuRecette({ recette, parts, onFermer, onBasculer }: { recett
     <ScrollView contentContainerStyle={{ gap: 8, padding: 16, paddingBottom: 4 }}>
      <Text accessibilityRole="header" style={a.titre}>{recette.name}</Text>
      <View style={ui.row}>{temps > 0 && <><Feather name="clock" size={14} color={colors.textMuted} /><Text style={[ui.detail, { marginTop: 0 }]}>{temps} min ·</Text></>}<Text style={[ui.detail, { marginTop: 0 }]}>{personnes} personne{personnes > 1 ? 's' : ''}</Text></View>
+     {/* Repas choisi : le nombre de personnes se règle ici, la tuile n'affiche que la pastille. */}
+     {choisie && onParts && <View style={[ui.sectionRow, { marginTop: 4 }]}><Text style={ui.productName}>Pour combien ?</Text><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel={`Une personne de moins pour ${recette.name}`} disabled={personnes <= 1} onPress={() => onParts(personnes - 1)} style={ui.iconButton}><Text style={ui.title}>−</Text></Pressable><Text style={[ui.num, { minWidth: 64 }]}>{personnes} pers.</Text><Pressable accessibilityRole="button" accessibilityLabel={`Une personne de plus pour ${recette.name}`} onPress={() => onParts(personnes + 1)} style={ui.iconButton}><Text style={ui.title}>+</Text></Pressable></View></View>}
      {recette.ingredients.map(i => <View key={i.id} style={[ui.row, { minHeight: 36 }]}>{photoSecours(i.name) ? <Photo name={i.name} style={a.ingredient} /> : <View style={a.ingredient} />}<Text style={[ui.productName, { flex: 1, fontWeight: '400' }]}>{i.name}</Text><Text style={[ui.detail, { marginTop: 0 }]}>{formatIngredientQty(i.quantity_per_serving * personnes, i.unit)}</Text></View>)}
      {!recette.ingredients.length && <Text style={ui.detail}>Aucun ingrédient enregistré pour cette recette.</Text>}
     </ScrollView>

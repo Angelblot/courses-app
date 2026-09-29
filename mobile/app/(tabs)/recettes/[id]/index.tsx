@@ -1,3 +1,4 @@
+import { usePersonnesFoyer } from '../../../../stores/foyer';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +17,7 @@ import { colors } from '../../../../lib/theme';
 export default function DetailRecette() {
   const {id}=useLocalSearchParams<{id:string}>(), router=useRouter();
   const {recette,chargement,erreur,recharger}=useRecette(id), {produits}=useProducts(), w=useWizard();
+  const personnesFoyer=usePersonnesFoyer();
   const [parts,setParts]=useState<number|null>(null),[avis,setAvis]=useState('');
   const [erreurAction,setErreurAction]=useState(''),[suppression,setSuppression]=useState(false),[busy,setBusy]=useState(false);
   const [cible,setCible]=useState<{id:string;nom:string}|null>(null);
@@ -35,7 +37,7 @@ export default function DetailRecette() {
       else {setErreurAction(r.erreur??'Suppression impossible. Réessaie.');setSuppression(false);}
     } catch {setErreurAction('Suppression impossible. Vérifie ta connexion.');setSuppression(false);} finally {setBusy(false);}
   }
-  const n=parts??(id?w.selectedRecipes[id]:undefined)??recette?.servings_default??2;
+  const n=parts??(id?w.selectedRecipes[id]:undefined)??personnesFoyer??recette?.servings_default??2;
   const choisi=!!recette&&w.selectedRecipes[recette.id]!=null;
   const aJour=choisi&&w.selectedRecipes[recette!.id]===n;
   return <SafeAreaView edges={['top']} style={rs.page}>

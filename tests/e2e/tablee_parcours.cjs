@@ -4,8 +4,8 @@ const token=['eyJhbGciOiJIUzI1NiJ9',Buffer.from(JSON.stringify({sub:user.id,exp:
 const session={access_token:token,refresh_token:'demo',expires_in:36000,expires_at:Math.floor(Date.now()/1000)+36000,token_type:'bearer',user};
 const products=[{id:'oeufs',name:'Œufs Plein Air',ean13:'1234567890123',unit:'unité',brand:'Plein air',category:'pls',favorite:true,image_url:null,grammage_g:null,volume_ml:null,product_type:'oeuf'},{id:'patates',name:'Pommes de terre',ean13:'1234567890124',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:1000,volume_ml:null,product_type:'pomme_de_terre'},{id:'oignons',name:'Oignons jaunes',ean13:'1234567890125',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:500,volume_ml:null,product_type:'oignon'}];
 const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,image_url:null,prep_minutes:15,cook_minutes:40,recipe_ingredients:[{id:'ing',name:'Pommes de terre',quantity_per_serving:300,unit:'g',rayon:'fruits_legumes',product_id:'patates'}]}];
-(async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{const page=await b.newPage({viewport:{width:390,height:844},serviceWorkers:'block'});const errors=[];page.on('pageerror',e=>errors.push(e.message));let sent;let inserted;
-await page.route('https://qmymwicsgilhoihtfdjm.supabase.co/**',async route=>{const req=route.request(),url=req.url();let data=[];if(url.includes('/auth/v1/user'))data=user;else if(url.includes('/auth/v1/token'))data=session;else if(url.includes('/rest/v1/products')){if(req.method()==='POST'){inserted=req.postDataJSON();data={...inserted,id:'off1'};products.push(data);}else if(url.includes('ean13=eq.'))data=null;else data=products;}else if(url.includes('/rest/v1/recipes'))data=recipes;else if(url.includes('/rest/v1/cart_jobs')&&req.method()==='POST'){sent=req.postDataJSON();data={id:'job-demo'};}await route.fulfill({json:data});});
+(async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{const page=await b.newPage({viewport:{width:390,height:844},serviceWorkers:'block'});const errors=[];page.on('pageerror',e=>errors.push(e.message));let sent;let inserted;let foyer={id:'h1',name:'Foyer démo',personnes:3},patchFoyer=null;
+await page.route('https://qmymwicsgilhoihtfdjm.supabase.co/**',async route=>{const req=route.request(),url=req.url();let data=[];if(url.includes('/auth/v1/user'))data=user;else if(url.includes('/auth/v1/token'))data=session;else if(url.includes('/rest/v1/products')){if(req.method()==='POST'){inserted=req.postDataJSON();data={...inserted,id:'off1'};products.push(data);}else if(url.includes('ean13=eq.'))data=null;else data=products;}else if(url.includes('/rest/v1/households')){if(req.method()==='PATCH'){foyer={...foyer,...req.postDataJSON()};patchFoyer=foyer;}data=foyer;}else if(url.includes('/rest/v1/recipes'))data=recipes;else if(url.includes('/rest/v1/cart_jobs')&&req.method()==='POST'){sent=req.postDataJSON();data={id:'job-demo'};}await route.fulfill({json:data});});
 await page.route('https://world.openfoodfacts.org/**',r=>r.fulfill({json:{products:[{code:'3017620422003',product_name:'Crème de noisettes',brands:'Démo',quantity:'400 g',categories_tags:['en:groceries']}]}}));
 await page.addInitScript(({session,id})=>{localStorage.setItem('sb-qmymwicsgilhoihtfdjm-auth-token',JSON.stringify(session));if(!localStorage.getItem('seeded')){localStorage.setItem('tablee-maison-v1:'+id,JSON.stringify({quotidien:{oeufs:'needed',patates:'needed'},quotidienQty:{oeufs:1,patates:1}}));localStorage.setItem('seeded','yes');}}, {session,id:user.id});
 const btn=name=>page.getByRole('button',{name,exact:true});
@@ -16,7 +16,11 @@ await btn('Noter « Pain du boulanger »').click();
 await btn('Retirer Pain du boulanger').waitFor();
 await page.goto('http://localhost:8082/wizard/recettes');
 await page.getByRole('checkbox',{name:'Choisir Poulet rôti aux légumes',exact:true}).click();
-await page.getByRole('button',{name:'Plus de portions pour Poulet rôti aux légumes'}).click({clickCount:3});
+// Le repas part pour les 3 personnes du foyer ; on en ajoute 2 dans l'aperçu.
+await page.getByText('3 pers.',{exact:true}).waitFor();
+await btn('Voir la recette Poulet rôti aux légumes, 55 min').click();
+await page.getByRole('button',{name:'Une personne de plus pour Poulet rôti aux légumes'}).click({clickCount:2});
+await page.getByText('5 pers.',{exact:true}).first().waitFor();await btn('Fermer').last().click();
 await page.screenshot({path:'/tmp/tablee-recettes.png'});
 await btn('Voir le bilan').click();
 // Au bilan, le pain noté à la main se précise depuis la ligne Manques (feuille).
@@ -44,6 +48,10 @@ await btn('Revenir au bilan').last().click();
 await page.reload();await btn('Voir et ajuster la liste').last().click();await page.getByText('Pain du boulanger',{exact:true}).last().waitFor();
 const draft=await page.evaluate(id=>JSON.parse(localStorage.getItem('tablee-maison-v1:'+id)),user.id);
 if(draft.selectedRecipes.rec1!==5||draft.quotidienQty.oeufs!==2||draft.quotidien.oignons!=='needed'||draft.extras[0].quantity!==2||draft.quotidien.off1!=='needed')throw Error('Draft mismatch '+JSON.stringify(draft));
+// Réglages : « À table » enregistre le nombre de personnes du foyer.
+await page.goto('http://localhost:8082/compte');await page.getByText('À table',{exact:true}).waitFor();
+await btn('Une personne de plus à table').click();await page.waitForTimeout(500);
+if(!patchFoyer||patchFoyer.personnes!==4)throw Error('Household size not saved '+JSON.stringify(patchFoyer));
 if(errors.length)throw Error(errors.join('\n'));
 await page.screenshot({path:'/tmp/tablee-parcours-liste.png'});
 console.log(JSON.stringify({success:true,draft,inserted,overflow:await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)}));

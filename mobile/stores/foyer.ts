@@ -12,7 +12,7 @@ export type Membre = {
   email: string | null;
 };
 
-export type Foyer = { id: string; name: string };
+export type Foyer = { id: string; name: string; personnes: number | null };
 
 export function useFoyer() {
   const [foyer, setFoyer] = useState<Foyer | null>(null);
@@ -29,7 +29,7 @@ export function useFoyer() {
     setChargement(true);
 
     const [{ data: f, error: e1 }, { data: m, error: e2 }, { data: u }] = await Promise.all([
-      supabase.from('households').select('id, name').maybeSingle(),
+      supabase.from('households').select('id, name, personnes').maybeSingle(),
       // La vue, et non household_members : auth.users n'est pas exposée, donc
       // sans elle on n'aurait que des identifiants à afficher.
       supabase.from('membres_du_foyer').select('id, user_id, role, joined_at, email'),
@@ -47,6 +47,7 @@ export function useFoyer() {
     } else {
       setErreur(null);
       setFoyer((f as Foyer) ?? null);
+      publier((f as Foyer | null)?.personnes ?? null);
       const liste = (m as Membre[]) ?? [];
       setMembres(liste);
       const monId = u?.user?.id;
@@ -124,5 +125,41 @@ export async function renommerFoyer(
     console.error('[renommerFoyer]', error);
     return { ok: false, erreur: 'Impossible de renommer le foyer.' };
   }
+  return { ok: true };
+}
+
+// Nombre de personnes à table, partagé par tout le foyer : lu une fois,
+// puis tenu à jour quand on le change dans Réglages.
+let personnesConnues: number | null | undefined;
+const abonnes = new Set<(n: number | null) => void>();
+const publier = (n: number | null) => { personnesConnues = n; abonnes.forEach((f) => f(n)); };
+
+/** Nombre de personnes à table du foyer, ou null s'il n'est pas indiqué. */
+export function usePersonnesFoyer(): number | null {
+  const [n, setN] = useState<number | null>(personnesConnues ?? null);
+  useEffect(() => {
+    abonnes.add(setN);
+    if (personnesConnues === undefined) {
+      void supabase.from('households').select('personnes').maybeSingle().then(({ data, error }) => {
+        if (!error) publier((data as { personnes: number | null } | null)?.personnes ?? null);
+      });
+    }
+    return () => { abonnes.delete(setN); };
+  }, []);
+  return n;
+}
+
+/** Règle le nombre de personnes à table du foyer (1 à 20). */
+export async function reglerPersonnes(
+  id: string,
+  n: number,
+): Promise<{ ok: boolean; erreur?: string }> {
+  const valeur = Math.min(20, Math.max(1, Math.round(n)));
+  const { error } = await supabase.from('households').update({ personnes: valeur }).eq('id', id);
+  if (error) {
+    console.error('[reglerPersonnes]', error);
+    return { ok: false, erreur: 'Impossible d’enregistrer le nombre de personnes.' };
+  }
+  publier(valeur);
   return { ok: true };
 }

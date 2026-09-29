@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import {
-  useFoyer, inviter, retirerMembre, renommerFoyer, type Membre,
+  useFoyer, inviter, retirerMembre, renommerFoyer, reglerPersonnes, type Membre,
 } from '../../stores/foyer';
 import { libelleMembre, peutRetirer } from '../../lib/foyer-libelles.ts';
 import { colors, radius, spacing } from '../../lib/theme';
@@ -21,6 +21,7 @@ export default function Compte() {
   const [messageInvitation, setMessageInvitation] = useState<string | null>(null);
   const [erreurInvitation, setErreurInvitation] = useState<string | null>(null);
   const [erreurNom, setErreurNom] = useState<string | null>(null);
+  const [erreurPersonnes, setErreurPersonnes] = useState<string | null>(null);
 
   const rechargerAuFocus = useCallback(() => { recharger(); }, [recharger]);
   useFocusEffect(rechargerAuFocus);
@@ -34,6 +35,14 @@ export default function Compte() {
     } else {
       setErreurNom(r.erreur ?? null);
     }
+  };
+
+  // Enregistré à chaque pas : les repas choisis ensuite partent pour ce nombre.
+  const changerPersonnes = async (n: number) => {
+    if (!foyer || n < 1 || n > 20) return;
+    const r = await reglerPersonnes(foyer.id, n);
+    setErreurPersonnes(r.ok ? null : r.erreur ?? null);
+    if (r.ok) recharger();
   };
 
   const envoyerInvitation = async () => {
@@ -112,6 +121,23 @@ export default function Compte() {
             />
             {erreurNom && <Text style={s.erreur}>{erreurNom}</Text>}
 
+            <View style={s.personnes}>
+              <View style={{ flex: 1 }}>
+                <Text style={ui.productName}>À table</Text>
+                <Text style={s.aide}>
+                  {foyer.personnes
+                    ? `Les repas choisis sont prévus pour ${foyer.personnes} personne${foyer.personnes > 1 ? 's' : ''}.`
+                    : 'Indique combien vous êtes : les quantités des repas suivront.'}
+                </Text>
+              </View>
+              <View style={ui.counter}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Une personne de moins à table" disabled={(foyer.personnes ?? 2) <= 1} onPress={() => changerPersonnes((foyer.personnes ?? 2) - 1)} style={ui.iconButton}><Text style={ui.title}>−</Text></Pressable>
+                <Text style={ui.num} accessibilityLabel={`${foyer.personnes ?? 2} personnes à table`}>{foyer.personnes ?? 2}</Text>
+                <Pressable accessibilityRole="button" accessibilityLabel="Une personne de plus à table" disabled={(foyer.personnes ?? 2) >= 20} onPress={() => changerPersonnes((foyer.personnes ?? 2) + 1)} style={ui.iconButton}><Text style={ui.title}>+</Text></Pressable>
+              </View>
+            </View>
+            {erreurPersonnes && <Text style={s.erreur}>{erreurPersonnes}</Text>}
+
             <Text style={s.section}>
               {`Membres (${membres.length})`}
             </Text>
@@ -177,6 +203,10 @@ const s = StyleSheet.create({
     marginTop: spacing.xl, marginBottom: spacing.xs,
   },
   aide: { fontSize: 13, color: colors.textMuted, lineHeight: 18, marginBottom: spacing.xs },
+  personnes: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm,
+    backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md,
+  },
   bloc: { gap: spacing.sm },
   champ: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,

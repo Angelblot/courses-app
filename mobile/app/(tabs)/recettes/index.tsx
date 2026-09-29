@@ -5,6 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useRecipes } from '../../../stores/recipes';
 import { useWizard } from '../../../contexts/WizardContext';
+import { usePersonnesFoyer } from '../../../stores/foyer';
 import { Photo, Action, Head, ui } from '../../../components/MaisonUI';
 import { AjoutRecetteSheet } from '../../../components/AjoutRecetteSheet';
 import { ApercuRecette } from '../../../components/ApercuRecette';
@@ -18,6 +19,8 @@ function ChoixRepas({session=false}:{session?:boolean}){
  const r=useRecipes(),w=useWizard(),{width,fontScale}=useWindowDimensions();const [query,setQuery]=useState(''),[seuls,setSeuls]=useState(false),[rapides,setRapides]=useState(false),[apercu,setApercu]=useState<Recipe|null>(null);
  useFocusEffect(useCallback(()=>{r.recharger();},[r.recharger]));
  const choisis=r.recettes.filter(r=>w.selectedRecipes[r.id]!=null);
+ // Un repas choisi part pour le nombre de personnes du foyer, sinon celui de la recette.
+ const personnes=usePersonnesFoyer(),portions=(rec:Recipe)=>personnes??rec.servings_default??2;
  // La pastille du pied filtre les repas choisis ; plus rien à filtrer, on revoit tout.
  useEffect(()=>{if(!choisis.length)setSeuls(false);},[choisis.length]);
  const recettes=r.recettes.filter(r=>(!seuls||w.selectedRecipes[r.id]!=null)&&r.name.toLowerCase().includes(query.toLowerCase())&&(!rapides||((r.prep_minutes??0)+(r.cook_minutes??0)>0&&(r.prep_minutes??0)+(r.cook_minutes??0)<=30)));
@@ -28,17 +31,23 @@ function ChoixRepas({session=false}:{session?:boolean}){
  <TextInput value={query} onChangeText={setQuery} style={ui.input} placeholder="Une recette, une envie…" accessibilityLabel="Chercher une recette"/>
  {!seuls&&<View style={ui.sectionRow}><Pressable accessibilityRole="checkbox" accessibilityState={{checked:rapides}} aria-checked={rapides} onPress={()=>setRapides(!rapides)} style={{minHeight:44,padding:12,borderRadius:22,backgroundColor:rapides?colors.accent:colors.accentSoft,borderWidth:1,borderColor:rapides?colors.accent:colors.traitControle}}><Text style={{color:rapides?'white':'#48613A'}}>30 min ou moins</Text></Pressable><Text style={ui.detail}>{recettes.length} recette{recettes.length>1?'s':''}</Text></View>}
  {r.chargement&&<ActivityIndicator/>}{r.erreur&&<><Text style={ui.error}>{r.erreur}</Text><Action secondary onPress={r.recharger}>Réessayer</Action></>}
- <View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}>{recettes.map(rec=>{const parts=w.selectedRecipes[rec.id],temps=(rec.prep_minutes??0)+(rec.cook_minutes??0);return <View key={rec.id} style={[c2.carte,{width:columns===2?'48%':'100%'},parts?c2.choisie:null]}>
- <Pressable accessibilityRole="button" accessibilityLabel={`Voir la recette ${rec.name}`} onPress={()=>session?setApercu(rec):router.push(`/recettes/${rec.id}`)}><Photo recipe name={rec.name} url={rec.image_url} style={{width:'100%',height:columns===2?135:175,borderRadius:0}}/>{!!parts&&<View style={c2.coche} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden><Feather name="check" size={18} color={colors.accentContrast}/></View>}</Pressable>
- <View style={{padding:12,gap:10,flex:1}}><Text style={[ui.productName,{minHeight:40}]}>{rec.name}</Text><View style={ui.row}><Feather name="clock" size={13} color="#656D60"/><Text style={ui.detail}>{temps?`${temps} min`:'Durée non renseignée'}</Text></View>
- {parts?<><View style={[ui.counter,{justifyContent:'space-between'}]}><Pressable accessibilityRole="button" accessibilityLabel={`Moins de portions pour ${rec.name}`} style={ui.iconButton} onPress={()=>w.setParts(rec.id,parts-1)}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{parts} pers.</Text><Pressable accessibilityRole="button" accessibilityLabel={`Plus de portions pour ${rec.name}`} style={ui.iconButton} onPress={()=>w.setParts(rec.id,parts+1)}><Text style={ui.title}>+</Text></Pressable></View><Pressable accessibilityRole="checkbox" accessibilityState={{checked:!!parts}} aria-checked={!!parts} accessibilityLabel={`Choisir ${rec.name}`} onPress={()=>w.toggleRecette(rec.id,rec.servings_default)} style={({pressed})=>[ui.button,!parts&&ui.secondary,pressed&&{opacity:.85}]}><View style={[ui.row,{gap:6}]}><Feather name={parts?'check':'plus'} size={16} color={parts?colors.accentContrast:colors.accent}/><Text style={[ui.buttonText,!parts&&{color:colors.accent}]}>{parts?'Choisi':'Choisir'}</Text></View></Pressable></>:<View style={{marginTop:'auto'}}><Pressable accessibilityRole="checkbox" accessibilityState={{checked:!!parts}} aria-checked={!!parts} accessibilityLabel={`Choisir ${rec.name}`} onPress={()=>w.toggleRecette(rec.id,rec.servings_default)} style={({pressed})=>[ui.button,!parts&&ui.secondary,pressed&&{opacity:.85}]}><View style={[ui.row,{gap:6}]}><Feather name={parts?'check':'plus'} size={16} color={parts?colors.accentContrast:colors.accent}/><Text style={[ui.buttonText,!parts&&{color:colors.accent}]}>{parts?'Choisi':'Choisir'}</Text></View></Pressable></View>}</View>
+ <View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>{recettes.map(rec=>{const parts=w.selectedRecipes[rec.id],temps=(rec.prep_minutes??0)+(rec.cook_minutes??0);return <View key={rec.id} style={[t.tuile,{width:columns===2?'48.5%':'100%',aspectRatio:columns===2?1/1.08:1.5}]}>
+  {/* La tuile ouvre l'aperçu ; le bouton rond du coin choisit ou retire. */}
+  <Pressable accessibilityRole="button" accessibilityLabel={`Voir la recette ${rec.name}${temps?`, ${temps} min`:''}`} onPress={()=>session?setApercu(rec):router.push(`/recettes/${rec.id}`)} style={({pressed})=>[StyleSheet.absoluteFill,pressed&&{opacity:.9}]}>
+   <Photo recipe name={rec.name} url={rec.image_url} style={t.photo}/>
+   <View style={t.voile} pointerEvents="none">{VOILE.map((o,k)=><View key={k} style={{flex:1,backgroundColor:`rgba(20,28,16,${o})`}}/>)}</View>
+   <View style={t.legende} pointerEvents="none"><Text style={t.nom} numberOfLines={2}>{rec.name}</Text>{temps>0&&<Text style={t.meta}>{temps} min</Text>}</View>
+   {!!parts&&<View style={t.pers} pointerEvents="none"><Text style={t.persTexte}>{parts} pers.</Text></View>}
+  </Pressable>
+  {!!parts&&<View style={t.contour} pointerEvents="none"/>}
+  <Pressable accessibilityRole="checkbox" accessibilityState={{checked:!!parts}} aria-checked={!!parts} accessibilityLabel={`Choisir ${rec.name}`} hitSlop={6} onPress={()=>w.toggleRecette(rec.id,portions(rec))} style={({pressed})=>[t.rond,parts?t.rondOn:null,pressed&&{opacity:.85}]}><Feather name={parts?'check':'plus'} size={18} color={parts?colors.accentContrast:colors.accent}/></Pressable>
  </View>})}</View>
  {!r.chargement&&!r.erreur&&!recettes.length&&<View style={ui.notice}><Text style={ui.productName}>Aucune recette trouvée.</Text><Text style={ui.subtitle}>Essaie un autre nom ou enlève le filtre de durée.</Text></View>}
  <View style={ui.sectionRow}><Text style={ui.detail}>Compléter ma collection</Text><Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>router.push('/recettes/nouvelle')}><Text style={ui.link}>Créer</Text></Pressable><Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>router.push('/recettes/importer')}><Text style={ui.link}>Importer</Text></Pressable></View>
  </ScrollView><View style={[ui.footer,ui.row,{gap:8}]}>
  {choisis.length>0&&<Pressable accessibilityRole="button" accessibilityLabel={`${choisis.length} repas choisi${choisis.length>1?'s':''}, ${seuls?'tout voir':'ne voir qu’eux'}`} accessibilityState={{selected:seuls}} onPress={()=>setSeuls(!seuls)} style={({pressed})=>[f.pastille,seuls&&f.pastilleOn,pressed&&{opacity:.7}]}><View style={ui.row}>{choisis.slice(0,2).map((rec,i)=><Photo key={rec.id} recipe name={rec.name} url={rec.image_url} style={[f.vignette,i>0&&{marginLeft:-18}]}/>)}</View><Text style={[ui.link,seuls&&{color:colors.accentContrast}]}>{choisis.length} repas</Text></Pressable>}
  <View style={{flex:1}}><Action onPress={()=>router.push(session?'/wizard/recap':'/wizard/recettes')}>{session?'Voir le bilan':'Préparer mes courses'}</Action></View></View>
- <ApercuRecette recette={apercu} parts={apercu?w.selectedRecipes[apercu.id]:undefined} onFermer={()=>setApercu(null)} onBasculer={()=>apercu&&w.toggleRecette(apercu.id,apercu.servings_default)}/></SafeAreaView>
+ <ApercuRecette recette={apercu} parts={apercu?w.selectedRecipes[apercu.id]:undefined} onFermer={()=>setApercu(null)} onBasculer={()=>apercu&&w.toggleRecette(apercu.id,portions(apercu))} onParts={n=>apercu&&w.setParts(apercu.id,n)}/></SafeAreaView>
 }
 
 /**
@@ -75,11 +84,24 @@ export default function Recettes({session=false}:{session?:boolean}){
  return session?<ChoixRepas session/>:<Collection/>;
 }
 
-/** Carte d'une recette à choisir : une carte choisie a un contour vert et une coche. */
-const c2=StyleSheet.create({
- carte:{backgroundColor:'white',borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:colors.border},
- choisie:{borderWidth:2.5,borderColor:colors.accent},
- coche:{position:'absolute',top:8,right:8,width:32,height:32,borderRadius:16,backgroundColor:colors.accent,alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:'white'},
+// Dégradé du bas de la tuile, en fines bandes : lisible sur toutes les photos, sans palier visible.
+const VOILE=Array.from({length:16},(_,k)=>+(0.76*Math.pow(k/15,1.6)).toFixed(3));
+/**
+ * Tuile d'une recette à choisir : la photo d'abord, le nom posé dessus.
+ * Choisie, elle prend un contour vert, une coche et le nombre de personnes.
+ */
+const t=StyleSheet.create({
+ tuile:{borderRadius:16,overflow:'hidden',backgroundColor:colors.accentSoft},
+ photo:{width:'100%',height:'100%',borderRadius:0},
+ voile:{position:'absolute',left:0,right:0,bottom:0,height:'58%'},
+ legende:{position:'absolute',left:10,right:10,bottom:10,gap:2},
+ nom:{color:'white',fontSize:15,fontWeight:'700',lineHeight:19},
+ meta:{color:'white',fontSize:12,fontWeight:'500'},
+ pers:{position:'absolute',top:10,left:10,backgroundColor:'rgba(255,255,255,.95)',borderRadius:12,paddingHorizontal:8,paddingVertical:3},
+ persTexte:{fontSize:12,fontWeight:'700',color:colors.text,fontVariant:['tabular-nums']},
+ contour:{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:16,borderWidth:3,borderColor:colors.accent},
+ rond:{position:'absolute',top:6,right:6,width:44,height:44,borderRadius:22,backgroundColor:'white',alignItems:'center',justifyContent:'center',shadowColor:'#141C10',shadowOpacity:.22,shadowRadius:6,shadowOffset:{width:0,height:2},elevation:3},
+ rondOn:{backgroundColor:colors.accent,borderWidth:2,borderColor:'white'},
 });
 /** Pied de l'étape Repas : la pastille des repas choisis, puis l'étape suivante. */
 const f=StyleSheet.create({
