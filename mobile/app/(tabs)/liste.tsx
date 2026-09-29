@@ -16,7 +16,7 @@ import { photoSecours } from '../../lib/photos-maison';
 const pluriel=(n:number,mot:string)=>`${n} ${mot}${n>1?'s':''}`;
 /**
  * Bilan de la session, ou « Ma liste » hors session. En session, l'écran
- * annonce ce qui est prêt ; la liste détaillée est à un tap (toujours
+ * annonce ce qui part ; la liste détaillée est à un tap (toujours
  * visible sur tablette, en seconde colonne). Rien ne bloque l'envoi sauf une
  * liste vide : un manque noté à la main part tel quel, l'extension le
  * cherche par son nom ; la ligne Manques propose seulement de le préciser.
@@ -36,11 +36,11 @@ export default function Liste({session=false}:{session?:boolean}){
  // Tout ce qui est noté à la main (manque ou extra) part par son nom.
  const libres=acheter.filter(l=>l.key.startsWith('extra:')&&!l.product_id).length,sources=resumeBilan(w);
  // Les sources se recoupent (un repas et un manque pour le même produit) : on ne les additionne pas.
- const sousTitre=libres?`dont ${pluriel(libres,'produit')} noté${libres>1?'s':''} à la main, envoyé${libres>1?'s':''} tel${libres>1?'s':''} quel${libres>1?'s':''}`:sources.length?`depuis ${sources.length>1?`${sources.slice(0,-1).join(', ')} et ${sources[sources.length-1]}`:sources[0]}`:'';
+ const sousTitre=libres?`dont ${libres} cherché${libres>1?'s':''} par ${libres>1?'leur':'son'} nom`:sources.length?`depuis ${sources.length>1?`${sources.slice(0,-1).join(', ')} et ${sources[sources.length-1]}`:sources[0]}`:'';
  const bouton=<Action disabled={vide||loading||!!erreur} onPress={()=>setEnvoi(true)}>Envoyer au drive</Action>;
  const pied=<>{session?<PiedAvecRetour vers="recettes">{bouton}</PiedAvecRetour>:bouton}{vide&&!loading&&!erreur&&<Raison>Ta liste est vide.</Raison>}</>;
  const entete=session?loading&&vide?<View style={[b.hero,{minHeight:68}]} accessible accessibilityLabel="Préparation de ta liste"><ActivityIndicator color={colors.accent}/><Text style={ui.detail}>Préparation de ta liste…</Text></View>:<>
-  <View style={b.hero} accessible accessibilityRole="header" accessibilityLabel={`${pluriel(acheter.length,'produit')} ${acheter.length>1?'prêts':'prêt'}. ${sousTitre}`}><Text style={b.nombre}>{acheter.length}</Text><View style={{flex:1}}><Text style={b.pret}>{acheter.length>1?'produits':'produit'} {acheter.length>1?'prêts':'prêt'}</Text><Text style={ui.detail}>{sousTitre}</Text></View></View>
+  <View style={b.hero} accessible accessibilityRole="header" accessibilityLabel={`${pluriel(acheter.length,'produit')} dans ta liste. ${sousTitre}`}><Text style={b.nombre}>{acheter.length}</Text><View style={{flex:1}}><Text style={b.pret}>{acheter.length>1?'produits':'produit'} dans ta liste</Text><Text style={ui.detail}>{sousTitre}</Text></View></View>
   {vignettes.length>0&&<View style={[ui.row,{gap:0,paddingLeft:6}]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>{vignettes.map((l,i)=><Photo key={l.key} name={l.name} url={p.produits.find(x=>x.id===l.product_id)?.image_url} style={[b.vignette,i>0&&{marginLeft:-10}]}/>)}</View>}
   <Corrections points={points} doublons={doublons.length} aPreciser={manques.map(([,m])=>m.name)} onVerifier={()=>setRegler(true)}/>
   {!large&&<Pressable accessibilityRole="button" accessibilityLabel={detail?'Masquer la liste':'Voir et ajuster la liste'} accessibilityHint="Par rayon, quantités, déjà chez moi" accessibilityState={{expanded:detail}} onPress={()=>setDetail(!detail)} style={({pressed})=>[ui.product,{minHeight:60,paddingLeft:16},pressed&&{opacity:.85}]}><View style={{flex:1}}><Text style={ui.productName}>{detail?'Masquer la liste':'Voir et ajuster la liste'}</Text><Text style={[ui.detail,{marginTop:2}]}>Par rayon, quantités, déjà chez moi</Text></View><Feather name={detail?'chevron-up':'chevron-down'} size={20} color={colors.textMuted}/></Pressable>}
@@ -110,7 +110,6 @@ function LigneCorrection({etat,titre,detail,action,onPress}:{etat:EtatCorrection
 function Corrections({points,doublons,aPreciser,onVerifier}:{points:number;doublons:number;aPreciser:string[];onVerifier:()=>void}){
  const {w,p}=useMaison();
  const manques=Object.entries(manquesDuBrouillon(w)).filter(([key])=>manqueActif(w,key));
- const pending=manquesAPreciser(w,p.produits.map(x=>x.id)).length,prets=manques.length-pending;
  const favoris=p.produits.filter(x=>x.favorite&&rayonDepuisLibelle(x.category)&&!manques.some(([k])=>k===`produit:${x.id}`));
  const vus=favoris.filter(x=>w.habitudesVues?.[x.id]),retenues=vus.filter(x=>w.quotidien[x.id]==='needed').length;
  // Un rayon est revu quand tous ses produits l'ont été ; tant qu'il en reste, la ligne rappelle au lieu de valider.
@@ -122,8 +121,8 @@ function Corrections({points,doublons,aPreciser,onVerifier}:{points:number;doubl
  return <View style={{gap:8}}>
   {!repas&&<LigneCorrection etat="rappel" titre="Repas" detail="Aucun repas choisi cette fois" action="Choisir" onPress={()=>router.dismissTo('/wizard/recettes')}/>}
   {/* Ce qui peut être précisé passe par la ligne Manques, qui ouvre la feuille ; rien ne bloque l'envoi. */}
-  {points?<LigneCorrection etat="attention" titre="Manques" detail={[`${pl(prets,'prêt')}`,aPreciser.length===1?`« ${aPreciser[0]} » : l’extension cherchera ce nom`:aPreciser.length?`${aPreciser.length} produits cherchés par leur nom`:'',doublons?`${doublons} doublon${doublons>1?'s':''} possible${doublons>1?'s':''}`:''].filter(Boolean).join(' · ')} action="Préciser" onPress={onVerifier}/>
-  :<LigneCorrection etat={manques.length?'ok':'ajout'} titre="Manques" detail={manques.length?pl(prets,'prêt'):'Rien de noté'} onPress={()=>ouvrir('manques')}/>}
+  {points?<LigneCorrection etat="attention" titre="Manques" detail={[pl(manques.length,'noté'),aPreciser.length===1?`« ${aPreciser[0]} » : l’extension cherchera ce nom`:aPreciser.length?`${aPreciser.length} produits cherchés par leur nom`:'',doublons?`${doublons} doublon${doublons>1?'s':''} possible${doublons>1?'s':''}`:''].filter(Boolean).join(' · ')} action="Préciser" onPress={onVerifier}/>
+  :<LigneCorrection etat={manques.length?'ok':'ajout'} titre="Manques" detail={manques.length?pl(manques.length,'noté'):'Rien de noté'} onPress={()=>ouvrir('manques')}/>}
   {favoris.length>0&&(!vus.length?<LigneCorrection etat="rappel" titre="Habitudes" detail={`Pas encore revues · ${pl(favoris.length,'produit')}`} action="Revoir" onPress={()=>ouvrir('habitudes')}/>
    :revus<rayons.length?<LigneCorrection etat="rappel" titre="Habitudes" detail={`${revus} rayon${revus>1?'s':''} sur ${rayons.length} revu${revus>1?'s':''} · ${pl(retenues,'retenu')}`} action="Continuer" onPress={()=>ouvrir('habitudes')}/>
    :<LigneCorrection etat="ok" titre="Habitudes" detail={`${pl(retenues,'retenu')} sur ${favoris.length}`} onPress={()=>ouvrir('habitudes')}/>)}

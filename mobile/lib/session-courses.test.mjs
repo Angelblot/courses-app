@@ -89,3 +89,12 @@ test('un brouillon arrêté sur une ancienne étape reprend au bilan',()=>{
  for(const v of ['manques','habitudes','exceptions'])assert.equal(etapeDeReprise(v),'recap');
  assert.equal(etapeDeReprise(undefined),undefined);assert.equal(etapeDeReprise('inconnue'),undefined);
 });
+
+test('produitsProches : type ou mot du libellé, sans faux voisin', async () => {
+ const { produitsProches } = await import('./session-courses.ts');
+ const produits = [{ name: 'Lessive liquide Le Chat' }, { name: 'Lessives capsules' }, { name: 'Liquide vaisselle' }, { name: 'Pommes de terre', product_type: 'pomme_de_terre' }];
+ assert.deepEqual(produitsProches('lessive', produits).map(p => p.name), ['Lessive liquide Le Chat', 'Lessives capsules']);
+ assert.deepEqual(produitsProches('Lessive', produits, 1).length, 1);
+ assert.deepEqual(produitsProches('xy', produits), []);
+ assert.deepEqual(produitsProches('ananas', produits), []);
+});

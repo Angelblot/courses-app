@@ -2,7 +2,7 @@ const {chromium}=require('playwright');const fs=require('fs');
 const user={id:'11111111-1111-4111-8111-111111111111',aud:'authenticated',role:'authenticated',email:'demo@example.test'};
 const token=['eyJhbGciOiJIUzI1NiJ9',Buffer.from(JSON.stringify({sub:user.id,exp:Math.floor(Date.now()/1000)+36000,role:'authenticated'})).toString('base64url'),'demo'].join('.');
 const session={access_token:token,refresh_token:'demo',expires_in:36000,expires_at:Math.floor(Date.now()/1000)+36000,token_type:'bearer',user};
-const products=[{id:'beurre',name:'Beurre doux',ean13:'1234567890126',unit:'unité',brand:null,category:'pls',favorite:true,image_url:null,grammage_g:250,volume_ml:null,product_type:'beurre'},{id:'oeufs',name:'Œufs Plein Air',ean13:'1234567890123',unit:'unité',brand:'Plein air',category:'pls',favorite:true,image_url:null,grammage_g:null,volume_ml:null,product_type:'oeuf'},{id:'patates',name:'Pommes de terre',ean13:'1234567890124',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:1000,volume_ml:null,product_type:'pomme_de_terre'},{id:'oignons',name:'Oignons jaunes',ean13:'1234567890125',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:500,volume_ml:null,product_type:'oignon'}];
+const products=[{id:'beurre',name:'Beurre doux',ean13:'1234567890126',unit:'unité',brand:null,category:'pls',favorite:true,image_url:null,grammage_g:250,volume_ml:null,product_type:'beurre'},{id:'oeufs',name:'Œufs Plein Air',ean13:'1234567890123',unit:'unité',brand:'Plein air',category:'pls',favorite:true,image_url:null,grammage_g:null,volume_ml:null,product_type:'oeuf'},{id:'patates',name:'Pommes de terre',ean13:'1234567890124',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:1000,volume_ml:null,product_type:'pomme_de_terre'},{id:'oignons',name:'Oignons jaunes',ean13:'1234567890125',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:500,volume_ml:null,product_type:'oignon'},{id:'lessive',name:'Lessive liquide',ean13:'1234567890127',unit:'unité',brand:'Le Chat',category:'entretien',favorite:false,image_url:null,grammage_g:null,volume_ml:2000,product_type:null}];
 const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,image_url:null,prep_minutes:15,cook_minutes:40,recipe_ingredients:[{id:'ing',name:'Pommes de terre',quantity_per_serving:300,unit:'g',rayon:'fruits_legumes',product_id:'patates'}]}];
 (async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{
  const page=await b.newPage({viewport:{width:390,height:844},serviceWorkers:'block'}),errors=[];page.on('pageerror',e=>errors.push(e.message));let sent,coupures=2,horsLigne=true,envois=0;const ids=[];
@@ -23,13 +23,15 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await btn('1 repas choisi, les revoir').waitFor();await shot('1-repas');
  await btn('Voir le bilan').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Étape 2 sur 2 : le bilan, avec ses corrections ; rien ne bloque sauf les vrais problèmes.
- await btn('Manques : 2 prêts · « lessive » : l’extension cherchera ce nom. Préciser').waitFor();await btn('Habitudes : Pas encore revues · 2 produits. Revoir').waitFor();
+ await btn('Manques : 3 notés · « lessive » : l’extension cherchera ce nom. Préciser').waitFor();await btn('Habitudes : Pas encore revues · 2 produits. Revoir').waitFor();
  await shot('2-bilan');
  // Le retour du pied ramène aux repas, « Voir le bilan » au bilan.
  await btn('Revenir à l’étape Repas').last().click();await texte('Étape 1 sur 2 · Repas').waitFor();await btn('Voir le bilan').last().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Correction Manques : produits du catalogue prêts, « lessive » à préciser plus tard.
  // B1 : la ligne Manques ouvre directement la feuille ; on peut la refermer sans rien trancher.
- await btn('Manques : 2 prêts · « lessive » : l’extension cherchera ce nom. Préciser').last().click();await page.getByRole('dialog',{name:'Préciser « lessive »'}).waitFor();await page.waitForTimeout(700);await shot('3-verifier');
+ await btn('Manques : 3 notés · « lessive » : l’extension cherchera ce nom. Préciser').last().click();await page.getByRole('dialog',{name:'Préciser « lessive »'}).waitFor();await page.waitForTimeout(700);await shot('3-verifier');
+ // F2 : la feuille ouvre sur les produits proches du mot noté.
+ await btn('Choisir : Lessive liquide, Le Chat · 2000 ml').waitFor();
  await page.getByRole('dialog',{name:'Préciser « lessive »'}).getByRole('button',{name:'Fermer',exact:true}).click();await page.waitForTimeout(500);
  // Pause : abandonner s'annule depuis l'accueil, puis on reprend au bilan.
  await btn('Faire une pause').last().click();await btn('Abandonner ces courses').click();
@@ -58,21 +60,22 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await btn('Extras : Un produit hors habitudes').last().click();
  const champ=page.getByRole('textbox',{name:'Produit manquant',exact:true}).last();await champ.fill('Pommes de terre bio');
  await texte('Déjà dans ta liste').waitFor();await shot('5-extras-similaire');
- await btn('+ 1 · passer à 3').click();await btn('Annuler : Pommes de terre : 2 → 3').click();
- await champ.fill('Pommes de terre bio');await btn('Noter « Pommes de terre bio » à part').click();
+ if(await texte('Nombre d’articles').count())throw Error('Lone quantity stepper shown next to a similar line');
+ await btn('1 de plus : Pommes de terre, passer à 3').click();await btn('Annuler : Pommes de terre : 2 → 3').click();
+ await champ.fill('Pommes de terre bio');await btn('Noter à part : Pommes de terre bio').click();
  await texte('1 × Pommes de terre bio').waitFor();
  await btn('Retirer Pommes de terre bio').click();await btn('Annuler : Pommes de terre bio retiré de ta liste').click();await texte('1 × Pommes de terre bio').waitFor();
  await btn('Revenir au bilan').last().click();await btn('Extras : 1 ajouté').waitFor();
  // Noté à part : pas redemandé comme doublon. Il reste la lessive à préciser.
  // U2 : rien ne bloque l'envoi ; la lessive partirait telle quelle, et la ligne Manques propose de la préciser.
- const preciser=btn('Manques : 2 prêts · « lessive » : l’extension cherchera ce nom. Préciser');await preciser.waitFor();
+ const preciser=btn('Manques : 3 notés · « lessive » : l’extension cherchera ce nom. Préciser');await preciser.waitFor();
  if(!await btn('Envoyer au drive').last().isEnabled())throw Error('Send blocked by a free-label item');
- await texte('dont 2 produits notés à la main, envoyés tels quels').waitFor();
+ await texte('dont 2 cherchés par leur nom').waitFor();
  if(await page.getByText(/chose.? à vérifier/).count())throw Error('Banner still shown');
  await shot('6-bilan');
  await preciser.click();await texte('Préciser « lessive »').waitFor();await page.waitForTimeout(700);await shot('6b-verifier');
- await btn('Garder 1 × lessive').click();await page.getByText('Préciser « lessive »',{exact:true}).waitFor({state:'detached'});
- await texte('produits prêts').waitFor();if(!await btn('Envoyer au drive').last().isEnabled())throw Error('Send button disabled');
+ await btn('Laisser « lessive » tel quel').click();await page.getByText('Préciser « lessive »',{exact:true}).waitFor({state:'detached'});
+ await texte('produits dans ta liste').waitFor();if(!await btn('Envoyer au drive').last().isEnabled())throw Error('Send button disabled');
  await shot('6c-bilan-pret');
  await btn('Voir et ajuster la liste').last().click();await texte('Fruits & légumes').waitFor();
  await page.setViewportSize({width:1024,height:1366});await page.waitForTimeout(600);await shot('6-bilan-tablette');

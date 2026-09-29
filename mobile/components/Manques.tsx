@@ -11,7 +11,7 @@ import { manquesDuBrouillon, manqueActif, manquesAPreciser, type Manque } from '
 import { colors } from '../lib/theme';
 import { Action, Head, Photo, Raison, ui, useAnnulation } from './MaisonUI';
 import { revenirAuBilan } from './SessionProgress';
-const sources={widget:'Widget',siri:'Siri',manuel:'Noté',precedent:'Ajout précédent'};
+export const sources:Record<string,string>={widget:'Widget',siri:'Siri',manuel:'Noté',precedent:'Ajout précédent'};
 /**
  * Un manque. Prêt d'office s'il désigne un produit du catalogue : on le
  * touche seulement pour changer la quantité ou le format. Un libellé libre
@@ -22,13 +22,13 @@ export function ManqueRow({lineKey,manque,products,aPreciser,onRetrait}:{lineKey
  const product=products.find(p=>p.id===id),extra=w.extras.find(x=>`extra:${x.id}`===lineKey);
  const [qty,setQty]=useState(id?w.quotidienQty[id]??1:extra?.quantity??1),[chosen,setChosen]=useState(id),[search,setSearch]=useState(''),[edit,setEdit]=useState(false);
  const selected=products.find(p=>p.id===chosen),name=selected?.name??product?.name??extra?.name??manque.name;
- // Un produit prêt garde sa nouvelle quantité tout de suite ; un manque à
- // préciser attend « Garder », puisqu'on peut encore changer de produit.
+ // Un produit du catalogue garde sa nouvelle quantité tout de suite ; un
+ // manque à préciser attend le bouton, puisqu'on peut encore changer de produit.
  const changerQty=(n:number)=>{setQty(n);if(!aPreciser&&chosen===id)w.validerManque(lineKey,n,chosen);};
  const ouvert=aPreciser||edit,format=selected?[selected.brand,selected.volume_ml?`${selected.volume_ml} ml`:selected.grammage_g?`${selected.grammage_g} g`:selected.unit].filter(Boolean).join(' · '):'';
  const quantite=id?w.quotidienQty[id]??1:extra?.quantity??1;
  return <View style={[m.carte,aPreciser&&m.aPreciser]}>
- <Pressable accessibilityRole="button" accessibilityLabel={aPreciser?`${name}, à préciser`:`${name}, ${quantite} article${quantite>1?'s':''}, prêt. Modifier`} accessibilityState={{expanded:ouvert}} disabled={aPreciser} onPress={()=>setEdit(!edit)} style={ui.row}>
+ <Pressable accessibilityRole="button" accessibilityLabel={aPreciser?`${name}, à préciser`:`${name}, ${quantite} article${quantite>1?'s':''}. Modifier`} accessibilityState={{expanded:ouvert}} disabled={aPreciser} onPress={()=>setEdit(!edit)} style={ui.row}>
   <Photo name={name} url={selected?.image_url}/>
   <View style={{flex:1}}><Text style={ui.productName}>{name}</Text><Text style={ui.detail}>{[sources[manque.source],format].filter(Boolean).join(' · ')}</Text>{aPreciser&&<Text style={m.drapeau}>À préciser</Text>}</View>
   {!aPreciser&&<View style={ui.row}><Text style={ui.num}>× {quantite}</Text><View style={m.pret}><Feather name={edit?'chevron-up':'check'} size={16} color={colors.accent}/></View></View>}
@@ -38,7 +38,7 @@ export function ManqueRow({lineKey,manque,products,aPreciser,onRetrait}:{lineKey
  {search.trim().length>=2&&<ProductSuggestions items={products.filter(p=>p.name.toLowerCase().includes(search.trim().toLowerCase())).slice(0,20).map(productSuggestion)} selectedId={chosen} onSelect={setChosen}/>}
  {search.trim().length>=2&&!products.some(p=>p.name.toLowerCase().includes(search.trim().toLowerCase()))&&<Text style={ui.detail}>Aucun produit trouvé. Essaie un autre nom.</Text>}
  {!!id&&!product&&!selected&&<Text style={ui.error}>Ce produit n’est plus dans le catalogue. Choisis un remplacement ou retire ce manque.</Text>}
- <Action disabled={!!chosen&&!selected} onPress={()=>{w.validerManque(lineKey,qty,chosen);setEdit(false);}}>{aPreciser?`Garder ${qty} × ${name}`:'Enregistrer'}</Action>
+ <Action disabled={!!chosen&&!selected} onPress={()=>{w.validerManque(lineKey,qty,chosen);setEdit(false);}}>{aPreciser?selected&&chosen!==id?`Choisir ${qty} × ${name}`:`Laisser « ${name} » tel quel`:'Enregistrer'}</Action>
  <Pressable accessibilityRole="button" accessibilityLabel={`Je n’en ai plus besoin : ${name}`} style={ui.iconButton} onPress={()=>{const avant=w.ligneQuantites[lineKey];w.modifierLigne(lineKey,0);onRetrait?.(`${name} retiré de tes manques`,()=>w.restaurerLigne(lineKey,avant));}}><Text style={ui.detail}>Je n’en ai plus besoin</Text></Pressable></>}
  </View>;
 }

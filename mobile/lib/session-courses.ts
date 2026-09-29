@@ -124,3 +124,18 @@ export function abandonner(e: Etat): Etat {
   selectedRecipes: {}, habitudesVues: {}, ligneQuantites: {}, lignePossedees: {}, doublonsValides: [], choixProduits: {},
  };
 }
+
+/**
+ * Produits du catalogue qui ressemblent à un libellé noté à la main : même
+ * type de produit, ou un mot du libellé dans leur nom. Proposés d'emblée
+ * pour préciser un manque en un tap.
+ */
+export function produitsProches<P extends { name: string; product_type?: string | null }>(nom: string, produits: P[], max = 5): P[] {
+ const type = normalizeProductType(nom), mots = normaliserNom(nom).split(' ').filter(m => m.length >= 3);
+ if (!mots.length && !type) return [];
+ return produits.filter(p => {
+  if (type && p.product_type === type) return true;
+  const n = normaliserNom(p.name).split(' ');
+  return mots.some(m => n.some(x => x.startsWith(m) || m.startsWith(x) && x.length >= 4));
+ }).slice(0, max);
+}
