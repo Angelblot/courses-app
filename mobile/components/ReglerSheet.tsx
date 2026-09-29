@@ -12,7 +12,7 @@ import { colors } from '../lib/theme';
 type Doublon = { id: string; a: LigneMaison; b: LigneMaison };
 
 /**
- * « À régler avant le drive » : les manques à préciser et les doublons
+ * « À vérifier avant l’envoi » : les manques à préciser et les doublons
  * possibles, réglés sans quitter le bilan. Le bilan ferme la feuille
  * dès qu'il ne reste plus rien.
  */
@@ -23,9 +23,9 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
   <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.fond}>
    <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} />
-   <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="À régler avant le drive">
+   <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="À vérifier avant l’envoi">
     <View style={s.poignee} />
-    <Text style={s.titre} accessibilityRole="header">À régler avant le drive</Text>
+    <Text style={s.titre} accessibilityRole="header">À vérifier avant l’envoi</Text>
     <ScrollView style={{ maxHeight: height * 0.72 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 12, paddingBottom: 8 }}>
      {manques.map(([key, m]) => <ManqueRow key={key} lineKey={key} manque={m} products={products} aPreciser onRetrait={onRetrait} />)}
      {doublons.map(d => <View key={d.id} style={s.doublon}>

@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Head, Action, ui, useAnnulation } from '../../components/MaisonUI';
+import { Head, Action, PiedAvecRetour, ui, useAnnulation } from '../../components/MaisonUI';
 import { useProducts, ajouterProduit, basculerFavori } from '../../stores/products';
 import { useWizard } from '../../contexts/WizardContext';
 import { type FicheProduit } from '../../lib/openfoodfacts';
@@ -34,7 +34,7 @@ export default function Ajout({session=false}:{session?:boolean}){
  const dejaListes=[...w.extras.map(x=>x.name),...p.produits.filter(x=>w.quotidien[x.id]==='needed').map(x=>x.name)];
  const frequents=suggestionsFrequentes(w.extrasFrequents??{},dejaListes);
  const scanner=()=>router.push({pathname:'/scan',params:{destination:'liste',quantite:String(qty),manque:session?'0':'1'}});
- return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}><Head title={session?"Des extras ?":"Il me manque…"} back={!session} avatar={!session}/>
+ return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}><Head title={session?"Des extras ?":"Noter un manque"} back={!session} avatar={!session}/>
  <View style={ui.row}>
   <View style={a.champ}><Feather name="search" size={18} color={colors.textMuted}/><TextInput accessibilityLabel="Produit manquant" autoFocus={!session&&!params.name} maxLength={120} editable={!busy} returnKeyType="done" onSubmitEditing={()=>{if(saisie)noterLibre(saisie);}} value={nom} onChangeText={v=>{setNom(v);off.reinitialiser();setErreur('');setFiche(null);}} placeholder="Lait, café, papier toilette…" placeholderTextColor={colors.textMuted} style={a.saisie}/></View>
   <Pressable accessibilityRole="button" accessibilityLabel="Scanner un code-barres" onPress={scanner} style={({pressed})=>[a.scan,pressed&&{opacity:.7}]}><Feather name="maximize" size={20} color={colors.accent}/></Pressable>
@@ -54,7 +54,7 @@ export default function Ajout({session=false}:{session?:boolean}){
  </>}
  {!!erreur&&<Text accessibilityLiveRegion="polite" style={ui.error}>{erreur}</Text>}
  {ajoutes.length>0&&<View style={{gap:2,marginTop:4}}><Text accessibilityLiveRegion="polite" style={ui.detail}>Ajouté à ta liste</Text>{ajoutes.map(x=><View key={x.key} style={ui.sectionRow}><View style={[ui.row,{flex:1,gap:8}]}><Feather name="check" size={18} color={colors.accent}/><Text style={a.ajoute}>{x.qty} × {x.name}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${x.name}`} onPress={()=>retirer(x)} style={ui.iconButton}><Text style={ui.link}>Retirer</Text></Pressable></View>)}</View>}
- </ScrollView>{session?<View style={ui.footer}>{annulation.toast}<Action onPress={()=>router.push('/wizard/recap')}>Faire le bilan de ma liste</Action></View>:<View style={{marginBottom:insets.bottom+8}}>{annulation.toast}</View>}</SafeAreaView>
+ </ScrollView>{session?<View style={ui.footer}>{annulation.toast}<PiedAvecRetour vers="habitudes"><Action onPress={()=>router.push('/wizard/recap')}>Faire le bilan de ma liste</Action></PiedAvecRetour></View>:<View style={{marginBottom:insets.bottom+8}}>{annulation.toast}</View>}</SafeAreaView>
 }
 const a=StyleSheet.create({
  champ:{flex:1,flexDirection:'row',alignItems:'center',gap:8,minHeight:48,paddingHorizontal:14,borderRadius:12,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},

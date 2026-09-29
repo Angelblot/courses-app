@@ -6,8 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useMaison } from '../../contexts/useMaison';
-import { Action, Head, Photo, Raison, ui, useAnnulation } from '../../components/MaisonUI';
+import { Action, Head, PiedAvecRetour, Photo, Raison, ui, useAnnulation } from '../../components/MaisonUI';
 import { ReglerSheet } from '../../components/ReglerSheet';
+import { EnvoiSheet } from '../../components/EnvoiSheet';
 import { RAYONS } from '../../lib/rayons';
 import { colors } from '../../lib/theme';
 import { photoSecours } from '../../lib/photos-maison';
@@ -19,7 +20,7 @@ const pluriel=(n:number,mot:string)=>`${n} ${mot}${n>1?'s':''}`;
  */
 export default function Liste({session=false}:{session?:boolean}){
  const {w,p,r,lignes,acheter,loading,erreur,stale}=useMaison();
- const [owned,setOwned]=useState(false),[nom,setNom]=useState(''),[ouverte,setOuverte]=useState<string|null>(null),[detail,setDetail]=useState(!session),[regler,setRegler]=useState(false);
+ const [owned,setOwned]=useState(false),[nom,setNom]=useState(''),[ouverte,setOuverte]=useState<string|null>(null),[detail,setDetail]=useState(!session),[regler,setRegler]=useState(false),[envoi,setEnvoi]=useState(false);
  const doublons=doublonsPossibles(acheter,w.doublonsValides),manques=manquesAPreciser(w,p.produits.map(x=>x.id));
  const visibles=lignes.filter(l=>l.owned===owned);
  const aPreciser=acheter.filter(l=>l.aPreciser).length,points=manques.length+doublons.length;
@@ -28,7 +29,7 @@ export default function Liste({session=false}:{session?:boolean}){
  // Ce qui bloque l'envoi au drive, dit sous le bouton avec le geste qui le débloque.
  const blocage=!acheter.length?{texte:'Ta liste est vide.'}
   :stale?{texte:'Une recette de ta liste n’est plus disponible.'}
-  :points?{texte:`${pluriel(points,'point')} à régler.`,action:'Régler',onPress:()=>setRegler(true)}
+  :points?{texte:`${pluriel(points,'chose')} à vérifier.`,action:'Vérifier',onPress:()=>setRegler(true)}
   :aPreciser?{texte:`${pluriel(aPreciser,'conditionnement')} à préciser dans la liste.`,action:'Voir',onPress:()=>setDetail(true)}
   :null;
  // Seules les lignes qui ont une vraie photo figurent dans la frise du bilan.
@@ -59,9 +60,10 @@ export default function Liste({session=false}:{session?:boolean}){
  </>}
  </ScrollView>
  <View>{annulation.toast}
- {points>0&&!loading&&<Pressable accessibilityRole="button" accessibilityLabel={`${pluriel(points,'point')} à régler : ${detailPoints}. Régler`} onPress={()=>setRegler(true)} style={({pressed})=>[b.bandeau,pressed&&{opacity:.9}]}><Text style={b.bandeauTexte}><Text style={{fontWeight:'700'}}>{pluriel(points,'point')} à régler</Text> · {detailPoints}</Text><Text style={[b.bandeauTexte,{fontWeight:'700'}]}>Régler</Text></Pressable>}
- <View style={ui.footer}><Action disabled={!!blocage||loading||!!erreur} onPress={()=>router.push('/wizard/generation')}>Choisir mon drive</Action>{!!blocage&&!points&&!loading&&!erreur&&<Raison action={blocage.action} onPress={blocage.onPress}>{blocage.texte}</Raison>}</View></View>
+ {points>0&&!loading&&<Pressable accessibilityRole="button" accessibilityLabel={`${pluriel(points,'chose')} à vérifier : ${detailPoints}. Vérifier`} onPress={()=>setRegler(true)} style={({pressed})=>[b.bandeau,pressed&&{opacity:.9}]}><Text style={b.bandeauTexte}><Text style={{fontWeight:'700'}}>{pluriel(points,'chose')} à vérifier</Text> · {detailPoints}</Text><Text style={[b.bandeauTexte,{fontWeight:'700'}]}>Vérifier</Text></Pressable>}
+ <View style={ui.footer}>{session?<PiedAvecRetour vers="exceptions"><Action disabled={!!blocage||loading||!!erreur} onPress={()=>setEnvoi(true)}>Choisir mon drive</Action></PiedAvecRetour>:<Action disabled={!!blocage||loading||!!erreur} onPress={()=>setEnvoi(true)}>Choisir mon drive</Action>}{!!blocage&&!points&&!loading&&!erreur&&<Raison action={blocage.action} onPress={blocage.onPress}>{blocage.texte}</Raison>}</View></View>
  <ReglerSheet visible={regler} onFermer={()=>setRegler(false)} manques={manques} doublons={doublons} products={p.produits} onRetrait={annulation.proposer} toast={annulation.toast}/>
+ <EnvoiSheet visible={envoi} onFermer={()=>setEnvoi(false)}/>
  </SafeAreaView>
 }
 const b=StyleSheet.create({

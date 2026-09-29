@@ -7,7 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import { colors } from '../../lib/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { Head, Photo, Action, ui, useAnnulation } from '../../components/MaisonUI';
+import { Head, Photo, Action, PiedAvecRetour, ui, useAnnulation } from '../../components/MaisonUI';
 import { useProducts } from '../../stores/products';
 import { useWizard } from '../../contexts/WizardContext';
 import { RAYONS, rayonDepuisLibelle } from '../../lib/rayons';
@@ -43,17 +43,17 @@ export default function Habitudes({session=false}:{session?:boolean}){
  :cat?<><Text style={ui.heading}>Ce rayon est prêt.</Text><Text style={ui.subtitle}>Tes choix sont conservés.</Text><Action secondary onPress={()=>w.revoirHabitudes(items.map(x=>x.id))}>Revoir ce rayon</Action>{!!suivant&&<Pressable accessibilityRole="button" onPress={terminer} style={ui.iconButton}><Text style={ui.link}>{sortie}</Text></Pressable>}</>
  :!p.chargement&&!p.erreur?<><Text style={ui.heading}>Tes habitudes commencent ici.</Text><Text style={ui.subtitle}>Enregistre tes produits préférés avec le scanner.</Text><Action secondary onPress={()=>router.push('/scan')}>Scanner un premier favori</Action></>:null}
  </ScrollView>
- <View style={ui.footer}>{annulation.toast}{produit?<View style={h.decision}>
+ <View style={ui.footer}>{annulation.toast}{produit?<View style={h.decision}>{session&&<Pressable accessibilityRole="button" accessibilityLabel="Revenir à l’étape Manques" onPress={()=>router.canGoBack()?router.back():router.replace('/wizard/manques')} style={({pressed})=>[ui.retour,pressed&&{opacity:.7}]}><Feather name="chevron-left" size={22} color={colors.accent}/></Pressable>}
   <Pressable accessibilityRole="button" accessibilityLabel={`${produit.name} : j’en ai déjà`} onPress={()=>action.current(false)} style={h.choix}>{({pressed})=><><View style={[h.rond,h.non,pressed&&{opacity:.7}]}><Feather name="x" size={28} color={colors.accent}/></View><Text style={h.legende}>J’en ai déjà</Text></>}</Pressable>
   <View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel="Diminuer la quantité" style={ui.iconButton} onPress={()=>setQty(nombreArticles(qty-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{qty}</Text><Pressable accessibilityRole="button" accessibilityLabel="Augmenter la quantité" style={ui.iconButton} onPress={()=>setQty(nombreArticles(qty+1))}><Text style={ui.title}>+</Text></Pressable></View>
   <Pressable accessibilityRole="button" accessibilityLabel={`${produit.name} : il m’en faut ${qty}`} onPress={()=>action.current(true)} style={h.choix}>{({pressed})=><><View style={[h.rond,h.oui,pressed&&{opacity:.85}]}><Feather name="check" size={28} color={colors.accentContrast}/></View><Text style={h.legende}>Il m’en faut</Text></>}</Pressable>
- </View>:suivant?<Action onPress={()=>allerA(suivant.cle)}>Passer à {suivant.label}</Action>:<Action onPress={terminer}>{session?'Continuer vers les extras':'Vérifier ma liste'}</Action>}</View></SafeAreaView>
+ </View>:(()=>{const suite=suivant?<Action onPress={()=>allerA(suivant.cle)}>Passer à {suivant.label}</Action>:<Action onPress={terminer}>{session?'Continuer vers les extras':'Vérifier ma liste'}</Action>;return session?<PiedAvecRetour vers="manques">{suite}</PiedAvecRetour>:suite;})()}</View></SafeAreaView>
 }
 /** Pied de décision : les deux gestes reprennent le sens du glissement de la carte. */
 const h=StyleSheet.create({
  rayon:{minHeight:44,justifyContent:'center',paddingHorizontal:14,borderRadius:22,backgroundColor:colors.accentSoft},
  decision:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:4},
- choix:{alignItems:'center',gap:4,minWidth:88},
+ choix:{alignItems:'center',gap:4,minWidth:76},
  rond:{width:64,height:64,borderRadius:32,alignItems:'center',justifyContent:'center'},
  non:{borderWidth:1.5,borderColor:colors.accent},
  oui:{backgroundColor:colors.accent},

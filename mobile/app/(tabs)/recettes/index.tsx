@@ -7,13 +7,15 @@ import { useRecipes } from '../../../stores/recipes';
 import { useWizard } from '../../../contexts/WizardContext';
 import { Photo, Action, Head, ui } from '../../../components/MaisonUI';
 import { AjoutRecetteSheet } from '../../../components/AjoutRecetteSheet';
+import { ApercuRecette } from '../../../components/ApercuRecette';
+import type { Recipe } from '../../../stores/recipes';
 import { colors } from '../../../lib/theme';
 /**
  * Choix des repas, étape « recettes » de la session de courses.
  * Hors session, l'onglet Recettes affiche la collection (voir `Collection`).
  */
 function ChoixRepas({session=false}:{session?:boolean}){
- const r=useRecipes(),w=useWizard(),{width,fontScale}=useWindowDimensions();const [query,setQuery]=useState(''),[tab,setTab]=useState<'choisir'|'menu'>('choisir'),[rapides,setRapides]=useState(false);
+ const r=useRecipes(),w=useWizard(),{width,fontScale}=useWindowDimensions();const [query,setQuery]=useState(''),[tab,setTab]=useState<'choisir'|'menu'>('choisir'),[rapides,setRapides]=useState(false),[apercu,setApercu]=useState<Recipe|null>(null);
  useFocusEffect(useCallback(()=>{r.recharger();},[r.recharger]));
  const choisis=r.recettes.filter(r=>w.selectedRecipes[r.id]!=null);
  const recettes=r.recettes.filter(r=>(tab==='choisir'||w.selectedRecipes[r.id]!=null)&&r.name.toLowerCase().includes(query.toLowerCase())&&(!rapides||((r.prep_minutes??0)+(r.cook_minutes??0)>0&&(r.prep_minutes??0)+(r.cook_minutes??0)<=30)));
@@ -25,15 +27,16 @@ function ChoixRepas({session=false}:{session?:boolean}){
  {tab==='choisir'&&<View style={ui.sectionRow}><Pressable accessibilityRole="checkbox" accessibilityState={{checked:rapides}} onPress={()=>setRapides(!rapides)} style={{minHeight:44,padding:12,borderRadius:22,backgroundColor:rapides?'#48613A':'#E4EBDC'}}><Text style={{color:rapides?'white':'#48613A'}}>30 min ou moins</Text></Pressable><Text style={ui.detail}>{recettes.length} recette{recettes.length>1?'s':''}</Text></View>}
  {r.chargement&&<ActivityIndicator/>}{r.erreur&&<><Text style={ui.error}>{r.erreur}</Text><Action secondary onPress={r.recharger}>Réessayer</Action></>}
  <View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}>{recettes.map(rec=>{const parts=w.selectedRecipes[rec.id],temps=(rec.prep_minutes??0)+(rec.cook_minutes??0);return <View key={rec.id} style={{width:columns===2?'48%':'100%',backgroundColor:'white',borderRadius:14,overflow:'hidden'}}>
- <Pressable accessibilityRole="button" accessibilityLabel={`Voir la recette ${rec.name}`} onPress={()=>router.push(`/recettes/${rec.id}`)}><Photo recipe name={rec.name} url={rec.image_url} style={{width:'100%',height:columns===2?135:175,borderRadius:0}}/></Pressable>
+ <Pressable accessibilityRole="button" accessibilityLabel={`Voir la recette ${rec.name}`} onPress={()=>session?setApercu(rec):router.push(`/recettes/${rec.id}`)}><Photo recipe name={rec.name} url={rec.image_url} style={{width:'100%',height:columns===2?135:175,borderRadius:0}}/></Pressable>
  <View style={{padding:12,gap:10,flex:1}}><Text style={[ui.productName,{minHeight:40}]}>{rec.name}</Text><View style={ui.row}><Feather name="clock" size={13} color="#656D60"/><Text style={ui.detail}>{temps?`${temps} min`:'Durée non renseignée'}</Text></View>
- {parts?<><View style={[ui.counter,{justifyContent:'space-between'}]}><Pressable accessibilityRole="button" accessibilityLabel={`Moins de portions pour ${rec.name}`} style={ui.iconButton} onPress={()=>w.setParts(rec.id,parts-1)}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{parts}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Plus de portions pour ${rec.name}`} style={ui.iconButton} onPress={()=>w.setParts(rec.id,parts+1)}><Text style={ui.title}>+</Text></Pressable></View><Text style={[ui.detail,{textAlign:'center'}]}>personnes</Text><Action secondary onPress={()=>w.toggleRecette(rec.id,rec.servings_default)}>Retirer du menu</Action></>:<View style={{marginTop:'auto'}}><Action secondary onPress={()=>w.toggleRecette(rec.id,rec.servings_default)}>+ Choisir</Action></View>}</View>
+ {parts?<><View style={[ui.counter,{justifyContent:'space-between'}]}><Pressable accessibilityRole="button" accessibilityLabel={`Moins de portions pour ${rec.name}`} style={ui.iconButton} onPress={()=>w.setParts(rec.id,parts-1)}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{parts}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Plus de portions pour ${rec.name}`} style={ui.iconButton} onPress={()=>w.setParts(rec.id,parts+1)}><Text style={ui.title}>+</Text></Pressable></View><Text style={[ui.detail,{textAlign:'center'}]}>personnes</Text><Action secondary onPress={()=>w.toggleRecette(rec.id,rec.servings_default)}>Retirer de mes repas</Action></>:<View style={{marginTop:'auto'}}><Action secondary onPress={()=>w.toggleRecette(rec.id,rec.servings_default)}>+ Choisir</Action></View>}</View>
  </View>})}</View>
- {!r.chargement&&!r.erreur&&!recettes.length&&<View style={ui.notice}><Text style={ui.productName}>{tab==='menu'?'Ton menu est encore ouvert.':'Aucune recette trouvée.'}</Text><Text style={ui.subtitle}>{tab==='menu'?'Choisis quelques repas, ou passe directement aux produits habituels.':'Essaie un autre nom ou enlève le filtre de durée.'}</Text>{tab==='menu'&&<Action secondary onPress={()=>setTab('choisir')}>Choisir mes repas</Action>}</View>}
+ {!r.chargement&&!r.erreur&&!recettes.length&&<View style={ui.notice}><Text style={ui.productName}>{tab==='menu'?'Aucun repas choisi pour l’instant.':'Aucune recette trouvée.'}</Text><Text style={ui.subtitle}>{tab==='menu'?'Choisis quelques repas, ou passe directement aux produits habituels.':'Essaie un autre nom ou enlève le filtre de durée.'}</Text>{tab==='menu'&&<Action secondary onPress={()=>setTab('choisir')}>Choisir mes repas</Action>}</View>}
  <View style={ui.sectionRow}><Text style={ui.detail}>Compléter ma collection</Text><Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>router.push('/recettes/nouvelle')}><Text style={ui.link}>Créer</Text></Pressable><Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>router.push('/recettes/importer')}><Text style={ui.link}>Importer</Text></Pressable></View>
  </ScrollView><View style={[ui.footer,ui.row,{gap:8}]}>
  {choisis.length>0&&<Pressable accessibilityRole="button" accessibilityLabel={`${choisis.length} repas choisi${choisis.length>1?'s':''}, les revoir`} onPress={()=>setTab('menu')} style={({pressed})=>[f.pastille,pressed&&{opacity:.7}]}><View style={ui.row}>{choisis.slice(0,2).map((rec,i)=><Photo key={rec.id} recipe name={rec.name} url={rec.image_url} style={[f.vignette,i>0&&{marginLeft:-18}]}/>)}</View><Text style={ui.link}>{choisis.length} repas</Text></Pressable>}
- <View style={{flex:1}}><Action onPress={()=>router.push(session?'/wizard/manques':'/wizard/recettes')}>{session?'Vérifier mes manques':'Préparer ma session de courses'}</Action></View></View></SafeAreaView>
+ <View style={{flex:1}}><Action onPress={()=>router.push(session?'/wizard/manques':'/wizard/recettes')}>{session?'Vérifier mes manques':'Préparer mes courses'}</Action></View></View>
+ <ApercuRecette recette={apercu} parts={apercu?w.selectedRecipes[apercu.id]:undefined} onFermer={()=>setApercu(null)} onBasculer={()=>apercu&&w.toggleRecette(apercu.id,apercu.servings_default)}/></SafeAreaView>
 }
 
 /**
