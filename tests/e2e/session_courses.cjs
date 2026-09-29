@@ -78,6 +78,10 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await texte('produits dans ta liste').waitFor();if(!await btn('Envoyer au drive').last().isEnabled())throw Error('Send button disabled');
  await shot('6c-bilan-pret');
  await btn('Voir et ajuster la liste').last().click();await texte('Fruits & légumes').waitFor();
+ // Tout retrait depuis la liste s'annule : « Déjà chez moi » et « − » à 0.
+ await btn('Déjà chez moi : Pommes de terre bio').last().click();await btn('Annuler : Pommes de terre bio : déjà chez moi').click();
+ await btn('Diminuer Pommes de terre bio').last().click();await btn('Annuler : Pommes de terre bio retiré de ta liste').click();
+ await texte('5',{exact:true}).first().waitFor();
  await page.setViewportSize({width:1024,height:1366});await page.waitForTimeout(600);await shot('6-bilan-tablette');
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow');
  await page.setViewportSize({width:390,height:844});
