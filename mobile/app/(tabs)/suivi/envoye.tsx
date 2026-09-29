@@ -30,13 +30,16 @@ export default function Envoye() {
   <View style={e.corps}>
    <Text accessibilityRole="header" style={ui.heading}>{remplie === 'fait' ? 'Panier rempli.' : 'C’est envoyé.'}</Text>
    <View style={e.frise} accessibilityLiveRegion="polite">
-    {etapes.map((t, i) => <View key={i} style={e.etape} accessible accessibilityLabel={`${t.titre}, ${LIBELLES[t.etat]}. ${t.detail}`}>
-     <Pastille etat={t.etat} />
-     <View style={{ flex: 1, gap: 2 }}>
-      <Text style={[ui.productName, t.etat === 'avenir' && { color: colors.textMuted }]}>{t.titre}</Text>
-      {!!t.detail && <Text style={[ui.detail, { marginTop: 0 }, t.etat === 'erreur' && { color: colors.danger }]}>{t.detail}</Text>}
-      {t.aide && <Pressable accessibilityRole="button" onPress={() => { void Share.share({ message: CONSIGNES_EXTENSION }); }} hitSlop={8} style={{ minHeight: 32, justifyContent: 'center' }}><Text style={ui.link}>Elle n’est pas installée ?</Text></Pressable>}
+    {etapes.map((t, i) => <View key={i}>
+     {/* L'étape se lit d'un bloc ; le lien d'aide reste un bouton à part, atteignable par VoiceOver. */}
+     <View style={e.etape} accessible accessibilityLabel={`${t.titre}, ${LIBELLES[t.etat]}. ${t.detail}`}>
+      <Pastille etat={t.etat} />
+      <View style={{ flex: 1, gap: 2 }}>
+       <Text style={[ui.productName, t.etat === 'avenir' && { color: colors.textMuted }]}>{t.titre}</Text>
+       {!!t.detail && <Text style={[ui.detail, { marginTop: 0 }, t.etat === 'erreur' && { color: colors.danger }]}>{t.detail}</Text>}
+      </View>
      </View>
+     {t.aide && <Pressable accessibilityRole="button" onPress={() => { void Share.share({ message: CONSIGNES_EXTENSION }); }} style={e.aide}><Text style={ui.link}>Elle n’est pas installée ?</Text></Pressable>}
     </View>)}
    </View>
   </View>
@@ -63,5 +66,6 @@ const e = StyleSheet.create({
  etape: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
  pastille: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, borderColor: colors.traitControle, alignItems: 'center', justifyContent: 'center' },
  fait: { backgroundColor: colors.accent, borderColor: colors.accent },
+ aide: { minHeight: 44, justifyContent: 'center', marginLeft: 44 },
  encours: { borderColor: colors.accent },
 });

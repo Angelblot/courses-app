@@ -69,7 +69,7 @@ export default function Ajout({session=false}:{session?:boolean}){
  </ScrollView>{session?<View style={ui.footer}>{annulation.toast}<Action onPress={revenirAuBilan}>Revenir au bilan</Action></View>:<View style={{marginBottom:insets.bottom+8}}>{annulation.toast}</View>}</SafeAreaView>
 }
 const a=StyleSheet.create({
- champ:{flex:1,flexDirection:'row',alignItems:'center',gap:8,minHeight:48,paddingHorizontal:14,borderRadius:12,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},
+ champ:{flex:1,flexDirection:'row',alignItems:'center',gap:8,minHeight:48,paddingHorizontal:14,borderRadius:12,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.traitControle},
  saisie:{flex:1,minHeight:48,fontSize:16,color:colors.text},
  scan:{width:48,height:48,borderRadius:12,borderWidth:1.5,borderColor:colors.accent,alignItems:'center',justifyContent:'center'},
  puces:{flexDirection:'row',flexWrap:'wrap',gap:8},

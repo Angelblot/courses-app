@@ -30,7 +30,7 @@ export function SessionProgress({step}:{step:SessionStep}) {
  </SafeAreaView>;
 }
 const s=StyleSheet.create({
- pause:{width:44,height:44,borderRadius:22,alignItems:'center',justifyContent:'center',backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},
+ pause:{width:44,height:44,borderRadius:22,alignItems:'center',justifyContent:'center',backgroundColor:colors.surface,borderWidth:1,borderColor:colors.traitControle},
  barre:{flexDirection:'row',gap:4,paddingVertical:6},
  segment:{flex:1,justifyContent:'center'},
  trait:{height:4,borderRadius:2,backgroundColor:colors.border},

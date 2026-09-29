@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import type { Recipe } from '../stores/recipes';
 import { formatIngredientQty } from '../lib/unites';
-import { Action, Photo, ui } from './MaisonUI';
+import { Action, Photo, ui, nomDialogue } from './MaisonUI';
 import { colors } from '../lib/theme';
 import { photoSecours } from '../lib/photos-maison';
 
@@ -15,7 +15,7 @@ export function ApercuRecette({ recette, parts, onFermer, onBasculer }: { recett
  const insets = useSafeAreaInsets(), { height } = useWindowDimensions();
  if (!recette) return null;
  const personnes = parts ?? recette.servings_default ?? 2, temps = (recette.prep_minutes ?? 0) + (recette.cook_minutes ?? 0), choisie = parts != null;
- return <Modal visible transparent animationType="slide" onRequestClose={onFermer}>
+ return <Modal {...nomDialogue(recette.name)} visible transparent animationType="slide" onRequestClose={onFermer}>
   <View style={a.fond}>
    <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={onFermer} />
    <View style={[a.panneau, { paddingBottom: 12 + insets.bottom, maxHeight: height * 0.88 }]} accessibilityViewIsModal accessibilityLabel={recette.name} onAccessibilityEscape={onFermer}>

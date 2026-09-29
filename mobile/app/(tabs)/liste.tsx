@@ -76,7 +76,7 @@ const b=StyleSheet.create({
  bandeau:{marginHorizontal:12,marginBottom:8,borderRadius:14,backgroundColor:colors.attentionText,minHeight:48,paddingHorizontal:14,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},
  bandeauTexte:{color:colors.accentContrast,fontSize:14,flexShrink:1},
  correction:{flexDirection:'row',alignItems:'center',gap:12,minHeight:60,paddingHorizontal:12,paddingVertical:8,borderRadius:12,backgroundColor:colors.surface},
- rappel:{backgroundColor:colors.bg,borderWidth:1.5,borderColor:colors.border},
+ rappel:{backgroundColor:colors.bg,borderWidth:1.5,borderColor:colors.traitControle},
  icone:{width:30,height:30,borderRadius:15,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},
  iconeVide:{backgroundColor:'transparent',borderWidth:1.5,borderColor:colors.traitControle},
 });

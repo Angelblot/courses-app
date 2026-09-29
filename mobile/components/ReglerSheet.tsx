@@ -6,7 +6,7 @@ import type { Product } from '../stores/products';
 import type { LigneMaison } from '../lib/liste-maison';
 import type { Manque } from '../lib/session-courses';
 import { ManqueRow } from './Manques';
-import { ui } from './MaisonUI';
+import { ui, nomDialogue } from './MaisonUI';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../lib/theme';
 
@@ -21,7 +21,7 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
  const insets = useSafeAreaInsets(), { height } = useWindowDimensions(), w = useWizard();
  const retirer = (l: LigneMaison) => { const avant = w.ligneQuantites[l.key]; w.modifierLigne(l.key, 0); onRetrait(`${l.name} retiré de ta liste`, () => w.restaurerLigne(l.key, avant)); };
  const lien = (label: string, onPress: () => void) => <Pressable key={label} accessibilityRole="button" onPress={onPress} hitSlop={6} style={s.lien}><Text style={ui.link}>{label}</Text></Pressable>;
- return <Modal visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
+ return <Modal {...nomDialogue('À vérifier avant l’envoi')} visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
   <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.fond}>
    <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={onFermer} />
    <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="À vérifier avant l’envoi" onAccessibilityEscape={onFermer}>

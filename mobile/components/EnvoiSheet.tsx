@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useMaison } from '../contexts/useMaison';
 import { construireItems } from '../lib/consolidation';
 import { envoyerListe } from '../lib/cart-jobs';
-import { Action, Raison, ui } from './MaisonUI';
+import { Action, Raison, ui, nomDialogue } from './MaisonUI';
 import { colors } from '../lib/theme';
 
 const DRIVES = [{ cle: 'carrefour', nom: 'Carrefour', site: 'carrefour.fr' }, { cle: 'leclerc', nom: 'E.Leclerc', site: 'leclercdrive.fr' }];
@@ -18,6 +18,10 @@ const DRIVES = [{ cle: 'carrefour', nom: 'Carrefour', site: 'carrefour.fr' }, { 
  */
 export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: () => void }) {
  const insets = useSafeAreaInsets(), { w, acheter } = useMaison();
+ // Le nombre affiché est figé à l'ouverture : l'envoi vide la liste pendant que
+ // la feuille se referme, et elle afficherait « 0 article ».
+ const [total, setTotal] = useState(acheter.length);
+ useEffect(() => { if (visible) setTotal(acheter.length); }, [visible]);
  const [envoi, setEnvoi] = useState(false), [erreur, setErreur] = useState<string | null>(null), [aide, setAide] = useState(false), verrou = useRef(false);
  async function envoyer() {
   if (verrou.current || !w.drives.length || !acheter.length) return;
@@ -33,12 +37,12 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
   } catch { setErreur('Connexion interrompue. Vérifie le suivi avant de réessayer.'); }
   finally { verrou.current = false; setEnvoi(false); }
  }
- return <Modal visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
+ return <Modal {...nomDialogue('Où fait-on les courses ?')} visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
   <View style={s.fond}>
    <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={onFermer} />
    <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="Où fait-on les courses ?" onAccessibilityEscape={onFermer}>
     <View style={s.entete}><Text style={[s.titre, { flex: 1, marginBottom: 0 }]} accessibilityRole="header">Où fait-on les courses ?</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} hitSlop={6} style={s.fermer}><Feather name="x" size={22} color={colors.text} /></Pressable></View>
-    <Text style={[ui.detail, { marginTop: 0, marginBottom: 12, paddingHorizontal: 4 }]}>{acheter.length} article{acheter.length > 1 ? 's' : ''} à envoyer, dans un drive ou les deux.</Text>
+    <Text style={[ui.detail, { marginTop: 0, marginBottom: 12, paddingHorizontal: 4 }]}>{total} article{total > 1 ? 's' : ''} à envoyer, dans un drive ou les deux.</Text>
     <View style={{ gap: 10 }}>
      {DRIVES.map(d => { const coche = w.drives.includes(d.cle); return <Pressable key={d.cle} accessibilityRole="checkbox" accessibilityState={{ checked: coche, disabled: envoi }} aria-checked={coche} accessibilityLabel={d.nom} disabled={envoi} onPress={() => w.basculerDrive(d.cle)} style={({ pressed }) => [s.drive, coche && s.driveCoche, pressed && { opacity: .85 }]}>
       <View style={s.icone}><Feather name="shopping-bag" size={18} color={colors.accent} /></View>
@@ -67,7 +71,7 @@ const s = StyleSheet.create({
  entete: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2, paddingLeft: 4 },
  fermer: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
  titre: { fontSize: 20, fontWeight: '700', color: colors.text, letterSpacing: -0.4, paddingHorizontal: 4, marginBottom: 4 },
- drive: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, padding: 12, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+ drive: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, padding: 12, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.traitControle },
  driveCoche: { borderWidth: 2, borderColor: colors.accent },
  icone: { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
  case: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.traitControle, alignItems: 'center', justifyContent: 'center' },

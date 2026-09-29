@@ -81,7 +81,7 @@ const f=StyleSheet.create({
 
 const c=StyleSheet.create({
  recherche:{flexDirection:'row',alignItems:'center',gap:8},
- champ:{flex:1,flexDirection:'row',alignItems:'center',gap:8,minHeight:46,paddingHorizontal:14,borderRadius:23,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},
+ champ:{flex:1,flexDirection:'row',alignItems:'center',gap:8,minHeight:46,paddingHorizontal:14,borderRadius:23,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.traitControle},
  saisie:{flex:1,fontSize:16,color:colors.text,paddingVertical:10},
  filtre:{flexDirection:'row',alignItems:'center',gap:6,minHeight:46,paddingHorizontal:14,borderRadius:23,backgroundColor:colors.accentSoft},
  filtreActif:{backgroundColor:colors.accent},

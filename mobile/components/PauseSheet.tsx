@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useWizard } from '../contexts/WizardContext';
 import { SESSION_STEPS } from '../lib/session-courses';
-import { Action, ui } from './MaisonUI';
+import { Action, ui, nomDialogue } from './MaisonUI';
 import { colors } from '../lib/theme';
 
 /**
@@ -16,7 +16,7 @@ export function PauseSheet({ visible, onFermer }: { visible: boolean; onFermer: 
  const insets = useSafeAreaInsets(), w = useWizard();
  const etape = SESSION_STEPS.find(e => e.cle === w.sessionEtape)?.label;
  const quitter = () => { onFermer(); if (router.canDismiss()) router.dismissAll(); router.replace('/'); };
- return <Modal visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
+ return <Modal {...nomDialogue('Faire une pause ?')} visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
   <View style={s.fond}>
    <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={onFermer} />
    <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="Faire une pause ?" onAccessibilityEscape={onFermer}>

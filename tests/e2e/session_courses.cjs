@@ -41,6 +41,9 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await oignons.click();if(!await oignons.isChecked())throw Error('Habit row not checked');
  await page.getByRole('tab',{name:'Produits laitiers'}).last().click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
  await page.getByRole('tab',{name:'Fruits & légumes'}).last().click();if(!await oignons.isChecked())throw Error('Habit choice lost when switching aisle');
+ // Quitter par « ‹ Bilan » sans valider ne perd pas non plus la coche.
+ await btn('Revenir au bilan').first().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
+ await page.getByRole('button',{name:/^Habitudes :/}).last().click();await oignons.waitFor();if(!await oignons.isChecked())throw Error('Habit choice lost when leaving to the bilan');
  await shot('4-habitudes');
  await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
  await btn('Annuler : Fruits & légumes : 1 retenu').click();await oignons.waitFor();
@@ -71,10 +74,10 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow');
  await page.setViewportSize({width:390,height:844});
  // Envoi sans blocage, puis clôture qui suit l'ordinateur (W2).
- await btn('Choisir mon drive').last().click();await texte('Où fait-on les courses ?').waitFor();await page.waitForTimeout(700);await shot('7-envoi');
+ await btn('Choisir mon drive').last().click();await page.getByRole('dialog',{name:'Où fait-on les courses ?'}).waitFor();await page.waitForTimeout(700);await shot('7-envoi');
  if(!await page.getByRole('checkbox',{name:'Carrefour'}).isChecked()||await page.getByRole('checkbox',{name:'E.Leclerc'}).isChecked())throw Error('Drive checkbox state not exposed');
  if(await page.getByRole('checkbox',{name:/C’est fait/}).count())throw Error('First send still gated');
- await btn('Envoyer à mon ordinateur').click();await texte('C’est envoyé.').waitFor();await texte('Ton ordinateur prend la liste').waitFor();await btn('Elle n’est pas installée ?').waitFor();
+ await btn('Envoyer à mon ordinateur').click();await texte('C’est envoyé.').waitFor();await texte('Ton ordinateur prend la liste').waitFor();const aide=btn('Elle n’est pas installée ?');await aide.waitFor();if((await aide.boundingBox()).height<44)throw Error('Install help link under 44px');
  await page.waitForTimeout(800);
  // La feuille d'envoi doit être refermée sur l'écran de clôture.
  if(await page.getByText('Où fait-on les courses ?',{exact:true}).isVisible().catch(()=>false))throw Error('Send sheet still open on closing screen');

@@ -24,6 +24,11 @@ export type Etat = {
   doublonsValides?: string[];
   /** Paires déclarées distinctes à la saisie (cleDistinct) : plus jamais redemandées. */
   distincts?: string[];
+  /**
+   * Coches d'habitudes pas encore validées (quantité, ou null pour « décoché »).
+   * Gardées dans le brouillon : quitter l'écran avant « Rayon suivant » ne perd rien.
+   */
+  choixHabitudes?: Record<string, number | null>;
   importsExternes?: string[];
   /** Extras déjà notés, proposés en un tap. Survit à la remise à zéro de la liste. */
   extrasFrequents?: Record<string, Frequent>;
@@ -63,6 +68,8 @@ type Contexte = Etat & {
   ajouterProduitListe: (id: string, quantite?: number, manque?: boolean) => void;
   deciderHabituel: (id: string, quantite: number, acheter: boolean) => void;
   annulerHabituel: (id: string, avant: InstantaneHabitude) => void;
+  choisirHabitude: (id: string, quantite: number | null) => void;
+  oublierChoixHabitudes: (ids: string[]) => void;
   retenirExtra: (ajout: { name: string; productId?: string }) => void;
   revoirHabitudes: (ids: string[]) => void;
   toggleRecette: (id: string, partsParDefaut: number) => void;
@@ -155,6 +162,8 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
     ligneQuantites: { ...e.ligneQuantites, [`produit:${id}`]: Math.max(1, Math.round(quantite)) },
     lignePossedees: { ...e.lignePossedees, [`produit:${id}`]: !acheter },
   })), []);
+  const choisirHabitude = useCallback((id: string, quantite: number | null) => setEtat(e => ({ ...e, choixHabitudes: { ...e.choixHabitudes, [id]: quantite } })), []);
+  const oublierChoixHabitudes = useCallback((ids: string[]) => setEtat(e => ({ ...e, choixHabitudes: Object.fromEntries(Object.entries(e.choixHabitudes ?? {}).filter(([id]) => !ids.includes(id))) })), []);
   const annulerHabituel = useCallback((id: string, avant: InstantaneHabitude) => setEtat(e => restaurerHabitude(e, id, avant)), []);
   const retenirExtra = useCallback((ajout: { name: string; productId?: string }) => setEtat(e => ({ ...e, extrasFrequents: retenirFrequent(e.extrasFrequents ?? {}, ajout) })), []);
   const revoirHabitudes = useCallback((ids: string[]) => setEtat(e=>({...e, habitudesVues: Object.fromEntries(Object.entries(e.habitudesVues??{}).filter(([id])=>!ids.includes(id)))})), []);
@@ -252,12 +261,12 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   const oublierAbandon = useCallback(() => setAvantAbandon(null), []);
 
   const valeur = useMemo<Contexte>(() => ({
-    ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes,
+    ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, choisirHabitude, oublierChoixHabitudes, retenirExtra, revoirHabitudes,
     toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
     abandonnerSession, abandonEnAttente: avantAbandon !== null, annulerAbandon, oublierAbandon,
   }), [
-    etat, demarrerSession, allerEtape, validerManque, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
+    etat, demarrerSession, allerEtape, validerManque, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, choisirHabitude, oublierChoixHabitudes, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
     abandonnerSession, avantAbandon, annulerAbandon, oublierAbandon,
   ]);
