@@ -11,7 +11,7 @@ import { ui } from './MaisonUI';
 import { colors } from '../lib/theme';
 /**
  * En-tête de session : une ligne d'étape, une pause, une barre en cinq
- * segments. Les segments déjà atteints ramènent à leur étape.
+ * segments, indicative : le retour du pied ramène à l'étape d'avant.
  *
  * Navigation : chaque étape s'empile sur la précédente, si bien que le
  * retour (geste iOS, bouton Android) ramène toujours à l'étape d'avant.
@@ -25,7 +25,7 @@ export function SessionProgress({step}:{step:SessionStep}) {
   <Text accessibilityRole="header" style={[ui.detail,{marginTop:0,fontVariant:['tabular-nums']}]}>Étape {index+1} sur {SESSION_STEPS.length} · {SESSION_STEPS[index].label}</Text>
   <Pressable accessibilityRole="button" accessibilityLabel="Faire une pause" onPress={()=>setPause(true)} style={({pressed})=>[s.pause,pressed&&{opacity:.7}]}><Ionicons name="pause" size={20} color={colors.accent}/></Pressable>
  </View>
- <View style={s.barre}>{SESSION_STEPS.map((e,i)=><Pressable key={e.cle} accessibilityRole="button" accessibilityLabel={`Étape ${i+1} sur ${SESSION_STEPS.length} : ${e.label}`} accessibilityState={{selected:i===index,disabled:i>index}} disabled={i>index} hitSlop={{top:14,bottom:14}} onPress={()=>{if(i<index)router.dismissTo(`/wizard/${e.cle}`);}} style={s.segment}><View style={[s.trait,i<=index&&{backgroundColor:colors.accent}]}/></Pressable>)}</View>
+ <View style={s.barre} accessible={false} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>{SESSION_STEPS.map((e,i)=><View key={e.cle} style={s.segment}><View style={[s.trait,i<=index&&{backgroundColor:colors.accent}]}/></View>)}</View>
  <PauseSheet visible={pause} onFermer={()=>setPause(false)}/>
  </SafeAreaView>;
 }

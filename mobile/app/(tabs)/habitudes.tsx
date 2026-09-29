@@ -25,11 +25,11 @@ export default function Habitudes({session=false}:{session?:boolean}){
  const items=cat?itemsDe(cat.cle):[];
  const fini=(cle:string)=>{const l=itemsDe(cle);return l.length>0&&l.every(x=>w.habitudesVues?.[x.id]);};
  const annulation=useAnnulation();
- // Une coche non validée vit dans le brouillon (choixHabitudes) ; sinon on
- // part de ce qui est déjà dans la liste. Quitter l'écran ne perd rien.
- const choix:Record<string,number>=Object.fromEntries(items.flatMap(x=>{const c=w.choixHabitudes?.[x.id];if(c!==undefined)return c===null?[]:[[x.id,c]];return w.quotidien[x.id]==='needed'?[[x.id,nombreArticles(w.quotidienQty[x.id]??1)]]:[];}));
- const basculer=(id:string)=>w.choisirHabitude(id,id in choix?null:nombreArticles(w.quotidienQty[id]??1));
- const quantite=(id:string,n:number)=>w.choisirHabitude(id,nombreArticles(n));
+ // Cocher, c'est ajouter à la liste tout de suite ; décocher, c'est « déjà
+ // chez moi ». « Rayon suivant » ne fait que classer le reste du rayon.
+ const choix:Record<string,number>=Object.fromEntries(items.filter(x=>w.quotidien[x.id]==='needed'&&!w.lignePossedees[`produit:${x.id}`]).map(x=>[x.id,nombreArticles(w.quotidienQty[x.id]??1)]));
+ const basculer=(id:string)=>w.deciderHabituel(id,nombreArticles(w.quotidienQty[id]??1),!(id in choix));
+ const quantite=(id:string,n:number)=>w.deciderHabituel(id,nombreArticles(n),true);
  // Rayon suivant encore à passer, sinon le premier resté en arrière.
  const index=categories.findIndex(c=>c.cle===cat?.cle),aPasser=categories.filter(c=>c.cle!==cat?.cle&&itemsDe(c.cle).some(x=>!w.habitudesVues?.[x.id]));
  const suivant=aPasser.find(c=>categories.indexOf(c)>index)??aPasser[0];
@@ -41,17 +41,16 @@ export default function Habitudes({session=false}:{session?:boolean}){
   if(cat&&items.length){
    const avant:Record<string,InstantaneHabitude>=Object.fromEntries(items.map(x=>[x.id,instantaneHabitude(w,x.id)]));
    items.forEach(x=>w.deciderHabituel(x.id,choix[x.id]??1,x.id in choix));
-   const ids=items.map(x=>x.id),oublier=()=>w.oublierChoixHabitudes(ids);oublier();
    // Le toast ne vaut que si l'on reste ici ; après le dernier rayon, le
    // retour du pied rouvre la liste, qui reflète les choix faits.
    if(!suivant){terminer();return;}
    allerA(suivant.cle);
-   annulation.proposer(`${cat.label} : ${retenus} retenu${retenus>1?'s':''}`,()=>{items.forEach(x=>w.annulerHabituel(x.id,avant[x.id]));oublier();setRayon(cat.cle);});
+   annulation.proposer(`${cat.label} : ${retenus} retenu${retenus>1?'s':''}`,()=>{items.forEach(x=>w.annulerHabituel(x.id,avant[x.id]));setRayon(cat.cle);});
   }else if(suivant)allerA(suivant.cle);else terminer();
  }
  const libelle=`${suivant?'Rayon suivant':session?'Revenir au bilan':'Vérifier ma liste'}${retenus?` · ${retenus} retenu${retenus>1?'s':''}`:''}`;
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><View style={{paddingHorizontal:20,paddingTop:session?4:20,paddingBottom:4}}><Head title="Mes habitudes" back={!session} avatar={!session}/></View>
- <View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8,paddingHorizontal:20,paddingTop:session?8:0,paddingBottom:8}}>{categories.map(c=>{const actif=cat?.cle===c.cle,ok=fini(c.cle)&&!actif;return <Pressable key={c.cle} accessibilityRole="tab" accessibilityState={{selected:actif}} accessibilityLabel={`${c.label}${ok?', passé en revue':''}`} onPress={()=>allerA(c.cle)} style={[h.rayon,actif&&{backgroundColor:colors.accent}]}>{ok&&<Feather name="check" size={15} color={colors.accent}/>}<Text style={{color:actif?colors.accentContrast:colors.accent,fontWeight:'600'}}>{c.label}</Text></Pressable>;})}</ScrollView></View>
+ <View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8,paddingHorizontal:20,paddingTop:session?8:0,paddingBottom:8}}>{categories.map(c=>{const actif=cat?.cle===c.cle,ok=fini(c.cle)&&!actif;return <Pressable key={c.cle} accessibilityRole="tab" accessibilityState={{selected:actif}} aria-selected={actif} accessibilityLabel={`${c.label}${ok?', passé en revue':''}`} onPress={()=>allerA(c.cle)} style={[h.rayon,actif&&{backgroundColor:colors.accent,borderColor:colors.accent}]}>{ok&&<Feather name="check" size={15} color={colors.accent}/>}<Text style={{color:actif?colors.accentContrast:colors.accent,fontWeight:'600'}}>{c.label}</Text></Pressable>;})}</ScrollView></View>
  <ScrollView contentContainerStyle={[ui.content,{paddingTop:4,gap:8}]}>
  {p.chargement&&<ActivityIndicator/>}{p.erreur&&<><Text style={ui.error}>{p.erreur}</Text><Action secondary onPress={p.recharger}>Réessayer</Action></>}
  {cat&&items.length>0&&<Text style={ui.detail}>Touche ce qu’il te faut. Le reste est considéré comme déjà chez toi.</Text>}
@@ -69,7 +68,7 @@ export default function Habitudes({session=false}:{session?:boolean}){
  <View style={ui.footer}>{annulation.toast}<Action onPress={valider}>{libelle}</Action></View></SafeAreaView>
 }
 const h=StyleSheet.create({
- rayon:{minHeight:44,flexDirection:'row',alignItems:'center',gap:5,paddingHorizontal:14,borderRadius:22,backgroundColor:colors.accentSoft},
+ rayon:{minHeight:44,flexDirection:'row',alignItems:'center',gap:5,paddingHorizontal:14,borderRadius:22,backgroundColor:colors.accentSoft,borderWidth:1,borderColor:colors.traitControle},
  ligne:{flexDirection:'row',alignItems:'center',gap:8,backgroundColor:colors.surface,borderRadius:12,paddingLeft:6,paddingRight:10,borderWidth:1,borderColor:colors.surface},
  ligneOn:{borderWidth:2,borderColor:colors.accent},
  photo:{width:44,height:44,borderRadius:8},

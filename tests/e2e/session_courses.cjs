@@ -44,12 +44,15 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await page.getByRole('tab',{name:'Fruits & légumes'}).last().click();if(!await oignons.isChecked())throw Error('Habit choice lost when switching aisle');
  // Quitter par « ‹ Bilan » sans valider ne perd pas non plus la coche.
  await btn('Revenir au bilan').first().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
+ // Cocher, c'est déjà ajouter à la liste : le bilan compte la coche sans « Rayon suivant ».
+ await btn('Habitudes : 1 retenue sur 2').waitFor();
  await page.getByRole('button',{name:/^Habitudes :/}).last().click();await oignons.waitFor();if(!await oignons.isChecked())throw Error('Habit choice lost when leaving to the bilan');
  await shot('4-habitudes');
  await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
  await btn('Annuler : Fruits & légumes : 1 retenu').click();await oignons.waitFor();
- if(await oignons.isChecked())throw Error('Undo did not restore the aisle');
- await oignons.click();await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
+ // Annuler le rayon défait le classement du reste, pas la coche.
+ if(!await oignons.isChecked())throw Error('Undo removed the checked habit');
+ await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
  await btn('Revenir au bilan').last().click();await btn('Habitudes : 1 retenue sur 2').waitFor();
  // Correction Extras : une ligne proche existe ; on peut l'augmenter (annulable) ou noter à part.
  await btn('Extras : Un produit hors habitudes').last().click();

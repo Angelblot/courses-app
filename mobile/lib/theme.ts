@@ -10,9 +10,10 @@ export const colors = {
   surface: '#FFFFFF',
   // Trait chaud pour les champs et séparateurs.
   border: '#DCE1D6',
-  // Contour d'un contrôle vide (case, rond à cocher) : 3,2:1 sur blanc, le
-  // minimum WCAG pour un contrôle. #DCE1D6 n'y tenait que 1,3:1.
-  traitControle: '#8A9383',
+  // Contour d'un contrôle (case, rond à cocher, champ, puce) : au moins 3:1,
+  // le minimum WCAG, sur les trois fonds de l'app — 3,7 sur blanc, 3,5 sur
+  // crème, 3,1 sur vert pâle. #8A9383 ne tenait pas sur le crème (2,96).
+  traitControle: '#7E8777',
   // Trait des pastilles d'ingrédients : gris neutre, mesuré chez Jow, qui
   // disparaît sous l'image au lieu de l'encadrer.
   traitPastille: '#E9E9E9',
