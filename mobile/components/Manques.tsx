@@ -9,7 +9,8 @@ import type { Product } from '../stores/products';
 import { Feather } from '@expo/vector-icons';
 import { manquesDuBrouillon, manqueActif, manquesAPreciser, type Manque } from '../lib/session-courses';
 import { colors } from '../lib/theme';
-import { Action, Head, PiedAvecRetour, Photo, Raison, ui, useAnnulation } from './MaisonUI';
+import { Action, Head, Photo, Raison, ui, useAnnulation } from './MaisonUI';
+import { revenirAuBilan } from './SessionProgress';
 const sources={widget:'Widget',siri:'Siri',manuel:'Noté dans l’app',precedent:'Ajout précédent'};
 /**
  * Un manque. Prêt d'office s'il désigne un produit du catalogue : on le
@@ -53,7 +54,7 @@ export function Manques({session=false}:{session?:boolean}) {
  {!loading&&entries.length>0&&<Text style={ui.detail}>Touche un produit pour changer son format ou sa quantité.</Text>}
  {!entries.length&&!loading&&!erreur&&<View style={ui.notice}><Text style={ui.productName}>Rien ne manque pour le moment.</Text><Text style={ui.subtitle}>Ajoute un produit dès que tu remarques qu’il manque à la maison.</Text></View>}
  {!session&&<Action secondary onPress={()=>router.push('/ajout')}>Noter un manque</Action>}
- </ScrollView><View style={ui.footer}>{annulation.toast}{session?<><PiedAvecRetour vers="recettes"><Action disabled={loading||!!erreur} onPress={()=>router.push('/wizard/habitudes')}>{pending.length?`Continuer · ${prets?`${prets} prêt${prets>1?'s':''}, `:''}${pending.length} à préciser`:prets>0?`Tout est bon (${prets})`:'Passer à mes habitudes'}</Action></PiedAvecRetour>{pending.length>0&&!loading&&<Raison>{pending.length>1?`${pending.length} produits restent à préciser, maintenant ou au bilan.`:`« ${pending[0][1].name} » reste à préciser, maintenant ou au bilan.`}</Raison>}</>:<Action onPress={()=>{w.demarrerSession();router.navigate(`/wizard/${w.sessionEtape??'recettes'}`);}}>{w.sessionEtape?'Reprendre mes courses':'Préparer mes courses'}</Action>}</View></SafeAreaView>;
+ </ScrollView><View style={ui.footer}>{annulation.toast}{session?<><Action disabled={loading||!!erreur} onPress={revenirAuBilan}>{pending.length?`Revenir au bilan · ${pending.length} à préciser`:'Revenir au bilan'}</Action>{pending.length>0&&!loading&&<Raison>{pending.length>1?`${pending.length} produits restent à préciser, maintenant ou au bilan.`:`« ${pending[0][1].name} » reste à préciser, maintenant ou au bilan.`}</Raison>}</>:<Action onPress={()=>{w.demarrerSession();router.navigate(`/wizard/${w.sessionEtape??'recettes'}`);}}>{w.sessionEtape?'Reprendre mes courses':'Préparer mes courses'}</Action>}</View></SafeAreaView>;
 }
 const m=StyleSheet.create({
  carte:{backgroundColor:colors.surface,padding:12,borderRadius:12,gap:10},

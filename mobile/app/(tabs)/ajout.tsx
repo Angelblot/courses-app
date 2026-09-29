@@ -4,7 +4,8 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, T
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Head, Action, PiedAvecRetour, Photo, ui, useAnnulation } from '../../components/MaisonUI';
+import { Head, Action, Photo, ui, useAnnulation } from '../../components/MaisonUI';
+import { revenirAuBilan } from '../../components/SessionProgress';
 import { ajouterProduit, basculerFavori } from '../../stores/products';
 import { useMaison } from '../../contexts/useMaison';
 import { lignesSimilaires } from '../../lib/session-courses';
@@ -29,6 +30,10 @@ export default function Ajout({session=false}:{session?:boolean}){
  const off=useRechercheOff(),resultats=off.resultats,saisie=nom.trim();
  function confirme(key:string,name:string,q:number,productId?:string){w.retenirExtra({name,productId});setAjoutes(a=>[{key,name,qty:q},...a.filter(x=>x.key!==key)]);setNom('');setFiche(null);off.reinitialiser();setQty(1);setHabituel(false);setErreur('');}
  function noterLibre(name:string,q=qty){const id=w.ajouterExtra({name,quantity:q,unit:'unité',rayon:'autre'},!session);confirme(`extra:${id}`,name,q);}
+ // Une ligne proche existe : on lui ajoute la quantité plutôt que de créer un doublon.
+ function ajouterALigne(l:{key:string;name:string;totalQuantity:number}){const avant=w.ligneQuantites[l.key];w.modifierLigne(l.key,l.totalQuantity+qty);annulation.proposer(`${l.name} : ${l.totalQuantity} → ${l.totalQuantity+qty}`,()=>w.restaurerLigne(l.key,avant));setNom('');off.reinitialiser();setQty(1);}
+ // Noter à part vaut réponse : le bilan ne demandera pas si c'est un doublon.
+ function noterAPart(name:string){similaires.forEach(l=>w.declarerDistinct(name,l.name));noterLibre(name);}
  function ajouterCatalogue(id:string,name:string,q=qty){w.ajouterProduitListe(id,q,!session);confirme(`produit:${id}`,name,q,id);}
  function choisirFrequent(f:Frequent){const produit=f.productId?p.produits.find(x=>x.id===f.productId):undefined;if(produit)ajouterCatalogue(produit.id,produit.name,1);else noterLibre(f.name,1);}
  function retirer(x:Ajoute){const avant=w.ligneQuantites[x.key];w.modifierLigne(x.key,0);setAjoutes(a=>a.filter(y=>y.key!==x.key));annulation.proposer(`${x.name} retiré de ta liste`,()=>{w.restaurerLigne(x.key,avant);setAjoutes(a=>[x,...a]);});}
@@ -46,10 +51,10 @@ export default function Ajout({session=false}:{session?:boolean}){
   <Pressable accessibilityRole="button" accessibilityLabel="Scanner un code-barres" onPress={scanner} style={({pressed})=>[a.scan,pressed&&{opacity:.7}]}><Feather name="maximize" size={20} color={colors.accent}/></Pressable>
  </View>
  {saisie?<>
-  {similaires.length>0&&<><Text style={ui.section}>Déjà dans ta liste</Text>{similaires.map(l=><View key={l.key} style={ui.product}><Photo name={l.name} url={p.produits.find(x=>x.id===l.product_id)?.image_url}/><View style={{flex:1}}><Text style={ui.productName}>{l.name}</Text><Text style={ui.detail}>{[...new Set(l.sources.map(s=>s.label))].join(' · ')}</Text></View><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel={`Diminuer ${l.name}`} style={ui.iconButton} onPress={()=>w.modifierLigne(l.key,Math.max(0,l.totalQuantity-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{l.totalQuantity}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Augmenter ${l.name}`} style={ui.iconButton} onPress={()=>w.modifierLigne(l.key,l.totalQuantity+1)}><Text style={ui.title}>+</Text></Pressable></View></View>)}</>}
+  {similaires.length>0&&<><Text style={ui.section}>Déjà dans ta liste</Text>{similaires.map(l=><View key={l.key} style={[ui.product,{flexWrap:'wrap'}]}><Photo name={l.name} url={p.produits.find(x=>x.id===l.product_id)?.image_url}/><View style={{flex:1}}><Text style={ui.productName}>{l.name}</Text><Text style={ui.detail}>{[...new Set(l.sources.map(s=>s.label))].join(' · ')}</Text></View><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel={`Diminuer ${l.name}`} style={ui.iconButton} onPress={()=>w.modifierLigne(l.key,Math.max(0,l.totalQuantity-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{l.totalQuantity}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Augmenter ${l.name}`} style={ui.iconButton} onPress={()=>w.modifierLigne(l.key,l.totalQuantity+1)}><Text style={ui.title}>+</Text></Pressable></View><View style={{width:'100%'}}><Action onPress={()=>ajouterALigne(l)}>{`+ ${qty} · passer à ${l.totalQuantity+qty}`}</Action></View></View>)}</>}
   <View style={ui.sectionRow}><Text style={ui.productName}>Nombre d’articles</Text><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel="Diminuer la quantité" style={ui.iconButton} onPress={()=>setQty(nombreArticles(qty-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{qty}</Text><Pressable accessibilityRole="button" accessibilityLabel="Augmenter la quantité" style={ui.iconButton} onPress={()=>setQty(nombreArticles(qty+1))}><Text style={ui.title}>+</Text></Pressable></View></View>
   {locaux.length>0&&<><Text style={ui.section}>Dans tes produits</Text><ProductSuggestions items={locaux.map(productSuggestion)} actionLabel={`Ajouter × ${qty}`} onSelect={id=>{const produit=locaux.find(p=>p.id===id);if(produit)ajouterCatalogue(produit.id,produit.name);}}/></>}
-  <Action disabled={busy} onPress={()=>noterLibre(saisie)}>{`Noter « ${saisie} »`}</Action>
+  {similaires.length?<Pressable accessibilityRole="button" disabled={busy} onPress={()=>noterAPart(saisie)} style={{minHeight:44,alignItems:'center',justifyContent:'center'}}><Text style={ui.link}>{`Noter « ${saisie} » à part`}</Text></Pressable>:<Action disabled={busy} onPress={()=>noterLibre(saisie)}>{`Noter « ${saisie} »`}</Action>}
   {saisie.length>=3&&!resultats&&<Action secondary disabled={busy||off.enRecherche} onPress={search}>{off.enRecherche?'Recherche en cours…':`Chercher « ${saisie} » sur Open Food Facts`}</Action>}
   {busy&&<ActivityIndicator/>}{off.enRecherche&&<View style={ui.sectionRow}><ActivityIndicator/><Text accessibilityLiveRegion="polite" style={ui.detail}>{off.progression}</Text></View>}{!!off.erreur&&<Text accessibilityLiveRegion="polite" style={ui.error}>{off.erreur}</Text>}
   {resultats?.length===0&&!busy&&!off.enRecherche&&!erreur&&!off.erreur&&<Text style={ui.subtitle}>Aucun produit trouvé. Précise le nom ou scanne son code-barres.</Text>}
@@ -61,7 +66,7 @@ export default function Ajout({session=false}:{session?:boolean}){
  </>}
  {!!erreur&&<Text accessibilityLiveRegion="polite" style={ui.error}>{erreur}</Text>}
  {ajoutes.length>0&&<View style={{gap:2,marginTop:4}}><Text accessibilityLiveRegion="polite" style={ui.detail}>Ajouté à ta liste</Text>{ajoutes.map(x=><View key={x.key} style={ui.sectionRow}><View style={[ui.row,{flex:1,gap:8}]}><Feather name="check" size={18} color={colors.accent}/><Text style={a.ajoute}>{x.qty} × {x.name}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${x.name}`} onPress={()=>retirer(x)} style={ui.iconButton}><Text style={ui.link}>Retirer</Text></Pressable></View>)}</View>}
- </ScrollView>{session?<View style={ui.footer}>{annulation.toast}<PiedAvecRetour vers="habitudes"><Action onPress={()=>router.push('/wizard/recap')}>Faire le bilan de ma liste</Action></PiedAvecRetour></View>:<View style={{marginBottom:insets.bottom+8}}>{annulation.toast}</View>}</SafeAreaView>
+ </ScrollView>{session?<View style={ui.footer}>{annulation.toast}<Action onPress={revenirAuBilan}>Revenir au bilan</Action></View>:<View style={{marginBottom:insets.bottom+8}}>{annulation.toast}</View>}</SafeAreaView>
 }
 const a=StyleSheet.create({
  champ:{flex:1,flexDirection:'row',alignItems:'center',gap:8,minHeight:48,paddingHorizontal:14,borderRadius:12,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},

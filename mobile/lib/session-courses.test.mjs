@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { manquesDuBrouillon, manquesAPreciser, doublonsPossibles, instantaneHabitude, restaurerHabitude, resumeBilan, lignesSimilaires, abandonner } from './session-courses.ts';
+import { manquesDuBrouillon, manquesAPreciser, doublonsPossibles, instantaneHabitude, restaurerHabitude, resumeBilan, lignesSimilaires, abandonner, cleDistinct, etapeDeReprise } from './session-courses.ts';
 import { listeMaison } from './liste-maison.ts';
 import { importerAjouts } from './widget-products.ts';
 const base={selectedRecipes:{},quotidien:{},quotidienQty:{},extras:[],choixProduits:{},drives:[],ligneQuantites:{},lignePossedees:{}};
@@ -76,4 +76,16 @@ test('abandonner des courses garde les manques notés et efface le reste',()=>{
  assert.deepEqual(a.extras.map(x=>x.id),['s']);assert.deepEqual(Object.keys(a.manques),['produit:m','extra:s']);
  assert.deepEqual([a.habitudesVues,a.ligneQuantites,a.lignePossedees,a.doublonsValides,a.choixProduits],[{},{},{},[],{}]);
  assert.deepEqual([a.importsExternes,a.extrasFrequents,a.drives],[['i'],{z:{name:'Z',count:2}},['leclerc']]);
+});
+test('un produit noté « à part » ne revient pas comme doublon, même si les quantités changent',()=>{
+ const e={...base,quotidien:{[p.id]:'needed'},extras:[{id:'x',name:'Pommes de terre bio',quantity:1,unit:'unité',rayon:'fruits_legumes'}]};
+ const lines=listeMaison(e,[],[p]);
+ assert.equal(doublonsPossibles(lines,[],[cleDistinct('Pommes de terre','Pommes de terre bio')]).length,0);
+ assert.equal(doublonsPossibles(lines.map(l=>({...l,totalQuantity:l.totalQuantity+3})),[],[cleDistinct('pommes de terre bio','POMMES DE TERRE')]).length,0);
+ assert.equal(doublonsPossibles(lines,[],[]).length,1);
+});
+test('un brouillon arrêté sur une ancienne étape reprend au bilan',()=>{
+ assert.equal(etapeDeReprise('recettes'),'recettes');assert.equal(etapeDeReprise('recap'),'recap');
+ for(const v of ['manques','habitudes','exceptions'])assert.equal(etapeDeReprise(v),'recap');
+ assert.equal(etapeDeReprise(undefined),undefined);assert.equal(etapeDeReprise('inconnue'),undefined);
 });

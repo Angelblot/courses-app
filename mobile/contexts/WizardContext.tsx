@@ -1,4 +1,4 @@
-import { abandonner, manquesDuBrouillon, restaurerHabitude, type InstantaneHabitude, type Manque, type SessionStep } from '../lib/session-courses';
+import { abandonner, cleDistinct, etapeDeReprise, manquesDuBrouillon, restaurerHabitude, type InstantaneHabitude, type Manque, type SessionStep } from '../lib/session-courses';
 import { retenirFrequent, type Frequent } from '../lib/extras-frequents';
 import { WidgetSync } from '../components/WidgetSync';
 import { importerAjouts } from '../lib/widget-products';
@@ -22,6 +22,8 @@ export type Etat = {
   sessionEtape?: SessionStep;
   manques?: Record<string, Manque>;
   doublonsValides?: string[];
+  /** Paires déclarées distinctes à la saisie (cleDistinct) : plus jamais redemandées. */
+  distincts?: string[];
   importsExternes?: string[];
   /** Extras déjà notés, proposés en un tap. Survit à la remise à zéro de la liste. */
   extrasFrequents?: Record<string, Frequent>;
@@ -52,6 +54,7 @@ type Contexte = Etat & {
   allerEtape: (etape: SessionStep) => void;
   validerManque: (key: string, quantity: number, productId?: string) => void;
   accepterDoublon: (id: string) => void;
+  declarerDistinct: (a: string, b: string) => void;
   pret: boolean; sauvegardeErreur: string | null;
   modifierLigne: (key: string, n: number) => void;
   /** Remet la quantité d'une ligne telle qu'elle était, pour annuler un retrait. */
@@ -96,7 +99,7 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
       if (brut) {
         const data = JSON.parse(brut);
         if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Brouillon invalide');
-        setEtat({ ...INITIAL, ...data });
+        setEtat({ ...INITIAL, ...data, sessionEtape: etapeDeReprise(data.sessionEtape) });
       }
       setStockagePret(true);
     }).catch(() => { if (actif) setSauvegardeErreur('Impossible de restaurer le brouillon sur cet appareil.'); })
@@ -223,6 +226,7 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
     manques: manquesDuBrouillon(e), sessionEtape: 'recettes', habitudesVues: {}, doublonsValides: [],
   }), []);
   const allerEtape = useCallback((sessionEtape: SessionStep) => setEtat(e => ({ ...e, sessionEtape })), []);
+  const declarerDistinct = useCallback((a: string, b: string) => setEtat(e => ({ ...e, distincts: [...(e.distincts ?? []), cleDistinct(a, b)] })), []);
   const accepterDoublon = useCallback((id: string) => setEtat(e=>({...e,doublonsValides:[...(e.doublonsValides??[]),id]})),[]);
   const validerManque = useCallback((key: string, quantity: number, productId?: string) => setEtat(e => {
     const qty = Math.max(1, Math.round(quantity));
@@ -248,12 +252,12 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   const oublierAbandon = useCallback(() => setAvantAbandon(null), []);
 
   const valeur = useMemo<Contexte>(() => ({
-    ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes,
+    ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes,
     toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
     abandonnerSession, abandonEnAttente: avantAbandon !== null, annulerAbandon, oublierAbandon,
   }), [
-    etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
+    etat, demarrerSession, allerEtape, validerManque, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
     abandonnerSession, avantAbandon, annulerAbandon, oublierAbandon,
   ]);

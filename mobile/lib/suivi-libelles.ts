@@ -47,3 +47,23 @@ export function resume(travail: {
   if (travail.status === 'failed') return travail.error ?? "Réessaie depuis l'extension.";
   return libelleEtat(travail.status);
 }
+
+/** État de chacune des trois étapes de l'écran « C'est envoyé. ». */
+export type EtapeEnvoi = 'fait' | 'encours' | 'attention' | 'erreur' | 'avenir';
+
+/**
+ * Liste envoyée, prise en charge par l'ordinateur, panier rempli : l'état de
+ * chaque étape selon le statut du travail. Sans statut (pas encore lu), on
+ * attend l'ordinateur.
+ */
+export function etapesEnvoi(statut: string | undefined): [EtapeEnvoi, EtapeEnvoi, EtapeEnvoi] {
+  switch (statut) {
+    case 'claimed':
+    case 'running': return ['fait', 'fait', 'encours'];
+    case 'needs_action': return ['fait', 'fait', 'attention'];
+    case 'done': return ['fait', 'fait', 'fait'];
+    case 'failed':
+    case 'cancelled': return ['fait', 'fait', 'erreur'];
+    default: return ['fait', 'encours', 'avenir'];
+  }
+}

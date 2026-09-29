@@ -1,5 +1,6 @@
 import { ProductSuggestions, productSuggestion } from '../../components/ProductSuggestions';
-import { doublonsPossibles, manquesAPreciser, resumeBilan } from '../../lib/session-courses';
+import { doublonsPossibles, manqueActif, manquesAPreciser, manquesDuBrouillon, resumeBilan } from '../../lib/session-courses';
+import { rayonDepuisLibelle } from '../../lib/rayons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,7 +22,7 @@ const pluriel=(n:number,mot:string)=>`${n} ${mot}${n>1?'s':''}`;
 export default function Liste({session=false}:{session?:boolean}){
  const {w,p,r,lignes,acheter,loading,erreur,stale}=useMaison();
  const [owned,setOwned]=useState(false),[nom,setNom]=useState(''),[ouverte,setOuverte]=useState<string|null>(null),[detail,setDetail]=useState(!session),[regler,setRegler]=useState(false),[envoi,setEnvoi]=useState(false);
- const doublons=doublonsPossibles(acheter,w.doublonsValides),manques=manquesAPreciser(w,p.produits.map(x=>x.id));
+ const doublons=doublonsPossibles(acheter,w.doublonsValides,w.distincts),manques=manquesAPreciser(w,p.produits.map(x=>x.id));
  const visibles=lignes.filter(l=>l.owned===owned);
  const aPreciser=acheter.filter(l=>l.aPreciser).length,points=manques.length+doublons.length;
  const annulation=useAnnulation();
@@ -39,6 +40,7 @@ export default function Liste({session=false}:{session?:boolean}){
  {session?loading&&!acheter.length?<View style={[b.hero,{minHeight:68}]} accessible accessibilityLabel="Préparation de ta liste"><ActivityIndicator color={colors.accent}/><Text style={ui.detail}>Préparation de ta liste…</Text></View>:<>
   <View style={b.hero} accessible accessibilityRole="header" accessibilityLabel={`${pluriel(acheter.length,'article')} ${blocage?'à acheter':acheter.length>1?'prêts':'prêt'}. ${resumeBilan(w).join(', ')}`}><Text style={b.nombre}>{acheter.length}</Text><View style={{flex:1}}><Text style={b.pret}>{acheter.length>1?'articles':'article'} {blocage?'à acheter':acheter.length>1?'prêts':'prêt'}</Text><Text style={ui.detail}>{resumeBilan(w).join(' · ')}</Text></View></View>
   {vignettes.length>0&&<View style={[ui.row,{gap:0,paddingLeft:6}]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>{vignettes.map((l,i)=><Photo key={l.key} name={l.name} url={p.produits.find(x=>x.id===l.product_id)?.image_url} style={[b.vignette,i>0&&{marginLeft:-10}]}/>)}</View>}
+  <Corrections/>
   <Pressable accessibilityRole="button" accessibilityLabel={detail?'Masquer la liste':'Voir et ajuster la liste'} accessibilityHint="Par rayon, quantités, déjà chez moi" accessibilityState={{expanded:detail}} onPress={()=>setDetail(!detail)} style={({pressed})=>[ui.product,{minHeight:60,paddingLeft:16},pressed&&{opacity:.85}]}><View style={{flex:1}}><Text style={ui.productName}>{detail?'Masquer la liste':'Voir et ajuster la liste'}</Text><Text style={[ui.detail,{marginTop:2}]}>Par rayon, quantités, déjà chez moi</Text></View><Feather name={detail?'chevron-up':'chevron-down'} size={20} color={colors.textMuted}/></Pressable>
  </>:<><Head title="Ma liste" back/><Text style={ui.subtitle}>{pluriel(acheter.length,'article')} à acheter</Text></>}
  {loading&&<ActivityIndicator color={colors.accent}/>}{erreur&&<><Text style={ui.error}>{erreur}</Text><Action secondary onPress={()=>{p.recharger();r.recharger();}}>Réessayer</Action></>}
@@ -61,7 +63,7 @@ export default function Liste({session=false}:{session?:boolean}){
  </ScrollView>
  <View>{annulation.toast}
  {points>0&&!loading&&<Pressable accessibilityRole="button" accessibilityLabel={`${pluriel(points,'chose')} à vérifier : ${detailPoints}. Vérifier`} onPress={()=>setRegler(true)} style={({pressed})=>[b.bandeau,pressed&&{opacity:.9}]}><Text style={b.bandeauTexte}><Text style={{fontWeight:'700'}}>{pluriel(points,'chose')} à vérifier</Text> · {detailPoints}</Text><Text style={[b.bandeauTexte,{fontWeight:'700'}]}>Vérifier</Text></Pressable>}
- <View style={ui.footer}>{session?<PiedAvecRetour vers="exceptions"><Action disabled={!!blocage||loading||!!erreur} onPress={()=>setEnvoi(true)}>Choisir mon drive</Action></PiedAvecRetour>:<Action disabled={!!blocage||loading||!!erreur} onPress={()=>setEnvoi(true)}>Choisir mon drive</Action>}{!!blocage&&!points&&!loading&&!erreur&&<Raison action={blocage.action} onPress={blocage.onPress}>{blocage.texte}</Raison>}</View></View>
+ <View style={ui.footer}>{session?<PiedAvecRetour vers="recettes"><Action disabled={!!blocage||loading||!!erreur} onPress={()=>setEnvoi(true)}>Choisir mon drive</Action></PiedAvecRetour>:<Action disabled={!!blocage||loading||!!erreur} onPress={()=>setEnvoi(true)}>Choisir mon drive</Action>}{!!blocage&&!points&&!loading&&!erreur&&<Raison action={blocage.action} onPress={blocage.onPress}>{blocage.texte}</Raison>}</View></View>
  <ReglerSheet visible={regler} onFermer={()=>setRegler(false)} manques={manques} doublons={doublons} products={p.produits} onRetrait={annulation.proposer} toast={annulation.toast}/>
  <EnvoiSheet visible={envoi} onFermer={()=>setEnvoi(false)}/>
  </SafeAreaView>
@@ -73,4 +75,39 @@ const b=StyleSheet.create({
  vignette:{width:40,height:40,borderRadius:20,borderWidth:2,borderColor:colors.bg,backgroundColor:colors.surface},
  bandeau:{marginHorizontal:12,marginBottom:8,borderRadius:14,backgroundColor:colors.attentionText,minHeight:48,paddingHorizontal:14,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},
  bandeauTexte:{color:colors.accentContrast,fontSize:14,flexShrink:1},
+ correction:{flexDirection:'row',alignItems:'center',gap:12,minHeight:60,paddingHorizontal:12,paddingVertical:8,borderRadius:12,backgroundColor:colors.surface},
+ rappel:{backgroundColor:colors.bg,borderWidth:1.5,borderColor:colors.border},
+ icone:{width:30,height:30,borderRadius:15,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},
+ iconeVide:{backgroundColor:'transparent',borderWidth:1.5,borderColor:colors.traitControle},
 });
+
+type EtatCorrection='ok'|'attention'|'rappel'|'ajout';
+/** Une correction ouverte depuis le bilan : son état en une ligne, et l'écran qu'on connaît. */
+function LigneCorrection({etat,titre,detail,action,onPress}:{etat:EtatCorrection;titre:string;detail:string;action?:string;onPress:()=>void}){
+ return <Pressable accessibilityRole="button" accessibilityLabel={`${titre} : ${detail}${action?`. ${action}`:''}`} onPress={onPress} style={({pressed})=>[b.correction,etat==='rappel'&&b.rappel,pressed&&{opacity:.85}]}>
+  <View style={[b.icone,etat==='attention'&&{backgroundColor:colors.attentionSoft},etat==='rappel'&&b.iconeVide]}>{etat==='ok'?<Feather name="check" size={16} color={colors.accent}/>:etat==='attention'?<Feather name="alert-circle" size={16} color={colors.attentionText}/>:etat==='ajout'?<Feather name="plus" size={16} color={colors.accent}/>:null}</View>
+  <View style={{flex:1}}><Text style={ui.productName}>{titre}</Text><Text style={[ui.detail,{marginTop:1}]}>{detail}</Text></View>
+  {action?<Text style={ui.link}>{action}</Text>:<Feather name="chevron-right" size={18} color={colors.textMuted}/>}
+ </Pressable>;
+}
+/**
+ * Manques, Habitudes, Extras : plus des étapes, des corrections. Rien ne
+ * bloque l'envoi ; ce qui n'a pas été vu est seulement rappelé.
+ */
+function Corrections(){
+ const {w,p}=useMaison();
+ const manques=Object.entries(manquesDuBrouillon(w)).filter(([key])=>manqueActif(w,key));
+ const pending=manquesAPreciser(w,p.produits.map(x=>x.id)).length,prets=manques.length-pending;
+ const favoris=p.produits.filter(x=>x.favorite&&rayonDepuisLibelle(x.category)&&!manques.some(([k])=>k===`produit:${x.id}`));
+ const vus=favoris.filter(x=>w.habitudesVues?.[x.id]),retenues=vus.filter(x=>w.quotidien[x.id]==='needed').length;
+ const extras=w.extras.filter(x=>!manques.some(([k])=>k===`extra:${x.id}`)&&w.ligneQuantites[`extra:${x.id}`]!==0).length;
+ const repas=Object.keys(w.selectedRecipes).length;
+ const ouvrir=(cle:string)=>router.push(`/wizard/${cle}`);
+ const pl=(n:number,mot:string)=>`${n} ${mot}${n>1?'s':''}`;
+ return <View style={{gap:8}}>
+  {!repas&&<LigneCorrection etat="rappel" titre="Repas" detail="Aucun repas choisi cette fois" action="Choisir" onPress={()=>router.dismissTo('/wizard/recettes')}/>}
+  <LigneCorrection etat={pending?'attention':manques.length?'ok':'ajout'} titre="Manques" detail={manques.length?`${pl(prets,'prêt')}${pending?`, ${pending} à préciser`:''}`:'Rien de noté'} onPress={()=>ouvrir('manques')}/>
+  {favoris.length>0&&(vus.length?<LigneCorrection etat="ok" titre="Habitudes" detail={`${pl(retenues,'retenue')} sur ${favoris.length}`} onPress={()=>ouvrir('habitudes')}/>:<LigneCorrection etat="rappel" titre="Habitudes" detail={`Pas encore passées · ${pl(favoris.length,'produit')}`} action="Passer" onPress={()=>ouvrir('habitudes')}/>)}
+  <LigneCorrection etat="ajout" titre="Extras" detail={extras?pl(extras,'ajouté'):'Un produit hors habitudes'} onPress={()=>ouvrir('exceptions')}/>
+ </View>;
+}

@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
-import { useExtensionConnue } from '../stores/extension';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -9,10 +8,6 @@ import { construireItems } from '../lib/consolidation';
 import { envoyerListe } from '../lib/cart-jobs';
 import { Action, Raison, ui } from './MaisonUI';
 import { colors } from '../lib/theme';
-
-// L'extension s'installe en mode développeur, depuis le dépôt : il n'y a pas
-// de lien public. On partage donc les consignes, vers le Mac ou par mail.
-const CONSIGNES = "Installer l'extension Courses dans Chrome :\n1. Ouvre chrome://extensions\n2. Active le « Mode développeur » (en haut à droite)\n3. « Charger l'extension non empaquetée », puis choisis le dossier extension/ du projet courses-app\n4. Dans l'extension, connecte-toi au même compte que sur ton iPhone.";
 
 const DRIVES = [{ cle: 'carrefour', nom: 'Carrefour', site: 'carrefour.fr' }, { cle: 'leclerc', nom: 'E.Leclerc', site: 'leclercdrive.fr' }];
 
@@ -23,12 +18,9 @@ const DRIVES = [{ cle: 'carrefour', nom: 'Carrefour', site: 'carrefour.fr' }, { 
  */
 export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: () => void }) {
  const insets = useSafeAreaInsets(), { w, acheter } = useMaison();
- const [envoi, setEnvoi] = useState(false), [erreur, setErreur] = useState<string | null>(null), [aide, setAide] = useState(false), [installee, setInstallee] = useState(false), verrou = useRef(false);
- // Premier envoi : tant que l'extension n'a jamais relevé de liste, on fait
- // d'abord confirmer qu'elle est installée.
- const premiere = useExtensionConnue(visible) === false, bloque = premiere && !installee;
+ const [envoi, setEnvoi] = useState(false), [erreur, setErreur] = useState<string | null>(null), [aide, setAide] = useState(false), verrou = useRef(false);
  async function envoyer() {
-  if (verrou.current || !w.drives.length || !acheter.length || bloque) return;
+  if (verrou.current || !w.drives.length || !acheter.length) return;
   verrou.current = true; setEnvoi(true); setErreur(null);
   try {
    const n = acheter.length, drives = w.drives.join(',');
@@ -53,26 +45,16 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
       <View style={{ flex: 1 }}><Text style={ui.productName}>{d.nom}</Text><Text style={[ui.detail, { marginTop: 1 }]}>{d.site}</Text></View>
       <View style={[s.case, coche && s.caseCochee]}>{coche && <Feather name="check" size={16} color={colors.accentContrast} />}</View>
      </Pressable>; })}
-     {premiere ? <View style={s.premiere}>
-      <Text style={ui.productName}>Avant le premier envoi</Text>
-      {['Installe l’extension Courses dans Chrome, sur ton ordinateur.', 'Connecte-la au même compte que sur ton iPhone.'].map((t, i) => <View key={t} style={[ui.row, { alignItems: 'flex-start' }]}><Text style={s.num}>{i + 1}.</Text><Text style={[ui.detail, { marginTop: 0, flex: 1, color: colors.text }]}>{t}</Text></View>)}
-      <Action secondary onPress={() => { void Share.share({ message: CONSIGNES }); }}>Envoyer les instructions d’installation</Action>
-      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: installee }} aria-checked={installee} accessibilityLabel="C’est fait, l’extension est installée" onPress={() => setInstallee(!installee)} style={[ui.row, { minHeight: 44 }]}>
-       <View style={[s.case, installee && s.caseCochee]}>{installee && <Feather name="check" size={16} color={colors.accentContrast} />}</View>
-       <Text style={[ui.productName, { fontWeight: '400', flex: 1 }]}>C’est fait, l’extension est installée</Text>
-      </Pressable>
-     </View> : <>
      <Pressable accessibilityRole="button" accessibilityState={{ expanded: aide }} accessibilityLabel="Comment ça marche ?" onPress={() => setAide(!aide)} style={s.info}>
       <Feather name="monitor" size={18} color={colors.textMuted} />
       <Text style={[ui.detail, { flex: 1, marginTop: 0 }]}>Le panier se remplit sur ton ordinateur, avec l’extension Chrome.</Text>
       <Text style={ui.link}>{aide ? 'Masquer' : 'Comment ?'}</Text>
      </Pressable>
      {aide && <Text style={[ui.detail, { marginTop: 0, paddingHorizontal: 4 }]}>Ouvre Chrome et connecte l’extension Courses au même compte que sur ton iPhone. Après l’envoi, clique sur « Remplir le panier » dans l’extension. Tu vérifies puis paies sur le site du drive.</Text>}
-     </>}
      {!!erreur && <Text accessibilityLiveRegion="polite" style={ui.error}>{erreur}</Text>}
      {envoi && <ActivityIndicator color={colors.accent} />}
-     <Action disabled={envoi || !w.drives.length || bloque} onPress={envoyer}>{envoi ? 'Envoi en cours…' : 'Envoyer à mon ordinateur'}</Action>
-     {!w.drives.length ? <Raison>Coche au moins un drive.</Raison> : bloque && <Raison>Coche « C’est fait » une fois l’extension installée.</Raison>}
+     <Action disabled={envoi || !w.drives.length} onPress={envoyer}>{envoi ? 'Envoi en cours…' : 'Envoyer à mon ordinateur'}</Action>
+     {!w.drives.length && <Raison>Coche au moins un drive.</Raison>}
     </View>
    </View>
   </View>
@@ -90,7 +72,5 @@ const s = StyleSheet.create({
  icone: { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
  case: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.traitControle, alignItems: 'center', justifyContent: 'center' },
  caseCochee: { backgroundColor: colors.accent, borderColor: colors.accent },
- premiere: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, gap: 8 },
- num: { width: 18, color: colors.textMuted, fontVariant: ['tabular-nums'] },
  info: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.surface },
 });

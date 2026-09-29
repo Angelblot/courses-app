@@ -34,3 +34,13 @@ test('un travail à reprendre le dit clairement', () => {
   const t = resume({ status: 'needs_action', progress: {}, error: 'Vérification demandée sur Carrefour.' });
   assert.match(t, /Carrefour/);
 });
+test('les trois étapes de la clôture suivent l’état du remplissage',async()=>{
+ const { etapesEnvoi } = await import('./suivi-libelles.ts');
+ assert.deepEqual(etapesEnvoi('pending'),['fait','encours','avenir']);
+ assert.deepEqual(etapesEnvoi('claimed'),['fait','fait','encours']);
+ assert.deepEqual(etapesEnvoi('running'),['fait','fait','encours']);
+ assert.deepEqual(etapesEnvoi('needs_action'),['fait','fait','attention']);
+ assert.deepEqual(etapesEnvoi('done'),['fait','fait','fait']);
+ assert.deepEqual(etapesEnvoi('failed'),['fait','fait','erreur']);
+ assert.deepEqual(etapesEnvoi(undefined),['fait','encours','avenir']);
+});

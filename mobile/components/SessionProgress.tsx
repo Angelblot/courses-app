@@ -4,7 +4,7 @@ import { PauseSheet } from './PauseSheet';
 import { router } from 'expo-router';
 // Ionicons pour la pause : les deux barres pleines se reconnaissent, là où
 // les rectangles à contour de Feather se lisaient comme une petite boîte.
-import { Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SESSION_STEPS, type SessionStep } from '../lib/session-courses';
 import { ui } from './MaisonUI';
@@ -35,3 +35,22 @@ const s=StyleSheet.create({
  segment:{flex:1,justifyContent:'center'},
  trait:{height:4,borderRadius:2,backgroundColor:colors.border},
 });
+
+/** Revient au bilan : `back` quand on y vient de là, sinon on le remplace. */
+export const revenirAuBilan=()=>router.canGoBack()?router.back():router.replace('/wizard/recap');
+
+/**
+ * En-tête d'une correction (Manques, Habitudes, Extras) ouverte depuis le
+ * bilan : un retour au bilan à gauche, la pause à droite, pas de barre
+ * d'étapes puisque ce ne sont plus des étapes.
+ */
+export function EnteteCorrection(){
+ const [pause,setPause]=useState(false);
+ return <SafeAreaView edges={['top']} style={{backgroundColor:colors.bg,paddingHorizontal:12,paddingBottom:4}}>
+ <View style={[ui.sectionRow,{minHeight:52}]}>
+  <Pressable accessibilityRole="button" accessibilityLabel="Revenir au bilan" onPress={revenirAuBilan} style={({pressed})=>[ui.row,{minHeight:44,gap:2,paddingRight:8},pressed&&{opacity:.7}]}><Feather name="chevron-left" size={24} color={colors.accent}/><Text style={ui.link}>Bilan</Text></Pressable>
+  <Pressable accessibilityRole="button" accessibilityLabel="Faire une pause" onPress={()=>setPause(true)} style={({pressed})=>[s.pause,pressed&&{opacity:.7}]}><Ionicons name="pause" size={20} color={colors.accent}/></Pressable>
+ </View>
+ <PauseSheet visible={pause} onFermer={()=>setPause(false)}/>
+ </SafeAreaView>;
+}

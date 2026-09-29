@@ -10,87 +10,75 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await page.addInitScript(({session,id})=>{localStorage.setItem('sb-qmymwicsgilhoihtfdjm-auth-token',JSON.stringify(session));if(!localStorage.getItem('seeded-session')){localStorage.setItem('tablee-maison-v1:'+id,JSON.stringify({quotidien:{oeufs:'needed',patates:'needed'},quotidienQty:{oeufs:1,patates:2},extras:[{id:'siri-lessive',name:'lessive',quantity:1,unit:'unité',rayon:'autre'}],manques:{'produit:oeufs':{name:'Œufs Plein Air',source:'widget'},'produit:patates':{name:'Pommes de terre',source:'widget'},'extra:siri-lessive':{name:'lessive',source:'siri'}}}));localStorage.setItem('seeded-session','yes');}}, {session,id:user.id});
  const dir=process.env.CAPTURES||'.impeccable/review/session-courses';fs.mkdirSync(dir,{recursive:true});const shot=n=>page.screenshot({path:`${dir}/${n}.png`});
  const btn=(name)=>page.getByRole('button',{name,exact:true});
- const visible=async(loc,msg)=>{const b=await loc.boundingBox();if(!b||b.y<0||b.y+b.height>844)throw Error(msg+' '+JSON.stringify(b));};
+ const texte=t=>page.getByText(t,{exact:true}).last();
  await page.goto('http://localhost:8082');await page.getByText('Les courses, à ton rythme.',{exact:true}).waitFor({timeout:60000});
- // Accueil A1 : lignes touchables, « Tout voir » en titre, plus de boutons sous la liste.
+ // Accueil : lignes touchables, « Tout voir » en titre.
  if(await btn('Voir mes manques').count())throw Error('Duplicate home button remains');
  await btn('Tout voir, 3 produits').waitFor();await btn('Noter un manque…').waitFor();
  await shot('0-accueil');
- await btn('Préparer mes courses').click();
- // S : la photo d'une recette ouvre un aperçu sans quitter la session.
- await btn('Voir la recette Poulet rôti aux légumes').click();await btn('Choisir ce repas').click();await btn('Retirer de mes repas').waitFor();
- // En-tête E1, sans barre d'onglets ni avatar.
- await page.getByText('Étape 1 sur 5 · Repas',{exact:true}).waitFor();
+ // Étape 1 sur 2 : les repas ; la photo ouvre un aperçu sans quitter la session.
+ await btn('Préparer mes courses').click();await texte('Étape 1 sur 2 · Repas').waitFor();
  if(await page.getByRole('tab',{name:/Réglages/}).count()||await btn('Réglages').count())throw Error('Tab bar or avatar visible in session');
- if(await btn('Revoir mes choix').count())throw Error('Duplicate review button remains');
- await btn('1 repas choisi, les revoir').waitFor();
- await shot('1-repas');
- await btn('Vérifier mes manques').click();await page.getByText('Mes manques',{exact:true}).last().waitFor();
- // Manques M : les produits du catalogue sont prêts, seule « lessive » attend.
- await page.getByText('« lessive » reste à préciser, maintenant ou au bilan.',{exact:true}).waitFor();
- if(!await btn('Continuer · 2 prêts, 1 à préciser').isEnabled())throw Error('Ready missing products block the session');
- await shot('2-manques');
- // AA : la pause ouvre une feuille ; abandonner s'annule depuis l'accueil.
- await btn('Faire une pause').click();await btn('Abandonner ces courses').click();
+ await btn('Voir la recette Poulet rôti aux légumes').click();await btn('Choisir ce repas').click();await btn('Retirer de mes repas').waitFor();
+ await btn('1 repas choisi, les revoir').waitFor();await shot('1-repas');
+ await btn('Voir ma liste').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
+ // Étape 2 sur 2 : le bilan, avec ses corrections ; rien ne bloque sauf les vrais problèmes.
+ await btn('Manques : 2 prêts, 1 à préciser').waitFor();await btn('Habitudes : Pas encore passées · 2 produits. Passer').waitFor();
+ await shot('2-bilan');
+ // Le retour du pied ramène aux repas, « Voir ma liste » au bilan.
+ await btn('Revenir à l’étape Repas').last().click();await texte('Étape 1 sur 2 · Repas').waitFor();await btn('Voir ma liste').last().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
+ // Correction Manques : produits du catalogue prêts, « lessive » à préciser plus tard.
+ await btn('Manques : 2 prêts, 1 à préciser').last().click();await texte('Mes manques').waitFor();
+ await texte('« lessive » reste à préciser, maintenant ou au bilan.').waitFor();await shot('3-manques');
+ // Pause : abandonner s'annule depuis l'accueil, puis on reprend au bilan.
+ await btn('Faire une pause').last().click();await btn('Abandonner ces courses').click();
  await btn('Annuler : Courses abandonnées. Tes manques restent notés.').click();
- await btn('Reprendre mes courses').waitFor();await btn('Reprendre mes courses').click();
- await btn('Faire une pause').last().click();await btn('Finir plus tard').click();await page.reload();await btn('Reprendre mes courses').click();
- await btn('Continuer · 2 prêts, 1 à préciser').click();
- // HB : une liste à cocher par rayon ; le reste du rayon est « déjà chez moi ».
+ await btn('Reprendre mes courses').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
+ await btn('Faire une pause').last().click();await btn('Finir plus tard').click();await page.reload();await btn('Reprendre mes courses').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
+ // Correction Habitudes : liste à cocher par rayon, choix gardés d'un rayon à l'autre, rayon annulable.
+ await btn('Habitudes : Pas encore passées · 2 produits. Passer').last().click();
  const oignons=page.getByRole('checkbox',{name:'Oignons jaunes'}).last();await oignons.waitFor();
- await shot('3-habitudes');
  await oignons.click();if(!await oignons.isChecked())throw Error('Habit row not checked');
- // Changer de rayon avant de valider ne perd pas la coche.
  await page.getByRole('tab',{name:'Produits laitiers'}).last().click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
  await page.getByRole('tab',{name:'Fruits & légumes'}).last().click();if(!await oignons.isChecked())throw Error('Habit choice lost when switching aisle');
+ await shot('4-habitudes');
  await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
- // Un rayon validé s'annule : on revient au rayon, décisions défaites.
  await btn('Annuler : Fruits & légumes : 1 retenu').click();await oignons.waitFor();
  if(await oignons.isChecked())throw Error('Undo did not restore the aisle');
  await oignons.click();await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
- await shot('3b-habitudes-annuler');
- await btn('Continuer vers les extras').last().click();
- // Le retour mène à l'étape d'avant, jamais plus loin.
- await btn('Revenir à l’étape Habitudes').last().click();await page.getByText('Étape 3 sur 5 · Habitudes',{exact:true}).last().waitFor();
- await btn('Continuer vers les extras').last().click();await page.getByText('Étape 4 sur 5 · Extras',{exact:true}).last().waitFor();
- // X2 : un champ, le reste apparaît avec la saisie.
- if(await btn('Noter « »').count())throw Error('Empty note button shown');
- await page.getByRole('textbox',{name:'Produit manquant',exact:true}).last().fill('Pommes de terre bio');
- // DB : la ligne déjà listée remonte en tête, avec son compteur.
- await page.getByText('Déjà dans ta liste',{exact:true}).last().waitFor();await btn('Augmenter Pommes de terre').last().waitFor();await shot('4b-extras-similaire');
- await btn('Noter « Pommes de terre bio »').click();
- await page.getByText('1 × Pommes de terre bio',{exact:true}).waitFor();
- // Un retrait s'annule depuis le toast.
- await btn('Retirer Pommes de terre bio').click();await btn('Annuler : Pommes de terre bio retiré de ta liste').click();await page.getByText('1 × Pommes de terre bio',{exact:true}).waitFor();
- await shot('4-extras');
- await btn('Faire le bilan de ma liste').click();
- // Z2 + R2 : le bilan annonce, un bandeau ouvre la feuille « À régler ».
- const regler=btn('2 choses à vérifier : 1 manque, 1 doublon. Vérifier');await regler.waitFor();
+ await btn('Revenir au bilan').last().click();await btn('Habitudes : 1 retenue sur 2').waitFor();
+ // Correction Extras : une ligne proche existe ; on peut l'augmenter (annulable) ou noter à part.
+ await btn('Extras : Un produit hors habitudes').last().click();
+ const champ=page.getByRole('textbox',{name:'Produit manquant',exact:true}).last();await champ.fill('Pommes de terre bio');
+ await texte('Déjà dans ta liste').waitFor();await shot('5-extras-similaire');
+ await btn('+ 1 · passer à 3').click();await btn('Annuler : Pommes de terre : 2 → 3').click();
+ await champ.fill('Pommes de terre bio');await btn('Noter « Pommes de terre bio » à part').click();
+ await texte('1 × Pommes de terre bio').waitFor();
+ await btn('Retirer Pommes de terre bio').click();await btn('Annuler : Pommes de terre bio retiré de ta liste').click();await texte('1 × Pommes de terre bio').waitFor();
+ await btn('Revenir au bilan').last().click();await btn('Extras : 1 ajouté').waitFor();
+ // Noté à part : pas redemandé comme doublon. Il reste la lessive à préciser.
+ const verifier=btn('1 chose à vérifier : 1 manque. Vérifier');await verifier.waitFor();
  if(await btn('Choisir mon drive').last().isEnabled())throw Error('Blocked list can reach drive');
  const style=await btn('Choisir mon drive').last().evaluate(el=>{const c=getComputedStyle(el);return [c.backgroundColor,c.opacity].join(' ');});
  if(style!=='rgb(236, 238, 233) 1')throw Error('Disabled button style '+style);
- await shot('5-bilan');
- await regler.click();await page.getByText('À vérifier avant l’envoi',{exact:true}).waitFor();
- await page.waitForTimeout(700);await shot('5b-regler');
- await btn('Garder 1 × lessive').click();await btn('Retirer Pommes de terre bio').last().click();
- await btn('Annuler : Pommes de terre bio retiré de ta liste').last().waitFor();
- await page.getByText('À vérifier avant l’envoi',{exact:true}).waitFor({state:'detached'});
- await page.getByText('articles prêts',{exact:true}).last().waitFor();
- if(!await btn('Choisir mon drive').last().isEnabled())throw Error('Settled list still blocked');
- await shot('5c-bilan-pret');
- await btn('Voir et ajuster la liste').last().click();await page.getByText('Fruits & légumes',{exact:true}).last().waitFor();
- await page.setViewportSize({width:1024,height:1366});await shot('5-bilan-tablette');
+ await shot('6-bilan-bloque');
+ await verifier.click();await texte('À vérifier avant l’envoi').waitFor();await page.waitForTimeout(700);await shot('6b-verifier');
+ await btn('Garder 1 × lessive').click();await page.getByText('À vérifier avant l’envoi',{exact:true}).waitFor({state:'detached'});
+ await texte('articles prêts').waitFor();if(!await btn('Choisir mon drive').last().isEnabled())throw Error('Settled list still blocked');
+ await shot('6c-bilan-pret');
+ await btn('Voir et ajuster la liste').last().click();await texte('Fruits & légumes').waitFor();
+ await page.setViewportSize({width:1024,height:1366});await shot('6-bilan-tablette');
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow');
  await page.setViewportSize({width:390,height:844});
- // D3 : le drive se choisit dans une feuille, puis C : un écran de clôture.
- await btn('Choisir mon drive').last().click();await page.getByText('Où fait-on les courses ?',{exact:true}).waitFor();await page.waitForTimeout(700);await shot('6-envoi');
+ // Envoi sans blocage, puis clôture qui suit l'ordinateur (W2).
+ await btn('Choisir mon drive').last().click();await texte('Où fait-on les courses ?').waitFor();await page.waitForTimeout(700);await shot('7-envoi');
  if(!await page.getByRole('checkbox',{name:'Carrefour'}).isChecked()||await page.getByRole('checkbox',{name:'E.Leclerc'}).isChecked())throw Error('Drive checkbox state not exposed');
- await page.getByRole('dialog').getByRole('button',{name:'Fermer',exact:true}).waitFor();
- await page.getByRole('checkbox',{name:'E.Leclerc'}).click();await page.getByRole('checkbox',{name:'E.Leclerc'}).click();
- // EB : l'extension n'a jamais relevé d'envoi ; il faut confirmer qu'elle est installée.
- if(await btn('Envoyer à mon ordinateur').isEnabled())throw Error('First send not gated');
- await page.getByRole('checkbox',{name:'C’est fait, l’extension est installée'}).click();
- await btn('Envoyer à mon ordinateur').click();await page.getByText('C’est envoyé.',{exact:true}).waitFor();await shot('7-envoye');
- await page.waitForTimeout(600);if(!sent||sent.items.length!==4||sent.items.find(x=>x.product_id==='patates')?.quantity!==2)throw Error('Incorrect consolidated payload '+JSON.stringify(sent));
+ if(await page.getByRole('checkbox',{name:/C’est fait/}).count())throw Error('First send still gated');
+ await btn('Envoyer à mon ordinateur').click();await texte('C’est envoyé.').waitFor();await texte('Ton ordinateur prend la liste').waitFor();await btn('Elle n’est pas installée ?').waitFor();
+ await page.waitForTimeout(800);
+ // La feuille d'envoi doit être refermée sur l'écran de clôture.
+ if(await page.getByText('Où fait-on les courses ?',{exact:true}).isVisible().catch(()=>false))throw Error('Send sheet still open on closing screen');
+ await shot('8-envoye');
+ await page.waitForTimeout(300);if(!sent||sent.items.length!==5||sent.items.find(x=>x.product_id==='patates')?.quantity!==2)throw Error('Incorrect consolidated payload '+JSON.stringify(sent));
  if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true,items:sent.items.length,errors}));
  }catch(e){console.error(e);process.exitCode=1}finally{await b.close()}})();

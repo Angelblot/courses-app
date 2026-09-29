@@ -2,12 +2,24 @@ import type { Etat } from '../contexts/WizardContext';
 import type { LigneMaison } from './liste-maison';
 import { normalizeProductType } from './typology.ts';
 
+/**
+ * La session tient en deux étapes : choisir les repas, puis le bilan, qui
+ * intègre déjà manques et habitudes. Manques, Habitudes et Extras ne sont
+ * plus des étapes imposées : ce sont des corrections ouvertes depuis le bilan.
+ */
 export const SESSION_STEPS = [
- { cle: 'recettes', label: 'Repas' }, { cle: 'manques', label: 'Manques' },
- { cle: 'habitudes', label: 'Habitudes' }, { cle: 'exceptions', label: 'Extras' },
- { cle: 'recap', label: 'Bilan' },
+ { cle: 'recettes', label: 'Repas' }, { cle: 'recap', label: 'Bilan' },
 ] as const;
 export type SessionStep = typeof SESSION_STEPS[number]['cle'];
+export const CORRECTIONS = [
+ { cle: 'manques', label: 'Manques' }, { cle: 'habitudes', label: 'Habitudes' }, { cle: 'exceptions', label: 'Extras' },
+] as const;
+export type Correction = typeof CORRECTIONS[number]['cle'];
+/** Les brouillons d'avant la refonte ont pu s'arrêter sur une correction : on reprend au bilan. */
+export function etapeDeReprise(v: string | undefined): SessionStep | undefined {
+ if (v === 'recettes' || v === 'recap') return v;
+ return CORRECTIONS.some(c => c.cle === v) ? 'recap' : undefined;
+}
 export type Manque = { name: string; source: 'widget' | 'siri' | 'manuel' | 'precedent'; valide?: boolean };
 export const normaliserNom = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/œ/g,'oe').replace(/[^a-z0-9]+/g,' ').trim();
 
@@ -33,12 +45,20 @@ export function manquesAPreciser(e: Etat, produitIds: Iterable<string>) {
  const catalogue = new Set(produitIds);
  return Object.entries(manquesDuBrouillon(e)).filter(([key,m])=>manqueActif(e,key)&&!m.valide&&!(key.startsWith('produit:')&&catalogue.has(key.slice(8))));
 }
-export function doublonsPossibles(lignes: LigneMaison[], acceptes: string[] = []) {
+/** Clé d'une paire de produits déclarés distincts, indépendante des quantités. */
+export const cleDistinct = (a: string, b: string) => [normaliserNom(a), normaliserNom(b)].sort().join('|');
+/**
+ * Paires qui se ressemblent. `acceptes` retient une paire tranchée au bilan
+ * (et redemande si les quantités bougent) ; `distincts` retient une paire
+ * déclarée distincte dès la saisie, par ses noms seulement.
+ */
+export function doublonsPossibles(lignes: LigneMaison[], acceptes: string[] = [], distincts: string[] = []) {
  const actifs=lignes.filter(l=>!l.owned), result: {id:string;a:LigneMaison;b:LigneMaison}[]=[];
  for(let i=0;i<actifs.length;i++) for(let j=i+1;j<actifs.length;j++) {
   const a=actifs[i],b=actifs[j],na=normaliserNom(a.name),nb=normaliserNom(b.name);
   const ta=normalizeProductType(a.name),tb=normalizeProductType(b.name);
   if (!(a.ean13&&a.ean13===b.ean13) && na!==nb && !(ta&&ta===tb)) continue;
+  if (distincts.includes(cleDistinct(a.name,b.name))) continue;
   const id=[a,b].map(l=>`${l.key}:${l.totalQuantity}:${l.name}:${l.unit}`).sort().join('|');
   if(!acceptes.includes(id)) result.push({id,a,b});
  }

@@ -18,24 +18,28 @@ await page.goto('http://localhost:8082/wizard/recettes');
 await btn('+ Choisir').click();
 await page.getByRole('button',{name:'Plus de portions pour Poulet rôti aux légumes'}).click({clickCount:3});
 await page.screenshot({path:'/tmp/tablee-recettes.png'});
-await btn('Vérifier mes manques').click();
+await btn('Voir ma liste').click();
+// Au bilan, les manques s'ouvrent comme une correction.
+await page.getByRole('button',{name:/^Manques :/}).last().click();
 // Les œufs du catalogue sont prêts : on ouvre la ligne seulement pour changer la quantité.
 await btn('Œufs Plein Air, 1 article, prêt. Modifier').click();
 await btn('Augmenter Œufs Plein Air').click();await btn('Enregistrer').click();
 // Le pain noté à la main demande un geste avant le drive.
 await btn('Garder 2 × Pain du boulanger').click();
-await btn('Tout est bon (3)').click();
+await btn('Revenir au bilan').last().click();
 // Habitudes : on coche les oignons, le reste du rayon est « déjà chez moi ».
+await page.getByRole('button',{name:/^Habitudes :/}).last().click();
 await page.getByRole('checkbox',{name:'Oignons jaunes'}).last().click();
 await page.screenshot({path:'/tmp/tablee-habitudes.png'});
-await btn('Continuer vers les extras · 1 retenu').click();
+await btn('Revenir au bilan · 1 retenu').click();
+await page.getByRole('button',{name:/^Extras :/}).last().click();
 await page.getByLabel('Produit manquant').last().fill('Noisettes');
 await btn('Chercher « Noisettes » sur Open Food Facts').click();
 await page.getByText('Crème de noisettes',{exact:true}).click();
 await btn('Confirmer l’ajout à ma liste').click();
 await btn('Retirer Crème de noisettes').waitFor();
 if(inserted.ean13!=='3017620422003'||inserted.favorite!==false)throw Error('OFF identity/favorite mismatch');
-await btn('Faire le bilan de ma liste').click();
+await btn('Revenir au bilan').last().click();
 await page.reload();await btn('Voir et ajuster la liste').last().click();await page.getByText('Pain du boulanger',{exact:true}).last().waitFor();
 const draft=await page.evaluate(id=>JSON.parse(localStorage.getItem('tablee-maison-v1:'+id)),user.id);
 if(draft.selectedRecipes.rec1!==5||draft.quotidienQty.oeufs!==2||draft.quotidien.oignons!=='needed'||draft.extras[0].quantity!==2||draft.quotidien.off1!=='needed')throw Error('Draft mismatch '+JSON.stringify(draft));
