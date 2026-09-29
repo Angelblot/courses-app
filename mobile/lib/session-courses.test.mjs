@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { manquesDuBrouillon, manquesAPreciser, doublonsPossibles, instantaneHabitude, restaurerHabitude, resumeBilan } from './session-courses.ts';
+import { manquesDuBrouillon, manquesAPreciser, doublonsPossibles, instantaneHabitude, restaurerHabitude, resumeBilan, lignesSimilaires, abandonner } from './session-courses.ts';
 import { listeMaison } from './liste-maison.ts';
 import { importerAjouts } from './widget-products.ts';
 const base={selectedRecipes:{},quotidien:{},quotidienQty:{},extras:[],choixProduits:{},drives:[],ligneQuantites:{},lignePossedees:{}};
@@ -57,4 +57,23 @@ test('le résumé du bilan compte repas, manques, habitudes et extras',()=>{
 test('le résumé du bilan ignore les lignes retirées ou déjà possédées',()=>{
  const e={...base,manques:{},quotidien:{h:'needed'},habitudesVues:{h:true},extras:[{id:'z',name:'Z',quantity:1},{id:'y',name:'Y',quantity:1}],ligneQuantites:{'extra:z':0},lignePossedees:{'produit:h':true}};
  assert.deepEqual(resumeBilan(e),['1 extra']);
+});
+test('une ligne proche est retrouvée pendant la saisie d’un extra',()=>{
+ const l=(key,name,owned=false)=>({key,name,owned,unit:'unité',totalQuantity:2,sources:[],rayon:'autre',product_id:null,ean13:null,aPreciser:false,candidats:[]});
+ const lignes=[l('produit:p','Pommes de terre'),l('produit:o','Oignons jaunes'),l('extra:x','Pommes de terre nouvelles',true)];
+ assert.deepEqual(lignesSimilaires('Pommes de terre bio',lignes).map(x=>x.key),['produit:p']);
+ assert.deepEqual(lignesSimilaires('oignon',lignes).map(x=>x.key),['produit:o']);
+ assert.deepEqual(lignesSimilaires('Lait',lignes),[]);
+ assert.deepEqual(lignesSimilaires('po',lignes),[]);
+});
+test('abandonner des courses garde les manques notés et efface le reste',()=>{
+ const e={...base,sessionEtape:'recap',selectedRecipes:{r:2},quotidien:{m:'needed',h:'needed'},quotidienQty:{m:2,h:1},habitudesVues:{h:true},
+  manques:{'produit:m':{name:'M',source:'widget',valide:true},'extra:s':{name:'S',source:'siri'}},extras:[{id:'s',name:'S',quantity:1},{id:'z',name:'Z',quantity:1}],
+  ligneQuantites:{'produit:h':3},lignePossedees:{'produit:m':false},doublonsValides:['d'],importsExternes:['i'],extrasFrequents:{z:{name:'Z',count:2}},drives:['leclerc'],choixProduits:{g:'p'}};
+ const a=abandonner(e);
+ assert.equal(a.sessionEtape,undefined);
+ assert.deepEqual(a.selectedRecipes,{});assert.deepEqual(a.quotidien,{m:'needed'});assert.deepEqual(a.quotidienQty,{m:2});
+ assert.deepEqual(a.extras.map(x=>x.id),['s']);assert.deepEqual(Object.keys(a.manques),['produit:m','extra:s']);
+ assert.deepEqual([a.habitudesVues,a.ligneQuantites,a.lignePossedees,a.doublonsValides,a.choixProduits],[{},{},{},[],{}]);
+ assert.deepEqual([a.importsExternes,a.extrasFrequents,a.drives],[['i'],{z:{name:'Z',count:2}},['leclerc']]);
 });

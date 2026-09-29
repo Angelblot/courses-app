@@ -25,13 +25,10 @@ await btn('Augmenter Œufs Plein Air').click();await btn('Enregistrer').click();
 // Le pain noté à la main demande un geste avant le drive.
 await btn('Garder 2 × Pain du boulanger').click();
 await btn('Tout est bon (3)').click();
-// Habitudes : on fait glisser la carte vers la droite, donc « il m'en faut ».
-await page.getByText('Oignons jaunes',{exact:true}).last().waitFor();
-const carte=await page.getByText('Oignons jaunes',{exact:true}).last().boundingBox();
-await page.mouse.move(100,carte.y-60);await page.mouse.down();await page.mouse.move(245,carte.y-55,{steps:12});await page.mouse.up();
-await page.getByText('Ce rayon est prêt.',{exact:true}).last().waitFor();
+// Habitudes : on coche les oignons, le reste du rayon est « déjà chez moi ».
+await page.getByRole('checkbox',{name:'Oignons jaunes'}).last().click();
 await page.screenshot({path:'/tmp/tablee-habitudes.png'});
-await btn('Continuer vers les extras').click();
+await btn('Continuer vers les extras · 1 retenu').click();
 await page.getByLabel('Produit manquant').last().fill('Noisettes');
 await btn('Chercher « Noisettes » sur Open Food Facts').click();
 await page.getByText('Crème de noisettes',{exact:true}).click();

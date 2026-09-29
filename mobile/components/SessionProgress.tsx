@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { PauseSheet } from './PauseSheet';
 import { router } from 'expo-router';
 // Ionicons pour la pause : les deux barres pleines se reconnaissent, là où
 // les rectangles à contour de Feather se lisaient comme une petite boîte.
@@ -13,16 +15,18 @@ import { colors } from '../lib/theme';
  *
  * Navigation : chaque étape s'empile sur la précédente, si bien que le
  * retour (geste iOS, bouton Android) ramène toujours à l'étape d'avant.
- * Un segment dépile jusqu'à son étape ; la pause vide la pile.
+ * Un segment dépile jusqu'à son étape ; la pause ouvre une feuille pour
+ * finir plus tard ou abandonner, et vide la pile dans les deux cas.
  */
 export function SessionProgress({step}:{step:SessionStep}) {
- const index=SESSION_STEPS.findIndex(s=>s.cle===step);
+ const index=SESSION_STEPS.findIndex(s=>s.cle===step),[pause,setPause]=useState(false);
  return <SafeAreaView edges={['top']} style={{backgroundColor:colors.bg,paddingHorizontal:20,paddingBottom:4}}>
  <View style={[ui.sectionRow,{minHeight:52}]}>
   <Text accessibilityRole="header" style={[ui.detail,{marginTop:0,fontVariant:['tabular-nums']}]}>Étape {index+1} sur {SESSION_STEPS.length} · {SESSION_STEPS[index].label}</Text>
-  <Pressable accessibilityRole="button" accessibilityLabel="Faire une pause" onPress={()=>{if(router.canDismiss())router.dismissAll();router.replace('/');}} style={({pressed})=>[s.pause,pressed&&{opacity:.7}]}><Ionicons name="pause" size={20} color={colors.accent}/></Pressable>
+  <Pressable accessibilityRole="button" accessibilityLabel="Faire une pause" onPress={()=>setPause(true)} style={({pressed})=>[s.pause,pressed&&{opacity:.7}]}><Ionicons name="pause" size={20} color={colors.accent}/></Pressable>
  </View>
  <View style={s.barre}>{SESSION_STEPS.map((e,i)=><Pressable key={e.cle} accessibilityRole="button" accessibilityLabel={`Étape ${i+1} sur ${SESSION_STEPS.length} : ${e.label}`} accessibilityState={{selected:i===index,disabled:i>=index}} disabled={i>=index} hitSlop={{top:14,bottom:14}} onPress={()=>router.dismissTo(`/wizard/${e.cle}`)} style={s.segment}><View style={[s.trait,i<=index&&{backgroundColor:colors.accent}]}/></Pressable>)}</View>
+ <PauseSheet visible={pause} onFermer={()=>setPause(false)}/>
  </SafeAreaView>;
 }
 const s=StyleSheet.create({

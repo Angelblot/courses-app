@@ -2,7 +2,7 @@ const {chromium}=require('playwright');const fs=require('fs');
 const user={id:'11111111-1111-4111-8111-111111111111',aud:'authenticated',role:'authenticated',email:'demo@example.test'};
 const token=['eyJhbGciOiJIUzI1NiJ9',Buffer.from(JSON.stringify({sub:user.id,exp:Math.floor(Date.now()/1000)+36000,role:'authenticated'})).toString('base64url'),'demo'].join('.');
 const session={access_token:token,refresh_token:'demo',expires_in:36000,expires_at:Math.floor(Date.now()/1000)+36000,token_type:'bearer',user};
-const products=[{id:'oeufs',name:'Œufs Plein Air',ean13:'1234567890123',unit:'unité',brand:'Plein air',category:'pls',favorite:true,image_url:null,grammage_g:null,volume_ml:null,product_type:'oeuf'},{id:'patates',name:'Pommes de terre',ean13:'1234567890124',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:1000,volume_ml:null,product_type:'pomme_de_terre'},{id:'oignons',name:'Oignons jaunes',ean13:'1234567890125',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:500,volume_ml:null,product_type:'oignon'}];
+const products=[{id:'beurre',name:'Beurre doux',ean13:'1234567890126',unit:'unité',brand:null,category:'pls',favorite:true,image_url:null,grammage_g:250,volume_ml:null,product_type:'beurre'},{id:'oeufs',name:'Œufs Plein Air',ean13:'1234567890123',unit:'unité',brand:'Plein air',category:'pls',favorite:true,image_url:null,grammage_g:null,volume_ml:null,product_type:'oeuf'},{id:'patates',name:'Pommes de terre',ean13:'1234567890124',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:1000,volume_ml:null,product_type:'pomme_de_terre'},{id:'oignons',name:'Oignons jaunes',ean13:'1234567890125',unit:'unité',brand:null,category:'fruits_legumes',favorite:true,image_url:null,grammage_g:500,volume_ml:null,product_type:'oignon'}];
 const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,image_url:null,prep_minutes:15,cook_minutes:40,recipe_ingredients:[{id:'ing',name:'Pommes de terre',quantity_per_serving:300,unit:'g',rayon:'fruits_legumes',product_id:'patates'}]}];
 (async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{
  const page=await b.newPage({viewport:{width:390,height:844},serviceWorkers:'block'}),errors=[];page.on('pageerror',e=>errors.push(e.message));let sent;
@@ -30,24 +30,32 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await page.getByText('« lessive » reste à préciser, maintenant ou au bilan.',{exact:true}).waitFor();
  if(!await btn('Continuer · 2 prêts, 1 à préciser').isEnabled())throw Error('Ready missing products block the session');
  await shot('2-manques');
- await btn('Faire une pause').click();await page.reload();await btn('Reprendre mes courses').click();
+ // AA : la pause ouvre une feuille ; abandonner s'annule depuis l'accueil.
+ await btn('Faire une pause').click();await btn('Abandonner ces courses').click();
+ await btn('Annuler : Courses abandonnées. Tes manques restent notés.').click();
+ await btn('Reprendre mes courses').waitFor();await btn('Reprendre mes courses').click();
+ await btn('Faire une pause').last().click();await btn('Finir plus tard').click();await page.reload();await btn('Reprendre mes courses').click();
  await btn('Continuer · 2 prêts, 1 à préciser').click();
- // Habitudes H3 : la décision est dans le pied, visible sans défiler.
- const oui=btn('Oignons jaunes : il m’en faut 1');await oui.waitFor();
- await visible(oui,'Decision button hidden');await visible(btn('Oignons jaunes : j’en ai déjà'),'Decision button hidden');
- if(await btn('Continuer vers les extras').count())throw Error('Continue shown before every aisle is reviewed');
+ // HB : une liste à cocher par rayon ; le reste du rayon est « déjà chez moi ».
+ const oignons=page.getByRole('checkbox',{name:'Oignons jaunes'}).last();await oignons.waitFor();
  await shot('3-habitudes');
- // N1 : un toast permet d'annuler la décision, et la carte revient.
- await oui.click();await btn('Annuler : 1 × Oignons jaunes retenu').click();
- await oui.waitFor();await oui.click();await page.getByText('Ce rayon est prêt.',{exact:true}).last().waitFor();
+ await oignons.click();if(!await oignons.isChecked())throw Error('Habit row not checked');
+ await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
+ // Un rayon validé s'annule : on revient au rayon, décisions défaites.
+ await btn('Annuler : Fruits & légumes : 1 retenu').click();await oignons.waitFor();
+ if(await oignons.isChecked())throw Error('Undo did not restore the aisle');
+ await oignons.click();await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
  await shot('3b-habitudes-annuler');
- await btn('Continuer vers les extras').click();
+ await btn('Continuer vers les extras').last().click();
  // Le retour mène à l'étape d'avant, jamais plus loin.
  await btn('Revenir à l’étape Habitudes').last().click();await page.getByText('Étape 3 sur 5 · Habitudes',{exact:true}).last().waitFor();
  await btn('Continuer vers les extras').last().click();await page.getByText('Étape 4 sur 5 · Extras',{exact:true}).last().waitFor();
  // X2 : un champ, le reste apparaît avec la saisie.
  if(await btn('Noter « »').count())throw Error('Empty note button shown');
- await page.getByRole('textbox',{name:'Produit manquant',exact:true}).last().fill('Pommes de terre bio');await btn('Noter « Pommes de terre bio »').click();
+ await page.getByRole('textbox',{name:'Produit manquant',exact:true}).last().fill('Pommes de terre bio');
+ // DB : la ligne déjà listée remonte en tête, avec son compteur.
+ await page.getByText('Déjà dans ta liste',{exact:true}).last().waitFor();await btn('Augmenter Pommes de terre').last().waitFor();await shot('4b-extras-similaire');
+ await btn('Noter « Pommes de terre bio »').click();
  await page.getByText('1 × Pommes de terre bio',{exact:true}).waitFor();
  // Un retrait s'annule depuis le toast.
  await btn('Retirer Pommes de terre bio').click();await btn('Annuler : Pommes de terre bio retiré de ta liste').click();await page.getByText('1 × Pommes de terre bio',{exact:true}).waitFor();
@@ -76,6 +84,9 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  if(!await page.getByRole('checkbox',{name:'Carrefour'}).isChecked()||await page.getByRole('checkbox',{name:'E.Leclerc'}).isChecked())throw Error('Drive checkbox state not exposed');
  await page.getByRole('dialog').getByRole('button',{name:'Fermer',exact:true}).waitFor();
  await page.getByRole('checkbox',{name:'E.Leclerc'}).click();await page.getByRole('checkbox',{name:'E.Leclerc'}).click();
+ // EB : l'extension n'a jamais relevé d'envoi ; il faut confirmer qu'elle est installée.
+ if(await btn('Envoyer à mon ordinateur').isEnabled())throw Error('First send not gated');
+ await page.getByRole('checkbox',{name:'C’est fait, l’extension est installée'}).click();
  await btn('Envoyer à mon ordinateur').click();await page.getByText('C’est envoyé.',{exact:true}).waitFor();await shot('7-envoye');
  await page.waitForTimeout(600);if(!sent||sent.items.length!==4||sent.items.find(x=>x.product_id==='patates')?.quantity!==2)throw Error('Incorrect consolidated payload '+JSON.stringify(sent));
  if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true,items:sent.items.length,errors}));

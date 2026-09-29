@@ -1,18 +1,22 @@
 import { ProductSuggestions, productSuggestion } from '../../components/ProductSuggestions';
 import { useState, useRef } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Head, Action, PiedAvecRetour, ui, useAnnulation } from '../../components/MaisonUI';
-import { useProducts, ajouterProduit, basculerFavori } from '../../stores/products';
-import { useWizard } from '../../contexts/WizardContext';
+import { Head, Action, PiedAvecRetour, Photo, ui, useAnnulation } from '../../components/MaisonUI';
+import { ajouterProduit, basculerFavori } from '../../stores/products';
+import { useMaison } from '../../contexts/useMaison';
+import { lignesSimilaires } from '../../lib/session-courses';
 import { type FicheProduit } from '../../lib/openfoodfacts';
 import { useRechercheOff } from '../../hooks/useRechercheOff';
 import { nombreArticles } from '../../lib/ajouts-quotidiens';
 import { suggestionsFrequentes, type Frequent } from '../../lib/extras-frequents';
 import { colors } from '../../lib/theme';
 type Ajoute = { key: string; name: string; qty: number };
+// Sur le web, le navigateur trace son propre cadre de focus dans le champ ;
+// la bordure verte du champ entier le remplace. `none` n'est pas typé par RN.
+const sansCadreWeb = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as unknown as TextStyle) : null;
 /**
  * Étape Extras de la session, et « Il me manque… » hors session. Un seul
  * champ : on tape un nom pour le noter, on cherche le produit exact, ou on
@@ -20,8 +24,8 @@ type Ajoute = { key: string; name: string; qty: number };
  */
 export default function Ajout({session=false}:{session?:boolean}){
  const params=useLocalSearchParams<{name?:string}>();const [nom,setNom]=useState(typeof params.name==='string'?params.name:'');
- const [qty,setQty]=useState(1),[busy,setBusy]=useState(false),[erreur,setErreur]=useState(''),[fiche,setFiche]=useState<FicheProduit|null>(null),[habituel,setHabituel]=useState(false),[ajoutes,setAjoutes]=useState<Ajoute[]>([]);
- const p=useProducts(),w=useWizard(),lock=useRef(false),annulation=useAnnulation(),insets=useSafeAreaInsets();
+ const [qty,setQty]=useState(1),[busy,setBusy]=useState(false),[erreur,setErreur]=useState(''),[fiche,setFiche]=useState<FicheProduit|null>(null),[habituel,setHabituel]=useState(false),[ajoutes,setAjoutes]=useState<Ajoute[]>([]),[focus,setFocus]=useState(false);
+ const {p,w,lignes}=useMaison(),lock=useRef(false),annulation=useAnnulation(),insets=useSafeAreaInsets();
  const off=useRechercheOff(),resultats=off.resultats,saisie=nom.trim();
  function confirme(key:string,name:string,q:number,productId?:string){w.retenirExtra({name,productId});setAjoutes(a=>[{key,name,qty:q},...a.filter(x=>x.key!==key)]);setNom('');setFiche(null);off.reinitialiser();setQty(1);setHabituel(false);setErreur('');}
  function noterLibre(name:string,q=qty){const id=w.ajouterExtra({name,quantity:q,unit:'unité',rayon:'autre'},!session);confirme(`extra:${id}`,name,q);}
@@ -30,16 +34,19 @@ export default function Ajout({session=false}:{session?:boolean}){
  function retirer(x:Ajoute){const avant=w.ligneQuantites[x.key];w.modifierLigne(x.key,0);setAjoutes(a=>a.filter(y=>y.key!==x.key));annulation.proposer(`${x.name} retiré de ta liste`,()=>{w.restaurerLigne(x.key,avant);setAjoutes(a=>[x,...a]);});}
  function search(){if(busy)return;setErreur('');setFiche(null);void off.chercher(nom);}
  async function importer(){if(!fiche||lock.current)return;lock.current=true;setBusy(true);setErreur('');try{const res=await ajouterProduit(fiche,habituel);const produit=res.produit??res.doublon;if(produit){if(habituel&&!produit.favorite){const fav=await basculerFavori(produit.id,true);if(!fav.ok){setErreur('Impossible d’enregistrer ce produit habituel. Réessaie.');return;}}ajouterCatalogue(produit.id,produit.name);p.recharger();}else setErreur(res.reseau?'Connexion indisponible. La fiche est conservée à l’écran pour réessayer.':res.erreur??'Impossible d’enregistrer ce produit.');}catch{setErreur('Enregistrement impossible. Réessaie.');}finally{lock.current=false;setBusy(false);}}
- const locaux=p.produits.filter(p=>saisie.length>0&&p.name.toLowerCase().includes(saisie.toLowerCase())).slice(0,5);
+ // Déjà dans la liste : on ajuste la ligne existante plutôt que de créer un doublon.
+ const similaires=saisie?lignesSimilaires(saisie,lignes).slice(0,3):[];
+ const locaux=p.produits.filter(p=>saisie.length>0&&p.name.toLowerCase().includes(saisie.toLowerCase())&&!similaires.some(l=>l.product_id===p.id)).slice(0,5);
  const dejaListes=[...w.extras.map(x=>x.name),...p.produits.filter(x=>w.quotidien[x.id]==='needed').map(x=>x.name)];
  const frequents=suggestionsFrequentes(w.extrasFrequents??{},dejaListes);
  const scanner=()=>router.push({pathname:'/scan',params:{destination:'liste',quantite:String(qty),manque:session?'0':'1'}});
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}><Head title={session?"Des extras ?":"Noter un manque"} back={!session} avatar={!session}/>
  <View style={ui.row}>
-  <View style={a.champ}><Feather name="search" size={18} color={colors.textMuted}/><TextInput accessibilityLabel="Produit manquant" autoFocus={!session&&!params.name} maxLength={120} editable={!busy} returnKeyType="done" onSubmitEditing={()=>{if(saisie)noterLibre(saisie);}} value={nom} onChangeText={v=>{setNom(v);off.reinitialiser();setErreur('');setFiche(null);}} placeholder="Lait, café, papier toilette…" placeholderTextColor={colors.textMuted} style={a.saisie}/></View>
+  <View style={[a.champ,focus&&{borderColor:colors.accent,borderWidth:2}]}><Feather name="search" size={18} color={colors.textMuted}/><TextInput accessibilityLabel="Produit manquant" autoFocus={!session&&!params.name} maxLength={120} editable={!busy} returnKeyType="done" onSubmitEditing={()=>{if(saisie)noterLibre(saisie);}} value={nom} onChangeText={v=>{setNom(v);off.reinitialiser();setErreur('');setFiche(null);}} placeholder="Lait, café, papier toilette…" placeholderTextColor={colors.textMuted} onFocus={()=>setFocus(true)} onBlur={()=>setFocus(false)} style={[a.saisie,sansCadreWeb]}/></View>
   <Pressable accessibilityRole="button" accessibilityLabel="Scanner un code-barres" onPress={scanner} style={({pressed})=>[a.scan,pressed&&{opacity:.7}]}><Feather name="maximize" size={20} color={colors.accent}/></Pressable>
  </View>
  {saisie?<>
+  {similaires.length>0&&<><Text style={ui.section}>Déjà dans ta liste</Text>{similaires.map(l=><View key={l.key} style={ui.product}><Photo name={l.name} url={p.produits.find(x=>x.id===l.product_id)?.image_url}/><View style={{flex:1}}><Text style={ui.productName}>{l.name}</Text><Text style={ui.detail}>{[...new Set(l.sources.map(s=>s.label))].join(' · ')}</Text></View><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel={`Diminuer ${l.name}`} style={ui.iconButton} onPress={()=>w.modifierLigne(l.key,Math.max(0,l.totalQuantity-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{l.totalQuantity}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Augmenter ${l.name}`} style={ui.iconButton} onPress={()=>w.modifierLigne(l.key,l.totalQuantity+1)}><Text style={ui.title}>+</Text></Pressable></View></View>)}</>}
   <View style={ui.sectionRow}><Text style={ui.productName}>Nombre d’articles</Text><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel="Diminuer la quantité" style={ui.iconButton} onPress={()=>setQty(nombreArticles(qty-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{qty}</Text><Pressable accessibilityRole="button" accessibilityLabel="Augmenter la quantité" style={ui.iconButton} onPress={()=>setQty(nombreArticles(qty+1))}><Text style={ui.title}>+</Text></Pressable></View></View>
   {locaux.length>0&&<><Text style={ui.section}>Dans tes produits</Text><ProductSuggestions items={locaux.map(productSuggestion)} actionLabel={`Ajouter × ${qty}`} onSelect={id=>{const produit=locaux.find(p=>p.id===id);if(produit)ajouterCatalogue(produit.id,produit.name);}}/></>}
   <Action disabled={busy} onPress={()=>noterLibre(saisie)}>{`Noter « ${saisie} »`}</Action>

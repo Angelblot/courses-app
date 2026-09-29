@@ -1,4 +1,4 @@
-import { manquesDuBrouillon, restaurerHabitude, type InstantaneHabitude, type Manque, type SessionStep } from '../lib/session-courses';
+import { abandonner, manquesDuBrouillon, restaurerHabitude, type InstantaneHabitude, type Manque, type SessionStep } from '../lib/session-courses';
 import { retenirFrequent, type Frequent } from '../lib/extras-frequents';
 import { WidgetSync } from '../components/WidgetSync';
 import { importerAjouts } from '../lib/widget-products';
@@ -72,6 +72,11 @@ type Contexte = Etat & {
   choisirProduit: (cleGroupe: string, produitId: string) => void;
   basculerDrive: (nom: string) => void;
   reinitialiser: () => void;
+  /** Abandonne les courses en cours ; les manques notés restent. Annulable. */
+  abandonnerSession: () => void;
+  abandonEnAttente: boolean;
+  annulerAbandon: () => void;
+  oublierAbandon: () => void;
 };
 
 const WizardCtx = createContext<Contexte | null>(null);
@@ -237,13 +242,20 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
     return {...e,manques,quotidien,quotidienQty,extras,ligneQuantites,lignePossedees};
   }),[]);
 
+  const [avantAbandon, setAvantAbandon] = useState<Etat | null>(null);
+  const abandonnerSession = useCallback(() => { setAvantAbandon(etat); setEtat(abandonner(etat)); }, [etat]);
+  const annulerAbandon = useCallback(() => { if (avantAbandon) setEtat(avantAbandon); setAvantAbandon(null); }, [avantAbandon]);
+  const oublierAbandon = useCallback(() => setAvantAbandon(null), []);
+
   const valeur = useMemo<Contexte>(() => ({
     ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes,
     toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
+    abandonnerSession, abandonEnAttente: avantAbandon !== null, annulerAbandon, oublierAbandon,
   }), [
     etat, demarrerSession, allerEtape, validerManque, accepterDoublon, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser,
+    abandonnerSession, avantAbandon, annulerAbandon, oublierAbandon,
   ]);
 
   if (!pret) return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F7F2' }}><ActivityIndicator color="#48613A" /><Text>Restauration de ta liste…</Text></View>;

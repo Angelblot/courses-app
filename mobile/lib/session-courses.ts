@@ -72,3 +72,35 @@ export function resumeBilan(e: Etat): string[] {
  const parts: [number, string, string][] = [[Object.keys(e.selectedRecipes).length, 'repas', 'repas'], [manques.length, 'manque', 'manques'], [habitudes.length, 'habitude', 'habitudes'], [extras.length, 'extra', 'extras']];
  return parts.filter(([n]) => n > 0).map(([n, un, plusieurs]) => `${n} ${n > 1 ? plusieurs : un}`);
 }
+
+/**
+ * Lignes de la liste qui ressemblent à un nom en cours de saisie : même type
+ * de produit, ou un nom contenu dans l'autre. Montrées avant d'ajouter un
+ * extra, pour ajuster la ligne existante au lieu de créer un doublon.
+ */
+export function lignesSimilaires(nom: string, lignes: LigneMaison[]): LigneMaison[] {
+ const n = normaliserNom(nom);
+ if (n.length < 3) return [];
+ const type = normalizeProductType(nom);
+ return lignes.filter(l => {
+  if (l.owned) return false;
+  const m = normaliserNom(l.name);
+  return (type && normalizeProductType(l.name) === type) || m.includes(n) || n.includes(m);
+ });
+}
+
+/**
+ * Abandonne des courses en cours : les manques notés au fil des jours
+ * restent, tout ce que la session a ajouté ou décidé disparaît.
+ */
+export function abandonner(e: Etat): Etat {
+ const manques = Object.fromEntries(Object.entries(manquesDuBrouillon(e)).filter(([key]) => manqueActif(e, key)).map(([key, m]) => [key, { name: m.name, source: m.source }]));
+ const produits = Object.keys(manques).filter(k => k.startsWith('produit:')).map(k => k.slice(8));
+ const garder = <T,>(table: Record<string, T>) => Object.fromEntries(Object.entries(table).filter(([id]) => produits.includes(id)));
+ return {
+  manques, importsExternes: e.importsExternes, extrasFrequents: e.extrasFrequents, drives: e.drives,
+  quotidien: garder(e.quotidien), quotidienQty: garder(e.quotidienQty),
+  extras: e.extras.filter(x => `extra:${x.id}` in manques),
+  selectedRecipes: {}, habitudesVues: {}, ligneQuantites: {}, lignePossedees: {}, doublonsValides: [], choixProduits: {},
+ };
+}

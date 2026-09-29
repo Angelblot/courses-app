@@ -55,8 +55,8 @@ export default function Liste({session=false}:{session?:boolean}){
  {!loading&&!erreur&&!visibles.length&&<Text style={ui.subtitle}>{owned?'Les produits que tu possèdes déjà apparaîtront ici.':'Ta liste est vide. Ajoute un favori, un repas ou un produit ci-dessous.'}</Text>}
  {!session&&<><View style={ui.row}><View style={{flex:1}}><Action secondary onPress={()=>router.push('/favoris')}>Mes favoris</Action></View><View style={{flex:1}}><Action secondary onPress={()=>router.push('/recettes')}>Mes repas</Action></View></View>
  <Action secondary onPress={()=>router.push('/ajout')}>Rechercher un produit ou scanner</Action></>}
- <TextInput value={nom} onChangeText={setNom} placeholder="Ajouter un produit à la main…" accessibilityLabel="Nom du produit à ajouter" style={ui.input}/><Action disabled={!nom.trim()} secondary onPress={()=>{w.ajouterExtra({name:nom.trim(),quantity:1,unit:'unité',rayon:'autre'});setNom('');setOwned(false);}}>Ajouter à ma liste</Action>
- <Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>Alert.alert('Vider cette liste ?','Les recettes et les favoris de ton catalogue seront conservés.',[{text:'Annuler',style:'cancel'},{text:'Vider la liste',style:'destructive',onPress:w.reinitialiser}])}><Text style={ui.detail}>Vider la liste</Text></Pressable>
+ {!session&&<><TextInput value={nom} onChangeText={setNom} placeholder="Ajouter un produit à la main…" accessibilityLabel="Nom du produit à ajouter" style={ui.input}/><Action disabled={!nom.trim()} secondary onPress={()=>{w.ajouterExtra({name:nom.trim(),quantity:1,unit:'unité',rayon:'autre'});setNom('');setOwned(false);}}>Ajouter à ma liste</Action>
+ <Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>Alert.alert('Vider cette liste ?','Les recettes et les favoris de ton catalogue seront conservés.',[{text:'Annuler',style:'cancel'},{text:'Vider la liste',style:'destructive',onPress:w.reinitialiser}])}><Text style={ui.detail}>Vider la liste</Text></Pressable></>}
  </>}
  </ScrollView>
  <View>{annulation.toast}
