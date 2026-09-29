@@ -17,8 +17,8 @@ export function ApercuRecette({ recette, parts, onFermer, onBasculer }: { recett
  const personnes = parts ?? recette.servings_default ?? 2, temps = (recette.prep_minutes ?? 0) + (recette.cook_minutes ?? 0), choisie = parts != null;
  return <Modal visible transparent animationType="slide" onRequestClose={onFermer}>
   <View style={a.fond}>
-   <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} />
-   <View style={[a.panneau, { paddingBottom: 12 + insets.bottom, maxHeight: height * 0.88 }]} accessibilityViewIsModal accessibilityLabel={recette.name}>
+   <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={onFermer} />
+   <View style={[a.panneau, { paddingBottom: 12 + insets.bottom, maxHeight: height * 0.88 }]} accessibilityViewIsModal accessibilityLabel={recette.name} onAccessibilityEscape={onFermer}>
     <Photo recipe name={recette.name} url={recette.image_url} style={a.photo} />
     <ScrollView contentContainerStyle={{ gap: 8, padding: 16, paddingBottom: 4 }}>
      <Text accessibilityRole="header" style={a.titre}>{recette.name}</Text>

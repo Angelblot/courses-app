@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
-import { Image, Pressable, Text, View, StyleSheet, type ImageStyle, type StyleProp } from 'react-native';
+import { AccessibilityInfo, Image, Pressable, Text, View, StyleSheet, type ImageStyle, type StyleProp } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { colors } from '../lib/theme';
@@ -30,9 +30,12 @@ export function ScanAction(){return <Pressable accessibilityRole="button" onPres
  * se pose au-dessus du bloc du bas qui le contient (pied, bandeau).
  */
 export function useAnnulation(duree=6000){
- const [offre,setOffre]=useState<{texte:string;annuler:()=>void}|null>(null);
- useEffect(()=>{if(!offre)return;const t=setTimeout(()=>setOffre(null),duree);return()=>clearTimeout(t);},[offre,duree]);
- const proposer=useCallback((texte:string,annuler:()=>void)=>setOffre({texte,annuler}),[]);
+ const [offre,setOffre]=useState<{texte:string;annuler:()=>void}|null>(null),[lecteur,setLecteur]=useState(false);
+ // accessibilityLiveRegion n'existe que sur Android : sur iOS, on annonce. Et
+ // avec un lecteur d'écran, on laisse le temps d'atteindre « Annuler ».
+ useEffect(()=>{AccessibilityInfo.isScreenReaderEnabled().then(setLecteur);const sub=AccessibilityInfo.addEventListener('screenReaderChanged',setLecteur);return()=>sub.remove();},[]);
+ useEffect(()=>{if(!offre)return;const t=setTimeout(()=>setOffre(null),lecteur?Math.max(duree,20000):duree);return()=>clearTimeout(t);},[offre,duree,lecteur]);
+ const proposer=useCallback((texte:string,annuler:()=>void)=>{setOffre({texte,annuler});AccessibilityInfo.announceForAccessibility(`${texte}. Annuler est disponible en bas de l’écran.`);},[]);
  const effacer=useCallback(()=>setOffre(null),[]);
  const toast=offre?<View style={ui.toast}><Text accessibilityLiveRegion="polite" style={ui.toastTexte} numberOfLines={2}>{offre.texte}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Annuler : ${offre.texte}`} onPress={()=>{offre.annuler();setOffre(null);}} hitSlop={8} style={{minHeight:44,justifyContent:'center'}}><Text style={[ui.toastTexte,{fontWeight:'700'}]}>Annuler</Text></Pressable></View>:null;
  return {proposer,effacer,toast};

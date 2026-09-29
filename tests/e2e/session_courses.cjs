@@ -73,6 +73,8 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await page.setViewportSize({width:390,height:844});
  // D3 : le drive se choisit dans une feuille, puis C : un écran de clôture.
  await btn('Choisir mon drive').last().click();await page.getByText('Où fait-on les courses ?',{exact:true}).waitFor();await page.waitForTimeout(700);await shot('6-envoi');
+ if(!await page.getByRole('checkbox',{name:'Carrefour'}).isChecked()||await page.getByRole('checkbox',{name:'E.Leclerc'}).isChecked())throw Error('Drive checkbox state not exposed');
+ await page.getByRole('dialog').getByRole('button',{name:'Fermer',exact:true}).waitFor();
  await page.getByRole('checkbox',{name:'E.Leclerc'}).click();await page.getByRole('checkbox',{name:'E.Leclerc'}).click();
  await btn('Envoyer à mon ordinateur').click();await page.getByText('C’est envoyé.',{exact:true}).waitFor();await shot('7-envoye');
  await page.waitForTimeout(600);if(!sent||sent.items.length!==4||sent.items.find(x=>x.product_id==='patates')?.quantity!==2)throw Error('Incorrect consolidated payload '+JSON.stringify(sent));
