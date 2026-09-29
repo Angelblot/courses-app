@@ -5,7 +5,8 @@ import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useMaison } from '../contexts/useMaison';
 import { construireItems } from '../lib/consolidation';
-import { envoiRecent, envoyerListe } from '../lib/cart-jobs';
+import { envoiExiste, envoyerListe } from '../lib/cart-jobs';
+import { nouvelIdEnvoi } from '../lib/id-envoi';
 import { Action, Raison, ui, nomDialogue } from './MaisonUI';
 import { colors } from '../lib/theme';
 
@@ -22,13 +23,13 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
  // la feuille se referme, et elle afficherait « 0 produit ».
  const [total, setTotal] = useState(acheter.length);
  useEffect(() => { if (visible) setTotal(acheter.length); }, [visible]);
+ // Un identifiant par ouverture de la feuille : les nouveaux essais le réutilisent.
+ const [idEnvoi, setIdEnvoi] = useState(nouvelIdEnvoi);
+ useEffect(() => { if (visible) setIdEnvoi(nouvelIdEnvoi()); }, [visible]);
  const [envoi, setEnvoi] = useState(false), [erreur, setErreur] = useState<string | null>(null), [aide, setAide] = useState(false), verrou = useRef(false);
  async function envoyer() {
   if (verrou.current || !w.drives.length || !acheter.length) return;
   verrou.current = true; setEnvoi(true); setErreur(null);
-  // Horodatage pris un peu avant l'insertion, pour retrouver un envoi dont
-  // la réponse se serait perdue en route.
-  const depuis = new Date(Date.now() - 5000).toISOString();
   const n = acheter.length, drives = w.drives.join(',');
   const aboutir = (id: string) => {
    const heure = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -36,16 +37,18 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
    if (router.canDismiss()) router.dismissAll();
    router.replace({ pathname: '/suivi/envoye', params: { id, n: String(n), drives, heure } });
   };
+  // La liste est partie ou non, on le sait par son identifiant ; dans le
+  // doute, on ne vide rien et le même identifiant sert au nouvel essai.
+  const echec = async () => {
+   const existe = await envoiExiste(idEnvoi).catch(() => null);
+   if (existe) aboutir(idEnvoi);
+   else if (existe === false) setErreur('L’envoi n’a pas abouti, rien n’est parti. Réessaie.');
+   else setErreur('Pas de réseau pour le moment. Réessaie : la liste ne partira pas deux fois.');
+  };
   try {
-   const res = await envoyerListe(construireItems(acheter), w.drives);
-   if (res.ok && res.id) { aboutir(res.id); return; }
-   const deja = await envoiRecent(depuis);
-   if (deja) aboutir(deja); else setErreur(res.erreur ?? 'L’envoi n’a pas abouti. Réessaie.');
-  } catch {
-   // La connexion a coupé : si la liste est quand même partie, on ne la renvoie pas.
-   const deja = await envoiRecent(depuis).catch(() => null);
-   if (deja) aboutir(deja); else setErreur('Connexion interrompue, rien n’est parti. Réessaie quand le réseau revient.');
-  }
+   const res = await envoyerListe(construireItems(acheter), w.drives, idEnvoi);
+   if (res.ok && res.id) aboutir(res.id); else await echec();
+  } catch { await echec(); }
   finally { verrou.current = false; setEnvoi(false); }
  }
  return <Modal {...nomDialogue('Où fait-on les courses ?')} visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
@@ -60,7 +63,7 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
       <View style={{ flex: 1 }}><Text style={ui.productName}>{d.nom}</Text><Text style={[ui.detail, { marginTop: 1 }]}>{d.site}</Text></View>
       <View style={[s.case, coche && s.caseCochee]}>{coche && <Feather name="check" size={16} color={colors.accentContrast} />}</View>
      </Pressable>; })}
-     <Pressable accessibilityRole="button" accessibilityState={{ expanded: aide }} accessibilityLabel="Comment ça marche ?" onPress={() => setAide(!aide)} style={s.info}>
+     <Pressable accessibilityRole="button" accessibilityState={{ expanded: aide }} accessibilityLabel="Comment ? Voir comment l’extension remplit le panier" onPress={() => setAide(!aide)} style={s.info}>
       <Feather name="monitor" size={18} color={colors.textMuted} />
       <Text style={[ui.detail, { flex: 1, marginTop: 0 }]}>Le panier se remplit sur ton ordinateur, avec l’extension Chrome.</Text>
       <Text style={ui.link}>{aide ? 'Masquer' : 'Comment ?'}</Text>

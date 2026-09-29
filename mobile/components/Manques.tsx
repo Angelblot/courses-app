@@ -34,12 +34,12 @@ export function ManqueRow({lineKey,manque,products,aPreciser,onRetrait}:{lineKey
   {!aPreciser&&<View style={ui.row}><Text style={ui.num}>× {quantite}</Text><View style={m.pret}><Feather name={edit?'chevron-up':'check'} size={16} color={colors.accent}/></View></View>}
  </Pressable>
  {ouvert&&<><View style={ui.sectionRow}><Text style={ui.detail}>Nombre d’articles</Text><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel={`Diminuer ${name}`} style={ui.iconButton} onPress={()=>changerQty(Math.max(1,qty-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{qty}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Augmenter ${name}`} style={ui.iconButton} onPress={()=>changerQty(Math.min(99,qty+1))}><Text style={ui.title}>+</Text></Pressable></View></View>
- <TextInput style={ui.input} value={search} onChangeText={setSearch} placeholder="Changer de produit ou de format…" accessibilityLabel={`Chercher un remplacement pour ${name}`}/>
+ <TextInput style={ui.input} value={search} onChangeText={setSearch} placeholder="Changer de produit ou de format…" accessibilityLabel={`Changer de produit ou de format pour ${name}`}/>
  {search.trim().length>=2&&<ProductSuggestions items={products.filter(p=>p.name.toLowerCase().includes(search.trim().toLowerCase())).slice(0,20).map(productSuggestion)} selectedId={chosen} onSelect={setChosen}/>}
  {search.trim().length>=2&&!products.some(p=>p.name.toLowerCase().includes(search.trim().toLowerCase()))&&<Text style={ui.detail}>Aucun produit trouvé. Essaie un autre nom.</Text>}
  {!!id&&!product&&!selected&&<Text style={ui.error}>Ce produit n’est plus dans le catalogue. Choisis un remplacement ou retire ce manque.</Text>}
  <Action disabled={!!chosen&&!selected} onPress={()=>{w.validerManque(lineKey,qty,chosen);setEdit(false);}}>{aPreciser?`Garder ${qty} × ${name}`:'Enregistrer'}</Action>
- <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${name} de mes manques`} style={ui.iconButton} onPress={()=>{const avant=w.ligneQuantites[lineKey];w.modifierLigne(lineKey,0);onRetrait?.(`${name} retiré de tes manques`,()=>w.restaurerLigne(lineKey,avant));}}><Text style={ui.detail}>Je n’en ai plus besoin</Text></Pressable></>}
+ <Pressable accessibilityRole="button" accessibilityLabel={`Je n’en ai plus besoin : ${name}`} style={ui.iconButton} onPress={()=>{const avant=w.ligneQuantites[lineKey];w.modifierLigne(lineKey,0);onRetrait?.(`${name} retiré de tes manques`,()=>w.restaurerLigne(lineKey,avant));}}><Text style={ui.detail}>Je n’en ai plus besoin</Text></Pressable></>}
  </View>;
 }
 export function Manques({session=false}:{session?:boolean}) {

@@ -11,7 +11,7 @@ await page.addInitScript(({session,id})=>{localStorage.setItem('sb-qmymwicsgilho
 const btn=name=>page.getByRole('button',{name,exact:true});
 await page.goto('http://localhost:8082/ajout');
 await page.getByLabel('Produit manquant').fill('Pain du boulanger');
-await btn('Augmenter la quantité').click();
+await btn('Augmenter la quantité de Pain du boulanger').click();
 await btn('Noter « Pain du boulanger »').click();
 await btn('Retirer Pain du boulanger').waitFor();
 await page.goto('http://localhost:8082/wizard/recettes');
