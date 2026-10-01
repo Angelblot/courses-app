@@ -1,4 +1,5 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Feuille } from './Feuille';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -16,17 +17,14 @@ export function PauseSheet({ visible, onFermer }: { visible: boolean; onFermer: 
  const insets = useSafeAreaInsets(), w = useWizard();
  const etape = SESSION_STEPS.find(e => e.cle === w.sessionEtape)?.label;
  const quitter = () => { onFermer(); if (router.canDismiss()) router.dismissAll(); router.replace('/'); };
- return <Modal {...nomDialogue('Faire une pause ?')} visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
-  <View style={s.fond}>
-   <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={onFermer} />
+ return <Feuille visible={visible} onFermer={onFermer} nom={'Faire une pause ?'}>
    <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="Faire une pause ?" onAccessibilityEscape={onFermer}>
     <View style={s.entete}><Text style={s.titre} accessibilityRole="header">Faire une pause ?</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} hitSlop={6} style={s.fermer}><Feather name="x" size={22} color={colors.text} /></Pressable></View>
     <Text style={[ui.subtitle, { paddingHorizontal: 4 }]}>Tes choix sont gardés : tu reprendras à l’étape {etape ? `« ${etape} »` : 'où tu en es'}.</Text>
     <Action onPress={quitter}>Finir plus tard</Action>
     <Pressable accessibilityRole="button" onPress={() => { w.abandonnerSession(); quitter(); }} style={s.abandon}><Text style={s.abandonTexte}>Abandonner ces courses</Text></Pressable>
    </View>
-  </View>
- </Modal>;
+ </Feuille>;
 }
 
 const s = StyleSheet.create({

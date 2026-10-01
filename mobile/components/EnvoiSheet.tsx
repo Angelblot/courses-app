@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View, findNodeHandle } from 'react-native';
+import { Feuille } from './Feuille';
+import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, findNodeHandle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -63,9 +64,7 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
   } catch { await echec(); }
   finally { verrou.current = false; setEnvoi(false); }
  }
- return <Modal {...nomDialogue('Où fait-on les courses ?')} visible={visible} transparent animationType="slide" onRequestClose={fermer}>
-  <View style={s.fond}>
-   <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={fermer} />
+ return <Feuille visible={visible} onFermer={fermer} nom="Où fait-on les courses ?">
    <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="Où fait-on les courses ?" onAccessibilityEscape={fermer}>
     <View style={s.entete}><Text style={[s.titre, { flex: 1, marginBottom: 0 }]} accessibilityRole="header">Où fait-on les courses ?</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer" accessibilityState={{ disabled: envoi }} disabled={envoi} onPress={fermer} hitSlop={6} style={[s.fermer, envoi && { opacity: .4 }]}><Feather name="x" size={22} color={colors.text} /></Pressable></View>
     <Text style={[ui.detail, { marginTop: 0, marginBottom: 12, paddingHorizontal: 4 }]}>{total} produit{total > 1 ? 's' : ''} à envoyer, dans un drive ou les deux.</Text>
@@ -87,8 +86,7 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
      {!w.drives.length && <Raison>Coche au moins un drive.</Raison>}
     </View>
    </View>
-  </View>
- </Modal>;
+ </Feuille>;
 }
 
 const s = StyleSheet.create({

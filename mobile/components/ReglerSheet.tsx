@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Feuille } from './Feuille';
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWizard } from '../contexts/WizardContext';
 import type { Product } from '../stores/products';
@@ -27,9 +28,7 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
  const [titre, setTitre] = useState(titreCourant);
  useEffect(() => { if (nb > 0) setTitre(titreCourant); }, [nb, titreCourant]);
  const retirer = (l: LigneMaison) => { const avant = w.ligneQuantites[l.key]; w.modifierLigne(l.key, 0); onRetrait(`${l.name} retiré de ta liste`, () => w.restaurerLigne(l.key, avant)); };
- return <Modal {...nomDialogue(titre)} visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
-  <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.fond}>
-   <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={onFermer} />
+ return <Feuille visible={visible} onFermer={onFermer} nom={titre} clavier>
    <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel={titre} onAccessibilityEscape={onFermer}>
     <View style={s.entete}><Text style={[s.titre, { flex: 1, marginBottom: 0 }]} accessibilityRole="header">{titre}</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} hitSlop={6} style={s.fermer}><Feather name="x" size={22} color={colors.text} /></Pressable></View>
     <ScrollView style={{ maxHeight: height * 0.72 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 12, paddingBottom: 8 }}>
@@ -47,8 +46,7 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
     </ScrollView>
     <View>{toast}</View>
    </View>
-  </KeyboardAvoidingView>
- </Modal>;
+ </Feuille>;
 }
 
 /** Un manque à préciser : ses produits proches d'abord, « Laisser tel quel » ensuite. */

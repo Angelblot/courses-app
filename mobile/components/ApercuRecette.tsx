@@ -1,4 +1,5 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Feuille } from './Feuille';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import type { Recipe } from '../stores/recipes';
@@ -15,9 +16,7 @@ export function ApercuRecette({ recette, parts, onFermer, onBasculer, onParts }:
  const insets = useSafeAreaInsets(), { height } = useWindowDimensions();
  if (!recette) return null;
  const personnes = parts ?? recette.servings_default ?? 2, temps = (recette.prep_minutes ?? 0) + (recette.cook_minutes ?? 0), choisie = parts != null;
- return <Modal {...nomDialogue(recette.name)} visible transparent animationType="slide" onRequestClose={onFermer}>
-  <View style={a.fond}>
-   <Pressable style={StyleSheet.absoluteFill} accessible={false} focusable={false} importantForAccessibility="no" onPress={onFermer} />
+ return <Feuille visible onFermer={onFermer} nom={recette.name}>
    <View style={[a.panneau, { paddingBottom: 12 + insets.bottom, maxHeight: height * 0.88 }]} accessibilityViewIsModal accessibilityLabel={recette.name} onAccessibilityEscape={onFermer}>
     <Photo recipe name={recette.name} url={recette.image_url} style={a.photo} />
     <ScrollView contentContainerStyle={{ gap: 8, padding: 16, paddingBottom: 4 }}>
@@ -33,8 +32,7 @@ export function ApercuRecette({ recette, parts, onFermer, onBasculer, onParts }:
      <View style={{ flex: 1.4 }}><Action onPress={() => { onBasculer(); onFermer(); }}>{choisie ? 'Retirer de mes repas' : 'Choisir ce repas'}</Action></View>
     </View>
    </View>
-  </View>
- </Modal>;
+ </Feuille>;
 }
 
 const a = StyleSheet.create({

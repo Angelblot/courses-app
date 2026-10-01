@@ -1,4 +1,5 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Feuille } from './Feuille';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -39,9 +40,7 @@ const OPTIONS: Option[] = [
 export function AjoutRecetteSheet({ visible, onFermer }: { visible: boolean; onFermer: () => void }) {
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
-      <View style={s.fond}>
-        <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} />
+    <Feuille visible={visible} onFermer={onFermer} fondCliquable>
         <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal>
           <View style={s.poignee} />
           <Text style={s.titre} accessibilityRole="header">Ajouter une recette</Text>
@@ -63,8 +62,7 @@ export function AjoutRecetteSheet({ visible, onFermer }: { visible: boolean; onF
             </Pressable>
           ))}
         </View>
-      </View>
-    </Modal>
+    </Feuille>
   );
 }
 
