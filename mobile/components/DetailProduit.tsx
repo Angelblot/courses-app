@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import type { Product } from '../stores/products';
 import { basculerFavori } from '../stores/products';
 import { PastilleNutri } from './PastilleNutri';
+import { ReprisePhoto } from './ReprisePhoto';
 import { libelleRayon, rayonDepuisLibelle } from '../lib/rayons.ts';
 import { colors, radius, spacing, texte } from '../lib/theme';
 
@@ -77,6 +78,7 @@ export function DetailProduit({
           <View style={s.cadreImage}>
             <Photo name={produit.name} url={produit.image_url} style={s.image}/>
           </View>
+          <ReprisePhoto key={produit.id} produitId={produit.id} nom={produit.name} onChange={onChange} />
 
           <Text style={s.nom}>{produit.name}</Text>
           {produit.brand && <Text style={s.marque}>{produit.brand}</Text>}
