@@ -4,8 +4,8 @@ import {
   ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import type { ResultatRecherche } from '../lib/openfoodfacts.ts';
-import { libelleRayon, type CleRayon } from '../lib/rayons.ts';
-import { SelecteurRayon } from './SelecteurRayon';
+import type { CleRayon } from '../lib/rayons.ts';
+import { ChoixRayon } from './ChoixRayon';
 import { PastilleNutri } from './PastilleNutri';
 import { colors, radius, spacing } from '../lib/theme';
 
@@ -39,7 +39,6 @@ export function FicheScannee({
   // la saisie manuelle reste possible mais se déplie sur demande plutôt que
   // de s'imposer, pour ne pas laisser croire qu'elle est le seul chemin.
   const [saisieManuelle, setSaisieManuelle] = useState(false);
-  const [choixRayon, setChoixRayon] = useState(false);
 
   // Trois issues distinctes, trois écrans distincts : une fiche trouvée, un
   // produit qu'Open Food Facts ignore, et un réseau absent. Les confondre
@@ -74,18 +73,7 @@ export function FicheScannee({
             </View>
           </View>
 
-          {choixRayon ? (
-            <SelecteurRayon
-              valeur={rayon}
-              onChoisir={(cle) => { onChangerRayon(cle); setChoixRayon(false); }}
-              onFermer={() => setChoixRayon(false)}
-            />
-          ) : (
-            <Pressable style={s.rayon} onPress={() => setChoixRayon(true)}>
-              <Text style={s.rayonLabel}>Rayon</Text>
-              <Text style={s.rayonValeur}>{libelleRayon(rayon)}</Text>
-            </Pressable>
-          )}
+          <ChoixRayon valeur={rayon} onChoisir={onChangerRayon} />
 
           {message && (
             <Text style={[s.message, message.erreur && s.messageErreur]}>
@@ -170,18 +158,7 @@ export function FicheScannee({
             placeholderTextColor={colors.textMuted}
           />
 
-          {choixRayon ? (
-            <SelecteurRayon
-              valeur={rayon}
-              onChoisir={(cle) => { onChangerRayon(cle); setChoixRayon(false); }}
-              onFermer={() => setChoixRayon(false)}
-            />
-          ) : (
-            <Pressable style={s.rayon} onPress={() => setChoixRayon(true)}>
-              <Text style={s.rayonLabel}>Rayon</Text>
-              <Text style={s.rayonValeur}>{libelleRayon(rayon)}</Text>
-            </Pressable>
-          )}
+          <ChoixRayon valeur={rayon} onChoisir={onChangerRayon} />
 
           {message && (
             <Text style={[s.message, message.erreur && s.messageErreur]}>
@@ -239,13 +216,6 @@ const s = StyleSheet.create({
     textAlign: 'center', textDecorationLine: 'underline',
   },
   label: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginTop: spacing.xs },
-  rayon: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    paddingVertical: spacing.md, paddingHorizontal: spacing.lg,
-  },
-  rayonLabel: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
-  rayonValeur: { fontSize: 15, fontWeight: '600', color: colors.accent },
   champ: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
     padding: spacing.md, fontSize: 16, color: colors.text,

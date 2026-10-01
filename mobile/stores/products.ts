@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { FicheProduit } from '../lib/openfoodfacts.ts';
+import { fusionnerManuels, type ChampFiche, type Dependances, type ValeursFiche } from '../lib/fiche-produit.ts';
 import { estErreurReseau } from '../lib/postgrest.ts';
 import type { VenduChez } from '../lib/references.ts';
 
@@ -210,6 +211,92 @@ export async function enregistrerReglages(
       console.error('[enregistrerReglages]', error);
       return { ok: false, erreur: 'Impossible d’enregistrer ce réglage. Réessaie.' };
     }
+  }
+  return { ok: true };
+}
+
+/**
+ * Enregistre une correction faite à la main depuis la fiche.
+ *
+ * Les champs touchés rejoignent `champs_manuels` : une actualisation Open
+ * Food Facts ne les cochera plus d'office. Une actualisation passe
+ * `manuels: []` : elle n'ajoute rien à cette liste.
+ */
+export async function modifierProduit(
+  id: string,
+  champs: Partial<ValeursFiche>,
+  manuels: readonly ChampFiche[],
+): Promise<{ ok: boolean; erreur?: string }> {
+  const echec = (error: unknown) => {
+    console.error('[modifierProduit]', error);
+    return { ok: false, erreur: estErreurReseau(error as never) ? 'Pas de connexion : la fiche n’a pas été enregistrée.' : 'Impossible d’enregistrer la fiche pour le moment.' };
+  };
+  let patch: Record<string, unknown> = { ...champs };
+  if (manuels.length) {
+    const protections = await lireProtections(id);
+    if (protections === null) return echec('lecture des protections');
+    if (protections.colonne) patch = { ...patch, champs_manuels: fusionnerManuels(protections.champs_manuels, manuels) };
+  }
+  const { error } = await supabase.from('products').update(patch).eq('id', id);
+  return error ? echec(error) : { ok: true };
+}
+
+// Colonne absente : la migration 0019 n'est pas encore jouée sur ce projet.
+const colonneAbsente = (e: { code?: string } | null) => e?.code === '42703' || e?.code === 'PGRST204';
+
+/**
+ * Ce que l'actualisation doit respecter : corrections manuelles et photo
+ * améliorée. Sans la colonne `champs_manuels` (migration 0019 pas encore
+ * jouée), la fiche fonctionne quand même, sans retenir les corrections.
+ */
+export async function lireProtections(id: string): Promise<{ champs_manuels: string[]; image_originale: string | null; colonne: boolean } | null> {
+  const r = await supabase.from('products').select('champs_manuels, image_originale').eq('id', id).single();
+  if (!r.error) return { ...(r.data as { champs_manuels: string[]; image_originale: string | null }), colonne: true };
+  if (!colonneAbsente(r.error)) { console.error('[lireProtections]', r.error); return null; }
+  const repli = await supabase.from('products').select('image_originale').eq('id', id).single();
+  if (repli.error) { console.error('[lireProtections]', repli.error); return null; }
+  return { champs_manuels: [], image_originale: (repli.data as { image_originale: string | null }).image_originale, colonne: false };
+}
+
+/**
+ * Ce qui part avec le produit si on le supprime : en base, correspondances
+ * drive et historique d'achat suivent le produit (on delete cascade), les
+ * ingrédients de recette perdent seulement leur lien (on delete set null).
+ */
+export async function compterDependances(id: string, alternativeDe: string | null): Promise<Dependances | null> {
+  const [eq, achats, recettes] = await Promise.all([
+    supabase.from('product_equivalents').select('id', { count: 'exact', head: true }).eq('product_id', id),
+    supabase.from('purchase_lines').select('id', { count: 'exact', head: true }).eq('product_id', id),
+    supabase.from('recipe_ingredients').select('recipe_id').eq('product_id', id),
+  ]);
+  const erreur = eq.error ?? achats.error ?? recettes.error;
+  if (erreur) { console.error('[compterDependances]', erreur); return null; }
+  return {
+    correspondances: eq.count ?? 0,
+    achats: achats.count ?? 0,
+    recettes: new Set((recettes.data ?? []).map((r: { recipe_id: string }) => r.recipe_id)).size,
+    alternativeDe,
+  };
+}
+
+/**
+ * Supprime un produit du catalogue du foyer, puis le retire du classement
+ * des références qui le citaient en alternative : `alternatives` est une
+ * liste d'identifiants, sans clé étrangère pour la nettoyer.
+ */
+export async function supprimerProduit(id: string): Promise<{ ok: boolean; erreur?: string }> {
+  const { error } = await supabase.from('products').delete().eq('id', id);
+  if (error) {
+    console.error('[supprimerProduit]', error);
+    return { ok: false, erreur: estErreurReseau(error) ? 'Pas de connexion : le produit n’a pas été supprimé.' : 'Impossible de supprimer ce produit pour le moment.' };
+  }
+  // Un identifiant orphelin est ignoré au classement : un échec ici n'annule
+  // pas la suppression, il part seulement au journal.
+  const { data: citants, error: lecture } = await supabase.from('products').select('id, alternatives').contains('alternatives', [id]);
+  if (lecture) console.error('[supprimerProduit] classements', lecture);
+  for (const c of (citants ?? []) as { id: string; alternatives: string[] }[]) {
+    const { error: e } = await supabase.from('products').update({ alternatives: c.alternatives.filter(a => a !== id) }).eq('id', c.id);
+    if (e) console.error('[supprimerProduit] classement', e);
   }
   return { ok: true };
 }

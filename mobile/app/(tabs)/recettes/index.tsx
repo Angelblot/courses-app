@@ -25,13 +25,17 @@ function ChoixRepas({session=false}:{session?:boolean}){
  useEffect(()=>{if(!choisis.length)setSeuls(false);},[choisis.length]);
  const recettes=r.recettes.filter(r=>(!seuls||w.selectedRecipes[r.id]!=null)&&r.name.toLowerCase().includes(query.toLowerCase())&&(!rapides||((r.prep_minutes??0)+(r.cook_minutes??0)>0&&(r.prep_minutes??0)+(r.cook_minutes??0)<=30)));
  const columns=width>=360&&fontScale<1.4&&recettes.length>1?2:1;
+ // Taille en points, pas en pourcentage + aspectRatio : dans une rangée qui
+ // passe à la ligne, iOS réservait la place des tuiles mais les dessinait
+ // hautes de 0 (constaté le 01/10/2026, React Native 0.86).
+ const largeur=columns===2?Math.floor((width-40-10)/2):width-40,tuile={width:largeur,height:Math.round(columns===2?largeur*1.08:largeur/1.5)};
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}>
  <Head title="On mange quoi ?" avatar={false}/>
  {seuls&&<View style={ui.sectionRow}><Text style={ui.productName}>{choisis.length} repas choisi{choisis.length>1?'s':''}</Text><Pressable accessibilityRole="button" onPress={()=>setSeuls(false)} style={ui.iconButton}><Text style={ui.link}>Tout voir</Text></Pressable></View>}
  <TextInput value={query} onChangeText={setQuery} style={ui.input} placeholder="Une recette, une envie…" accessibilityLabel="Chercher une recette"/>
  {!seuls&&<View style={ui.sectionRow}><Pressable accessibilityRole="checkbox" accessibilityState={{checked:rapides}} aria-checked={rapides} onPress={()=>setRapides(!rapides)} style={{minHeight:44,padding:12,borderRadius:22,backgroundColor:rapides?colors.accent:colors.accentSoft,borderWidth:1,borderColor:rapides?colors.accent:colors.traitControle}}><Text style={{color:rapides?'white':'#48613A'}}>30 min ou moins</Text></Pressable><Text style={ui.detail}>{recettes.length} recette{recettes.length>1?'s':''}</Text></View>}
  {r.chargement&&<ActivityIndicator/>}{r.erreur&&<><Text style={ui.error}>{r.erreur}</Text><Action secondary onPress={r.recharger}>Réessayer</Action></>}
- <View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>{recettes.map(rec=>{const parts=w.selectedRecipes[rec.id],temps=(rec.prep_minutes??0)+(rec.cook_minutes??0);return <View key={rec.id} style={[t.tuile,{width:columns===2?'48.5%':'100%',aspectRatio:columns===2?1/1.08:1.5}]}>
+ <View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>{recettes.map(rec=>{const parts=w.selectedRecipes[rec.id],temps=(rec.prep_minutes??0)+(rec.cook_minutes??0);return <View key={rec.id} style={[t.tuile,tuile]}>
   {/* La tuile ouvre l'aperçu ; le bouton rond du coin choisit ou retire. */}
   <Pressable accessibilityRole="button" accessibilityLabel={`Voir la recette ${rec.name}${temps?`, ${temps} min`:''}`} onPress={()=>session?setApercu(rec):router.push(`/recettes/${rec.id}`)} style={({pressed})=>[StyleSheet.absoluteFill,pressed&&{opacity:.9}]}>
    <Photo recipe name={rec.name} url={rec.image_url} style={t.photo}/>

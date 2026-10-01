@@ -147,3 +147,19 @@ test('une réponse vide ou malformée ne casse rien', () => {
   assert.deepEqual(analyserRechercheNom(null), []);
   assert.deepEqual(analyserRechercheNom('pas du json'), []);
 });
+
+test('lookupEan : un 404 d’Open Food Facts est un code-barres inconnu, pas une coupure', async () => {
+  const { lookupEan } = await import('./openfoodfacts.ts');
+  const reel = globalThis.fetch;
+  const repondre = (status, corps) => { globalThis.fetch = async () => new Response(JSON.stringify(corps), { status }); };
+  try {
+    repondre(404, { code: '3245414146938', status: 0, status_verbose: 'product not found' });
+    assert.deepEqual(await lookupEan('3245414146938'), { etat: 'inconnu' });
+    repondre(503, {});
+    assert.deepEqual(await lookupEan('3245414146938'), { etat: 'hors_ligne' });
+    repondre(200, { status: 1, product: { product_name: 'Avocat Haas' } });
+    assert.equal((await lookupEan('3000001037576')).etat, 'trouve');
+  } finally {
+    globalThis.fetch = reel;
+  }
+});
