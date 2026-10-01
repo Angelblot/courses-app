@@ -19,7 +19,7 @@ const DRIVES = [{ cle: 'carrefour', nom: 'Carrefour', site: 'carrefour.fr' }, { 
  * remplit le panier. Le bilan a déjà vérifié que la liste est prête.
  */
 export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: () => void }) {
- const insets = useSafeAreaInsets(), { w, acheter } = useMaison();
+ const insets = useSafeAreaInsets(), { w, acheter, p } = useMaison();
  // Le nombre affiché est figé à l'ouverture : l'envoi vide la liste pendant que
  // la feuille se referme, et elle afficherait « 0 produit ».
  const [total, setTotal] = useState(acheter.length);
@@ -59,7 +59,7 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
    else setErreur('Pas de réseau pour le moment. Réessaie : la liste ne partira pas deux fois.');
   };
   try {
-   const res = await envoyerListe(construireItems(acheter), w.drives, idEnvoi);
+   const res = await envoyerListe(construireItems(acheter, p.produits), w.drives, idEnvoi);
    if (res.ok && res.id) aboutir(res.id); else await echec();
   } catch { await echec(); }
   finally { verrou.current = false; setEnvoi(false); }

@@ -17,9 +17,26 @@ test('widget reactivates owned/zero quantity product and Siri remains free text'
  assert.equal(added.lignePossedees[`produit:${id}`],false);assert.equal(added.ligneQuantites[`produit:${id}`],undefined);
  const siri=importerAjouts(state,[{...receipt,productID:undefined,source:'siri'}]);assert.equal(siri.extras[0].name,'Lait');
 });
-test('snapshot reflects favourites and consolidated recipe needs',()=>{
+// Plus de favoris : le widget montre les références ; une alternative vit sous la sienne.
+test('snapshot reflects references and consolidated recipe needs',()=>{
  const recipe={id:'meal',name:'Crêpes',ingredients:[{name:'Lait',product_id:id,quantity_per_serving:250,unit:'ml',rayon:'cremerie'}]};
- const snapshot=widgetProducts({...state,selectedRecipes:{meal:2}},[product,{...product,id:'other',favorite:false}],[recipe]);
+ const snapshot=widgetProducts({...state,selectedRecipes:{meal:2}},[{...product,alternatives:['other']},{...product,id:'other'}],[recipe]);
  assert.equal(snapshot.length,1);assert.equal(snapshot[0].inList,true);assert.equal(snapshot[0].detail,'1 L');
  assert.equal(widgetProducts({...state,quotidien:{[id]:'have'}},[product],[])[0].inList,false);
+});
+
+test('Siri : un besoin rejoint la référence de son type, un nom inconnu reste libre', async () => {
+  const { rattacherSiri } = await import('./widget-products.ts');
+  const produits = [{ id: 'o', name: 'Œufs Plein Air', brand: null, product_type: 'oeuf', alternatives: [] }];
+  const base = { quotidien: {}, quotidienQty: {}, lignePossedees: {}, ligneQuantites: {}, selectedRecipes: {}, extras: [
+    { id: 'siri-1', name: 'œufs', quantity: 2, unit: 'unité', rayon: 'autre' },
+    { id: 'siri-2', name: 'xyzzy', quantity: 1, unit: 'unité', rayon: 'autre' },
+  ], manques: { 'extra:siri-1': { name: 'œufs', source: 'siri' }, 'extra:siri-2': { name: 'xyzzy', source: 'siri' } } };
+  const r = rattacherSiri(base, produits);
+  assert.equal(r.quotidien.o, 'needed');
+  assert.equal(r.quotidienQty.o, 2);
+  assert.equal(r.manques['produit:o'].source, 'siri');
+  assert.equal(r.manques['extra:siri-1'], undefined);
+  assert.deepEqual(r.extras.map(x => x.id), ['siri-2']);
+  assert.equal(rattacherSiri(r, produits), r);
 });

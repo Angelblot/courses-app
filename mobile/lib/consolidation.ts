@@ -12,6 +12,7 @@ import {
 } from './unites.ts';
 import { normalizeProductType } from './typology.ts';
 import { rayonDepuisLibelle, RAYONS, type CleRayon } from './rayons.ts';
+import { classement, enseigneExclusive, type Enseigne, type ProduitClasse } from './references.ts';
 
 export type Source = { type: 'recipe' | 'quotidien' | 'extra'; label: string; qty: number };
 
@@ -371,6 +372,17 @@ export function getRecipeIngredientMatches({
   }));
 }
 
+/** Un produit tel que l'extension l'essaie : de quoi le trouver, son format et son enseigne réservée. */
+export type ProduitEssai = {
+  product_id: string;
+  name: string;
+  ean13: string | null;
+  /** Marque distributeur : enseigne seule à le vendre, sinon `null`. */
+  enseigne: Enseigne | null;
+  grammage_g: number | null;
+  volume_ml: number | null;
+};
+
 export type ItemPanier = {
   name: string;
   quantity: number;
@@ -379,6 +391,12 @@ export type ItemPanier = {
   category: CleRayon;
   /** Nécessaire pour enregistrer une équivalence ; `null` si l'origine est incertaine. */
   product_id: string | null;
+  /** Format et enseigne de la référence, pour ajuster la quantité d'une alternative. */
+  enseigne?: Enseigne | null;
+  grammage_g?: number | null;
+  volume_ml?: number | null;
+  /** Alternatives dans l'ordre d'essai, quand la référence manque au drive. */
+  alternatives?: ProduitEssai[];
 };
 
 /**
@@ -393,13 +411,24 @@ export type ItemPanier = {
  * adresse. Sans lui, l'extension retombe sur la recherche par nom et son
  * risque d'ambiguïté.
  */
-export function construireItems(lignes: LigneConsolidee[]): ItemPanier[] {
-  return lignes.map((l) => ({
-    name: l.name,
-    quantity: l.totalQuantity,
-    unit: l.unit,
-    ean13: l.ean13 ?? null,
-    category: l.rayon,
-    product_id: l.product_id ?? null,
-  }));
+export function construireItems(lignes: LigneConsolidee[], produits: (ProduitClasse & { ean13: string | null })[] = []): ItemPanier[] {
+  const parId = new Map(produits.map((p) => [p.id, p]));
+  const essai = (p: ProduitClasse & { ean13: string | null }): ProduitEssai => ({
+    product_id: p.id, name: p.name, ean13: p.ean13 ?? null, enseigne: enseigneExclusive(p),
+    grammage_g: p.grammage_g ?? null, volume_ml: p.volume_ml ?? null,
+  });
+  return lignes.map((l) => {
+    const item: ItemPanier = {
+      name: l.name,
+      quantity: l.totalQuantity,
+      unit: l.unit,
+      ean13: l.ean13 ?? null,
+      category: l.rayon,
+      product_id: l.product_id ?? null,
+    };
+    const ref = l.product_id ? parId.get(l.product_id) : undefined;
+    if (!ref) return item;
+    const [, ...alternatives] = classement(ref, produits);
+    return { ...item, enseigne: enseigneExclusive(ref), grammage_g: ref.grammage_g ?? null, volume_ml: ref.volume_ml ?? null, alternatives: alternatives.map(essai) };
+  });
 }

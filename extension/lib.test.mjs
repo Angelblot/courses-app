@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { estExpire, entetes } from './lib/session.js';
 import { strategie, indexer } from './lib/equivalences.js';
+import { candidats, quantitePour } from './lib/alternatives.js';
 
 const MAINTENANT = 1_700_000_000_000;
 
@@ -68,4 +69,28 @@ test('les équivalences sont indexées par produit', () => {
 test('indexer tolère une liste vide ou absente', () => {
   assert.equal(indexer([]).size, 0);
   assert.equal(indexer(null).size, 0);
+});
+
+test('alternatives : la référence d\'abord, puis les alternatives vendues chez cette enseigne', () => {
+  const item = {
+    name: 'Emmental râpé', quantity: 1, ean: '1', product_id: 'e', enseigne: 'carrefour', grammage_g: 200,
+    alternatives: [
+      { product_id: 'g', name: 'Gruyère râpé', ean13: '2', enseigne: 'leclerc', grammage_g: 100 },
+      { product_id: 'p', name: 'Parmesan râpé', ean13: '3', enseigne: null, grammage_g: 70 },
+    ],
+  };
+  assert.deepEqual(candidats(item, 'carrefour').map((c) => c.product_id), ['e', 'p']);
+  // Chez Leclerc, la marque Carrefour est sautée d'office.
+  const leclerc = candidats(item, 'leclerc');
+  assert.deepEqual(leclerc.map((c) => c.product_id), ['g', 'p']);
+  assert.equal(leclerc[0].quantity, 2);
+  assert.equal(leclerc[0].remplace, 'Emmental râpé');
+  assert.equal(leclerc[1].quantity, 3);
+});
+
+test('quantité : même total quand les formats se comparent, sinon article pour article', () => {
+  assert.equal(quantitePour({ grammage_g: 200 }, { grammage_g: 100 }, 1), 2);
+  assert.equal(quantitePour({ volume_ml: 1000 }, { volume_ml: 1500 }, 3), 2);
+  assert.equal(quantitePour({ grammage_g: 200 }, { volume_ml: 500 }, 2), 2);
+  assert.equal(quantitePour({}, {}, 0), 1);
 });

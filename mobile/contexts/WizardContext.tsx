@@ -268,7 +268,7 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   ]);
 
   if (!pret) return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F7F2' }}><ActivityIndicator color="#48613A" /><Text>Restauration de ta liste…</Text></View>;
-  return <WizardCtx.Provider value={valeur}>{nativeInbox && userId && stockagePret ? <WidgetSync account={userId} state={etat} writes={ecritures} /> : null}{children}</WizardCtx.Provider>;
+  return <WizardCtx.Provider value={valeur}>{nativeInbox && userId && stockagePret ? <WidgetSync account={userId} state={etat} writes={ecritures} rattacher={setEtat} /> : null}{children}</WizardCtx.Provider>;
 }
 
 export function useWizard(): Contexte {

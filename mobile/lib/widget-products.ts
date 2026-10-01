@@ -4,10 +4,12 @@ import type { Product } from '../stores/products';
 import type { Recipe } from '../stores/recipes';
 import { nouveauxAjouts } from './ajouts-quotidiens.ts';
 import { listeMaison } from './liste-maison.ts';
+import { referencePourNom, references, type ProduitClasse } from './references.ts';
 
 export function widgetProducts(state: Etat, products: Product[], recipes: Recipe[]) {
   const inList = new Set(listeMaison(state, recipes, products).filter(l => !l.owned).map(l => l.product_id));
-  return products.filter(p => p.favorite).map(p => ({
+  // Le widget propose les références : une alternative vit sous la sienne.
+  return references(products).map(p => ({
     id: p.id, name: p.name, imageURL: p.image_url, inList: inList.has(p.id),
     detail: p.volume_ml ? (p.volume_ml >= 1000 ? `${p.volume_ml / 1000} L` : `${p.volume_ml} ml`)
       : p.grammage_g ? (p.grammage_g >= 1000 ? `${p.grammage_g / 1000} kg` : `${p.grammage_g} g`)
@@ -37,4 +39,31 @@ export function importerAjouts(state: Etat, pending: unknown): Etat {
     }
   }
   return next;
+}
+
+/**
+ * Un besoin dit à Siri (« papier toilette ») rejoint la référence de son
+ * type : la ligne devient ce produit, avec ses alternatives. Ce qui ne
+ * correspond à aucun type connu reste un libellé libre, à préciser.
+ */
+export function rattacherSiri(state: Etat, produits: ProduitClasse[]): Etat {
+  let next: Etat | null = null;
+  for (const [key, m] of Object.entries(state.manques ?? {})) {
+    if (!key.startsWith('extra:siri-') || m.valide) continue;
+    const ref = referencePourNom(m.name, produits);
+    if (!ref) continue;
+    const extra = state.extras.find(x => `extra:${x.id}` === key);
+    next ??= { ...state, manques: { ...state.manques }, extras: [...state.extras], quotidien: { ...state.quotidien },
+      quotidienQty: { ...state.quotidienQty }, lignePossedees: { ...state.lignePossedees }, ligneQuantites: { ...state.ligneQuantites } };
+    const manques = next.manques!;
+    delete manques[key];
+    next.extras = next.extras.filter(x => `extra:${x.id}` !== key);
+    const id = ref.id, cleProduit = `produit:${id}`;
+    manques[cleProduit] = { name: ref.name, source: 'siri', valide: false };
+    next.quotidien[id] = 'needed';
+    next.quotidienQty[id] = Math.max(state.quotidienQty[id] ?? 0, extra?.quantity ?? 1);
+    next.lignePossedees[cleProduit] = false;
+    if (next.ligneQuantites[cleProduit] === 0) delete next.ligneQuantites[cleProduit];
+  }
+  return next ?? state;
 }

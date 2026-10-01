@@ -95,7 +95,9 @@ function render(state) {
       : r.ignored?.length
         ? ` (sans « ${r.ignored.join(' ')} »)`
         : '';
-    li.textContent = `${r.item} — ${detail}${nuance}`;
+    // Une alternative a pris le relais : on dit laquelle, et combien.
+    const relais = r.remplacePar ? ` · alternative : ${r.remplacePar} × ${r.quantity}` : '';
+    li.textContent = `${r.item} — ${detail}${nuance}${relais}`;
     if (r.approximate) li.classList.add('log__item--approx');
 
     // Une ambiguïté sans propositions est un cul-de-sac : on liste les

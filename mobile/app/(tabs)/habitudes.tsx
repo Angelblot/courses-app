@@ -11,6 +11,7 @@ import { useProducts } from '../../stores/products';
 import { useWizard } from '../../contexts/WizardContext';
 import { RAYONS, rayonDepuisLibelle } from '../../lib/rayons';
 import { nombreArticles } from '../../lib/ajouts-quotidiens';
+import { references } from '../../lib/references';
 /**
  * Habitudes : une liste à cocher par rayon. On touche ce qu'il faut acheter ;
  * le reste du rayon est considéré comme déjà à la maison quand on passe au
@@ -18,10 +19,12 @@ import { nombreArticles } from '../../lib/ajouts-quotidiens';
  */
 export default function Habitudes({session=false}:{session?:boolean}){
  const p=useProducts(),w=useWizard();useFocusEffect(useCallback(()=>{p.recharger();},[p.recharger]));
- const categories=RAYONS.filter(c=>p.produits.some(p=>p.favorite&&rayonDepuisLibelle(p.category)===c.cle));
+ // Tout produit de « Mes produits » est une habitude ; une alternative vit sous sa référence.
+ const habitudes=references(p.produits);
+ const categories=RAYONS.filter(c=>habitudes.some(p=>rayonDepuisLibelle(p.category)===c.cle));
  const [rayon,setRayon]=useState('');
  const cat=categories.find(c=>c.cle===rayon)??categories[0];
- const itemsDe=(cle:string)=>p.produits.filter(x=>x.favorite&&rayonDepuisLibelle(x.category)===cle&&!(session&&w.manques?.[`produit:${x.id}`]&&manqueActif(w,`produit:${x.id}`)));
+ const itemsDe=(cle:string)=>habitudes.filter(x=>rayonDepuisLibelle(x.category)===cle&&!(session&&w.manques?.[`produit:${x.id}`]&&manqueActif(w,`produit:${x.id}`)));
  const items=cat?itemsDe(cat.cle):[];
  const fini=(cle:string)=>{const l=itemsDe(cle);return l.length>0&&l.every(x=>w.habitudesVues?.[x.id]);};
  const annulation=useAnnulation();

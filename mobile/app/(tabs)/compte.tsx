@@ -8,6 +8,7 @@ import { useProducts } from '../../stores/products';
 import { useWizard } from '../../contexts/WizardContext';
 import { Groupe, Ligne } from '../../components/GroupeReglages';
 import { ui } from '../../components/MaisonUI';
+import { references } from '../../lib/references';
 import { colors } from '../../lib/theme';
 
 const NOMS_DRIVES: Record<string, string> = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' };
@@ -68,7 +69,7 @@ export default function Compte() {
       {!!erreurReglage && <Text accessibilityLiveRegion="polite" style={ui.error}>{erreurReglage}</Text>}
 
       <Groupe titre="Courses">
-        <Ligne icone="star" teinte="#9C7A12" libelle="Mes produits" valeur={produits.length || undefined} onPress={() => router.push('/favoris')} />
+        <Ligne icone="star" teinte="#9C7A12" libelle="Mes produits" valeur={references(produits).length || undefined} onPress={() => router.push('/favoris')} />
         <Ligne icone="shopping-cart" teinte={colors.accent} libelle="Drives et Chrome" valeur={drives} onPress={() => router.push('/wizard/generation')} />
         <Ligne icone="mic" teinte="#6E4F9A" libelle="Siri et widget" onPress={() => router.push('/siri')} derniere />
       </Groupe>

@@ -4,9 +4,9 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import type { Product } from '../stores/products';
-import { basculerFavori } from '../stores/products';
 import { PastilleNutri } from './PastilleNutri';
 import { ReprisePhoto } from './ReprisePhoto';
+import { ClassementProduit } from './ClassementProduit';
 import { libelleRayon, rayonDepuisLibelle } from '../lib/rayons.ts';
 import { colors, radius, spacing, texte } from '../lib/theme';
 
@@ -41,30 +41,23 @@ function Ligne({ libelle, valeur }: { libelle: string; valeur: string }) {
  * rien et allonge la fiche.
  */
 export function DetailProduit({
-  produit, onFermer, onChange, onAjouter,
+  produit, produits, onFermer, onChange, onAjouter,
 }: {
   produit: Product | null;
+  /** Le catalogue, pour classer la référence et ses alternatives. */
+  produits?: Product[];
   onFermer: () => void;
   onChange?: () => void;
   /** Ajoute le produit à la liste de courses (depuis Mes produits). */
   onAjouter?: () => void;
 }) {
-  const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   if (!produit) return null;
 
   const taille = contenance(produit);
   const rayon = libelleRayon(rayonDepuisLibelle(produit.category));
 
-  const changerFavori = async () => {
-    if (enCours) return;
-    setEnCours(true);
-    setErreur(null);
-    const r = await basculerFavori(produit.id, !produit.favorite);
-    setEnCours(false);
-    if (r.ok) onChange?.();
-    else setErreur(r.erreur ?? 'Impossible de modifier ce produit.');
-  };
+
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onFermer}>
@@ -87,23 +80,7 @@ export function DetailProduit({
 
           <View style={s.nutri}><PastilleNutri note={produit.nutriscore} /></View>
 
-          <Pressable
-            style={[s.favori, produit.favorite && s.favoriActif]}
-            onPress={changerFavori}
-            disabled={enCours}
-          >
-            <Feather
-              name="star"
-              size={16}
-              color={produit.favorite ? colors.accentContrast : colors.accent}
-            />
-            <Text style={[s.favoriTexte, produit.favorite && s.favoriTexteActif]}>
-              {produit.favorite ? 'Dans mon quotidien' : 'Ajouter à mon quotidien'}
-            </Text>
-          </Pressable>
-          <Text style={s.aide}>
-            Les produits du quotidien sont ceux que le wizard te propose de passer en revue.
-          </Text>
+          {produits && <ClassementProduit produit={produit} produits={produits} onChange={onChange} />}
 
           {erreur && <Text style={s.erreur}>{erreur}</Text>}
 

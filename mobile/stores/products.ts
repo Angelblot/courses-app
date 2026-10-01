@@ -23,10 +23,12 @@ export type Product = {
   volume_ml: number | null;
   product_type: string | null;
   nutriscore: string | null;
+  /** Alternatives dans l'ordre d'essai (références seulement). */
+  alternatives?: string[] | null;
 };
 
 const CHAMPS =
-  'id, ean13, name, brand, category, unit, favorite, image_url, grammage_g, volume_ml, product_type, nutriscore';
+  'id, ean13, name, brand, category, unit, favorite, image_url, grammage_g, volume_ml, product_type, nutriscore, alternatives';
 
 export function useProducts() {
   const [produits, setProduits] = useState<Product[]>([]);
@@ -172,6 +174,23 @@ export async function basculerFavori(
   if (error) {
     console.error('[basculerFavori]', error);
     return { ok: false, reseau: estErreurReseau(error), erreur: "Impossible de modifier ce produit pour le moment." };
+  }
+  return { ok: true };
+}
+
+/**
+ * Enregistre un classement (variante AL3) : chaque écriture fixe les
+ * alternatives d'un produit. Le premier du classement devient la référence.
+ */
+export async function enregistrerAlternatives(
+  ecritures: { id: string; alternatives: string[] }[],
+): Promise<{ ok: boolean; erreur?: string }> {
+  for (const e of ecritures) {
+    const { error } = await supabase.from('products').update({ alternatives: e.alternatives }).eq('id', e.id);
+    if (error) {
+      console.error('[enregistrerAlternatives]', error);
+      return { ok: false, erreur: 'Impossible d’enregistrer cet ordre. Réessaie.' };
+    }
   }
   return { ok: true };
 }

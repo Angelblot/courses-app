@@ -25,7 +25,7 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await btn('1 repas choisi, ne voir qu’eux').click();await texte('1 repas choisi').waitFor();await btn('Tout voir').click();await shot('1-repas');
  await btn('Voir le bilan').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Étape 2 sur 2 : le bilan, avec ses corrections ; rien ne bloque sauf les vrais problèmes.
- await btn('Manques : 3 notés · « lessive » : l’extension cherchera ce nom. Préciser').waitFor();await btn('Habitudes : Pas encore revues · 2 produits. Revoir').waitFor();
+ await btn('Manques : 3 notés · « lessive » : l’extension cherchera ce nom. Préciser').waitFor();await btn('Habitudes : Pas encore revues · 3 produits. Revoir').waitFor();
  await shot('2-bilan');
  // Le retour du pied ramène aux repas, « Voir le bilan » au bilan.
  await btn('Revenir à l’étape Repas').last().click();await texte('Étape 1 sur 2 · Repas').waitFor();await btn('Voir le bilan').last().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
@@ -41,7 +41,7 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await btn('Reprendre mes courses').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  await btn('Faire une pause').last().click();await btn('Finir plus tard').click();await page.reload();await btn('Reprendre mes courses').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Correction Habitudes : liste à cocher par rayon, choix gardés d'un rayon à l'autre, rayon annulable.
- await btn('Habitudes : Pas encore revues · 2 produits. Revoir').last().click();
+ await btn('Habitudes : Pas encore revues · 3 produits. Revoir').last().click();
  const oignons=page.getByRole('checkbox',{name:'Oignons jaunes'}).last();await oignons.waitFor();
  await oignons.click();if(!await oignons.isChecked())throw Error('Habit row not checked');
  await page.getByRole('tab',{name:'Produits laitiers'}).last().click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
@@ -49,7 +49,7 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  // Quitter par « ‹ Bilan » sans valider ne perd pas non plus la coche.
  await btn('Revenir au bilan').first().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Cocher, c'est déjà ajouter à la liste : le bilan compte la coche sans « Rayon suivant ».
- await btn('Habitudes : 1 rayon sur 2 revu · 1 retenu. Continuer').waitFor();
+ await btn('Habitudes : 1 rayon sur 3 revu · 1 retenu. Continuer').waitFor();
  await page.getByRole('button',{name:/^Habitudes :/}).last().click();await oignons.waitFor();if(!await oignons.isChecked())throw Error('Habit choice lost when leaving to the bilan');
  await shot('4-habitudes');
  await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
@@ -57,7 +57,9 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  // Annuler le rayon défait le classement du reste, pas la coche.
  if(!await oignons.isChecked())throw Error('Undo removed the checked habit');
  await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
- await btn('Revenir au bilan').last().click();await btn('Habitudes : 1 retenu sur 2').waitFor();
+ // Plus de favoris : tout produit du catalogue est une habitude, la lessive aussi (rayon Autre).
+ await btn('Rayon suivant').last().click();await page.getByRole('checkbox',{name:'Lessive liquide'}).last().waitFor();
+ await btn('Revenir au bilan').last().click();await btn('Habitudes : 1 retenu sur 3').waitFor();
  // Correction Extras : une ligne proche existe ; on peut l'augmenter (annulable) ou noter à part.
  await btn('Extras : Un produit hors habitudes').last().click();
  const champ=page.getByRole('textbox',{name:'Produit manquant',exact:true}).last();await champ.fill('Pommes de terre bio');

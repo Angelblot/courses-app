@@ -213,3 +213,16 @@ test("l'article de panier transporte l'identifiant du produit", () => {
   ]);
   assert.equal(items[0].product_id, 'p1');
 });
+
+test('construireItems : les alternatives suivent la référence, avec format et enseigne', () => {
+  const produits = [
+    { id: 'e', name: 'Emmental râpé CARREFOUR', brand: null, product_type: null, ean13: '1', grammage_g: 200, volume_ml: null, alternatives: ['g'] },
+    { id: 'g', name: 'Gruyère râpé', brand: 'Leclerc', product_type: null, ean13: '2', grammage_g: 100, volume_ml: null, alternatives: [] },
+  ];
+  const [item] = construireItems([{ key: 'produit:e', name: 'Emmental râpé CARREFOUR', unit: 'unité', rayon: 'pls', totalQuantity: 1, ean13: '1', product_id: 'e', sources: [] }], produits);
+  assert.equal(item.enseigne, 'carrefour');
+  assert.equal(item.grammage_g, 200);
+  assert.deepEqual(item.alternatives, [{ product_id: 'g', name: 'Gruyère râpé', ean13: '2', enseigne: 'leclerc', grammage_g: 100, volume_ml: null }]);
+  // Sans catalogue, la ligne part comme avant.
+  assert.equal(construireItems([{ key: 'x', name: 'x', unit: 'unité', rayon: 'autre', totalQuantity: 1, ean13: null, product_id: null, sources: [] }])[0].alternatives, undefined);
+});

@@ -6,10 +6,10 @@ import { useRecipes } from '../stores/recipes';
 import type { Etat } from '../contexts/WizardContext';
 import { nativeInbox } from '../lib/native-inbox';
 import { photoSecours } from '../lib/photos-maison';
-import { widgetProducts } from '../lib/widget-products';
+import { rattacherSiri, widgetProducts } from '../lib/widget-products';
 
 /** Never put an auth token in the widget. Only a local snapshot and thumbnails. */
-export function WidgetSync({ account, state, writes }: { account: string; state: Etat; writes: MutableRefObject<Promise<void>> }) {
+export function WidgetSync({ account, state, writes, rattacher }: { account: string; state: Etat; writes: MutableRefObject<Promise<void>>; rattacher: (maj: (e: Etat) => Etat) => void }) {
   const p = useProducts(), r = useRecipes(), path = usePathname();
   const lastPath = useRef(path);
   useEffect(() => {
@@ -17,6 +17,11 @@ export function WidgetSync({ account, state, writes }: { account: string; state:
     const sub = AppState.addEventListener('change', value => { if (value === 'active') { void p.recharger(); void r.recharger(); } });
     return () => sub.remove();
   }, [path, p.recharger, r.recharger]);
+  // Un besoin dit à Siri rejoint la référence de son type dès que le catalogue est là.
+  useEffect(() => {
+    if (p.chargement || !p.produits.length) return;
+    if (rattacherSiri(state, p.produits) !== state) rattacher(e => rattacherSiri(e, p.produits));
+  }, [state, p.produits, p.chargement, rattacher]);
   const payload = useMemo(() => JSON.stringify({
     products: widgetProducts(state, p.produits, r.recettes).map(p => ({...p,
       imageURL: p.imageURL || (photoSecours(p.name) ? Image.resolveAssetSource(photoSecours(p.name)).uri : null),

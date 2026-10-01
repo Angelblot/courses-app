@@ -9,6 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { useMaison } from '../../contexts/useMaison';
 import { Action, Head, PiedAvecRetour, Photo, Raison, ui, useAnnulation } from '../../components/MaisonUI';
 import type { LigneMaison } from '../../lib/liste-maison';
+import { references } from '../../lib/references';
 import { ReglerSheet } from '../../components/ReglerSheet';
 import { EnvoiSheet } from '../../components/EnvoiSheet';
 import { RAYONS } from '../../lib/rayons';
@@ -114,7 +115,7 @@ function LigneCorrection({etat,titre,detail,action,onPress}:{etat:EtatCorrection
 function Corrections({points,doublons,aPreciser,onVerifier}:{points:number;doublons:number;aPreciser:string[];onVerifier:()=>void}){
  const {w,p}=useMaison();
  const manques=Object.entries(manquesDuBrouillon(w)).filter(([key])=>manqueActif(w,key));
- const favoris=p.produits.filter(x=>x.favorite&&rayonDepuisLibelle(x.category)&&!manques.some(([k])=>k===`produit:${x.id}`));
+ const favoris=references(p.produits).filter(x=>rayonDepuisLibelle(x.category)&&!manques.some(([k])=>k===`produit:${x.id}`));
  const vus=favoris.filter(x=>w.habitudesVues?.[x.id]),retenues=vus.filter(x=>w.quotidien[x.id]==='needed').length;
  // Un rayon est revu quand tous ses produits l'ont été ; tant qu'il en reste, la ligne rappelle au lieu de valider.
  const rayons=[...new Set(favoris.map(x=>rayonDepuisLibelle(x.category)))],revus=rayons.filter(r=>favoris.filter(x=>rayonDepuisLibelle(x.category)===r).every(x=>w.habitudesVues?.[x.id])).length;

@@ -19,6 +19,7 @@ import {
   progresser, terminer, equivalencesDe, enregistrerEquivalence,
 } from './supabase.js';
 import { strategie, indexer } from './lib/equivalences.js';
+import { candidats, RAISONS_SUIVANT } from './lib/alternatives.js';
 
 /**
  * Période de sondage.
@@ -306,8 +307,28 @@ async function processJob() {
     }
 
     const item = state.items[index];
-    let result = await attempt(tabId, cfg, item, state.baseOrigin, state.equivalences ?? {});
-    const entry = { item: item.name, quantity: item.quantity, ...result };
+    // La référence, puis ses alternatives dans l'ordre, sans les marques
+    // distributeur d'une autre enseigne ; on s'arrête au premier trouvé.
+    const essais = candidats(item, state.site);
+    let result = { ok: false, reason: 'product_unavailable', autreEnseigne: true };
+    let retenu = null;
+    for (const essai of essais) {
+      result = await attempt(tabId, cfg, essai, state.baseOrigin, state.equivalences ?? {});
+      retenu = essai;
+      if (result.ok || !RAISONS_SUIVANT.has(result.reason)) break;
+      if (!result.memorise && state.jobId && essai.product_id) {
+        // L'absence apprise évite de réessayer ce produit à la prochaine commande.
+        await enregistrerEquivalence({ product_id: essai.product_id, drive: state.site, search_query: essai.name, unavailable: true });
+      }
+      result = { ...result, memorise: true };
+    }
+    const entry = {
+      item: item.name,
+      quantity: retenu?.quantity ?? item.quantity,
+      ...result,
+      // Dit au téléphone qu'une alternative a pris le relais de la référence.
+      ...(result.ok && retenu?.remplace ? { remplacePar: retenu.name } : {}),
+    };
 
     // Un challenge n'est pas un échec de produit : c'est une main à rendre.
     if (!result.ok && result.reason === 'challenge') {
@@ -492,6 +513,11 @@ async function demarrerTravail(jobId) {
     quantity: i.quantity,
     ean: i.ean13 ?? null,
     product_id: i.product_id ?? null,
+    // Référence et alternatives : l'ordre d'essai vient de l'application.
+    enseigne: i.enseigne ?? null,
+    grammage_g: i.grammage_g ?? null,
+    volume_ml: i.volume_ml ?? null,
+    alternatives: i.alternatives ?? [],
   }));
 
   await revendiquer(jobId);
