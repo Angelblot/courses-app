@@ -1,4 +1,4 @@
-import { Photo } from './MaisonUI';
+import { Action, Photo } from './MaisonUI';
 import { useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,11 +41,13 @@ function Ligne({ libelle, valeur }: { libelle: string; valeur: string }) {
  * rien et allonge la fiche.
  */
 export function DetailProduit({
-  produit, onFermer, onChange,
+  produit, onFermer, onChange, onAjouter,
 }: {
   produit: Product | null;
   onFermer: () => void;
   onChange?: () => void;
+  /** Ajoute le produit à la liste de courses (depuis Mes produits). */
+  onAjouter?: () => void;
 }) {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -104,6 +106,8 @@ export function DetailProduit({
           </Text>
 
           {erreur && <Text style={s.erreur}>{erreur}</Text>}
+
+          {onAjouter && <View style={{ alignSelf: 'stretch', marginTop: spacing.lg }}><Action onPress={onAjouter}>Ajouter à ma liste</Action></View>}
 
           <View style={s.fiche}>
             <Ligne libelle="Rayon" valeur={rayon} />

@@ -1,243 +1,96 @@
-import { nativeInbox } from '../../lib/native-inbox';
-import { Action, ui } from '../../components/MaisonUI';
-import { useCallback, useState } from 'react';
-import {
-  ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
-} from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import {
-  useFoyer, inviter, retirerMembre, renommerFoyer, reglerPersonnes, type Membre,
-} from '../../stores/foyer';
-import { libelleMembre, peutRetirer } from '../../lib/foyer-libelles.ts';
-import { colors, radius, spacing } from '../../lib/theme';
+import { useFoyer, renommerFoyer, reglerPersonnes } from '../../stores/foyer';
+import { useProducts } from '../../stores/products';
+import { useWizard } from '../../contexts/WizardContext';
+import { Groupe, Ligne } from '../../components/GroupeReglages';
+import { ui } from '../../components/MaisonUI';
+import { colors } from '../../lib/theme';
 
+const NOMS_DRIVES: Record<string, string> = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' };
+
+/**
+ * Réglages, rangés en groupes façon iPhone (variante R1) : le foyer, les
+ * courses, le compte. Ce qui demande plus d'une ligne (membres et
+ * invitations, mode d'emploi de Siri et du widget) a son propre écran.
+ */
 export default function Compte() {
-  const { foyer, membres, moi, chargement, erreur, recharger } = useFoyer();
+  const { foyer, membres, chargement, erreur, recharger } = useFoyer();
+  const { produits } = useProducts(), w = useWizard();
   const [nom, setNom] = useState<string | null>(null);
-  const [adresse, setAdresse] = useState('');
-  const [envoiEnCours, setEnvoiEnCours] = useState(false);
-  const [messageInvitation, setMessageInvitation] = useState<string | null>(null);
-  const [erreurInvitation, setErreurInvitation] = useState<string | null>(null);
-  const [erreurNom, setErreurNom] = useState<string | null>(null);
-  const [erreurPersonnes, setErreurPersonnes] = useState<string | null>(null);
-
-  const rechargerAuFocus = useCallback(() => { recharger(); }, [recharger]);
-  useFocusEffect(rechargerAuFocus);
+  const [erreurReglage, setErreurReglage] = useState<string | null>(null);
+  const [adresse, setAdresse] = useState<string | null>(null);
+  useFocusEffect(useCallback(() => { recharger(); }, [recharger]));
+  useEffect(() => { void supabase.auth.getUser().then(({ data }) => setAdresse(data.user?.email ?? null)); }, []);
 
   const enregistrerNom = async () => {
-    if (!foyer || nom === null || nom === foyer.name) return;
+    if (!foyer || nom === null || nom.trim() === foyer.name) { setNom(null); return; }
     const r = await renommerFoyer(foyer.id, nom);
-    if (r.ok) {
-      setErreurNom(null);
-      recharger();
-    } else {
-      setErreurNom(r.erreur ?? null);
-    }
+    setErreurReglage(r.ok ? null : r.erreur ?? null);
+    if (r.ok) { setNom(null); recharger(); }
   };
-
   // Enregistré à chaque pas : les repas choisis ensuite partent pour ce nombre.
   const changerPersonnes = async (n: number) => {
     if (!foyer || n < 1 || n > 20) return;
     const r = await reglerPersonnes(foyer.id, n);
-    setErreurPersonnes(r.ok ? null : r.erreur ?? null);
+    setErreurReglage(r.ok ? null : r.erreur ?? null);
     if (r.ok) recharger();
   };
+  const personnes = foyer?.personnes ?? 2;
+  const drives = w.drives.map(d => NOMS_DRIVES[d] ?? d).join(', ');
 
-  const envoyerInvitation = async () => {
-    if (envoiEnCours) return;
-    setEnvoiEnCours(true);
-    setMessageInvitation(null);
-    setErreurInvitation(null);
-    const r = await inviter(adresse);
-    setEnvoiEnCours(false);
-    if (r.ok) {
-      setMessageInvitation('Invitation envoyée.');
-      setAdresse('');
-      recharger();
-    } else {
-      setErreurInvitation(r.erreur ?? "L'invitation n'a pas pu être envoyée.");
-    }
-  };
+  if (chargement && !foyer) return <SafeAreaView style={s.centre}><ActivityIndicator color={colors.accent} /></SafeAreaView>;
 
-  const demanderRetrait = (m: Membre) => {
-    Alert.alert(
-      'Retirer ce membre ?',
-      'Il perdra l’accès au foyer. Le catalogue et les recettes restent.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Retirer',
-          style: 'destructive',
-          onPress: async () => {
-            const r = await retirerMembre(m.id);
-            if (r.ok) recharger();
-            else Alert.alert('Retrait impossible', r.erreur ?? '');
-          },
-        },
-      ],
-    );
-  };
+  return <SafeAreaView edges={['top']} style={ui.screen}>
+    <ScrollView contentContainerStyle={s.corps} keyboardShouldPersistTaps="handled">
+      <Text style={s.titre} accessibilityRole="header">Réglages</Text>
 
-  if (chargement && !foyer) {
-    return <SafeAreaView style={s.centre}><ActivityIndicator color={colors.accent} /></SafeAreaView>;
-  }
+      {erreur && <View style={s.alerte}><Text style={ui.error}>{erreur}</Text><Pressable accessibilityRole="button" onPress={recharger} style={s.lien}><Text style={ui.link}>Réessayer</Text></Pressable></View>}
 
-  return (
-    <SafeAreaView style={s.ecran}>
-      <ScrollView contentContainerStyle={s.corps}>
-        <Text style={s.titre}>Réglages</Text>
-        <View style={ui.notice}>
-          <Text style={ui.section}>Ajouter sans y penser</Text>
-          <Text style={ui.productName}>Avec Siri</Text>
-          <Text style={ui.subtitle}>{nativeInbox ? 'Dis « Siri, ajoute un produit dans Courses ». Siri te demande le produit et confirme l’ajout. Tu peux aussi personnaliser la quantité dans l’app Raccourcis, action « Noter un produit manquant ».' : 'Siri est disponible dans la version iPhone intégrant les raccourcis natifs. Il ne fonctionne pas dans cet aperçu web ni dans Expo Go.'}</Text>
-          <Text style={ui.productName}>Depuis ton écran d’accueil</Text>
-          <Text style={ui.subtitle}>Sur iPhone ou iPad, ajoute le widget Courses « Les essentiels ». Le grand format affiche six produits habituels avec leurs photos : touche + pour en ajouter un, puis « Suivants » pour changer de sélection. La coche confirme l’enregistrement sur cet appareil. Les ajouts du widget et de Siri rejoignent ta liste à l’ouverture de Courses, sur le même compte. Ouvre une première fois l’app pour actualiser tes produits.</Text>
-          <Action secondary onPress={()=>router.push('/ajout')}>Essayer l’ajout rapide</Action>
-        </View>
-        <Action secondary onPress={() => router.push('/favoris')}>Mes favoris et produits</Action>
-        <Action secondary onPress={() => router.push('/wizard/generation')}>Mes drives et Chrome</Action>
-
-        {erreur && (
-          <View style={s.bloc}>
-            <Text style={s.erreur}>{erreur}</Text>
-            <Pressable style={s.secondaire} onPress={recharger}>
-              <Text style={s.secondaireTexte}>Réessayer</Text>
-            </Pressable>
+      {foyer && <Groupe titre="Foyer">
+        <Ligne icone="home" teinte={colors.accent} libelle="Nom">
+          <TextInput value={nom ?? foyer.name} onChangeText={setNom} onBlur={enregistrerNom} onSubmitEditing={enregistrerNom} returnKeyType="done"
+            accessibilityLabel="Nom du foyer" style={s.champ} placeholder="Nom du foyer" placeholderTextColor={colors.textMuted} />
+        </Ligne>
+        <Ligne icone="users" teinte="#9A5A1E" libelle="À table">
+          <View style={s.compteur}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Une personne de moins à table" disabled={personnes <= 1} onPress={() => changerPersonnes(personnes - 1)} style={s.pas}><Text style={s.signe}>−</Text></Pressable>
+            <Text style={s.nombre} accessibilityLabel={`${personnes} personnes à table`}>{personnes}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Une personne de plus à table" disabled={personnes >= 20} onPress={() => changerPersonnes(personnes + 1)} style={s.pas}><Text style={s.signe}>+</Text></Pressable>
           </View>
-        )}
+        </Ligne>
+        <Ligne icone="mail" teinte="#3E6E8E" libelle="Membres et invitations" valeur={membres.length} onPress={() => router.push('/membres')} derniere />
+      </Groupe>}
+      {foyer && <Text style={s.aide}>{foyer.personnes ? `Les repas choisis sont prévus pour ${foyer.personnes} personne${foyer.personnes > 1 ? 's' : ''}.` : 'Indique combien vous êtes à table : les quantités des repas suivront.'}</Text>}
+      {!!erreurReglage && <Text accessibilityLiveRegion="polite" style={ui.error}>{erreurReglage}</Text>}
 
-        {foyer && (
-          <>
-            <Text style={s.section}>Ton foyer</Text>
-            <TextInput
-              style={s.champ}
-              value={nom ?? foyer.name}
-              onChangeText={setNom}
-              onBlur={enregistrerNom}
-              placeholder="Nom du foyer"
-              placeholderTextColor={colors.textMuted}
-            />
-            {erreurNom && <Text style={s.erreur}>{erreurNom}</Text>}
+      <Groupe titre="Courses">
+        <Ligne icone="star" teinte="#9C7A12" libelle="Mes produits" valeur={produits.length || undefined} onPress={() => router.push('/favoris')} />
+        <Ligne icone="shopping-cart" teinte={colors.accent} libelle="Drives et Chrome" valeur={drives} onPress={() => router.push('/wizard/generation')} />
+        <Ligne icone="mic" teinte="#6E4F9A" libelle="Siri et widget" onPress={() => router.push('/siri')} derniere />
+      </Groupe>
 
-            <View style={s.personnes}>
-              <View style={{ flex: 1 }}>
-                <Text style={ui.productName}>À table</Text>
-                <Text style={s.aide}>
-                  {foyer.personnes
-                    ? `Les repas choisis sont prévus pour ${foyer.personnes} personne${foyer.personnes > 1 ? 's' : ''}.`
-                    : 'Indique combien vous êtes : les quantités des repas suivront.'}
-                </Text>
-              </View>
-              <View style={ui.counter}>
-                <Pressable accessibilityRole="button" accessibilityLabel="Une personne de moins à table" disabled={(foyer.personnes ?? 2) <= 1} onPress={() => changerPersonnes((foyer.personnes ?? 2) - 1)} style={ui.iconButton}><Text style={ui.title}>−</Text></Pressable>
-                <Text style={ui.num} accessibilityLabel={`${foyer.personnes ?? 2} personnes à table`}>{foyer.personnes ?? 2}</Text>
-                <Pressable accessibilityRole="button" accessibilityLabel="Une personne de plus à table" disabled={(foyer.personnes ?? 2) >= 20} onPress={() => changerPersonnes((foyer.personnes ?? 2) + 1)} style={ui.iconButton}><Text style={ui.title}>+</Text></Pressable>
-              </View>
-            </View>
-            {erreurPersonnes && <Text style={s.erreur}>{erreurPersonnes}</Text>}
-
-            <Text style={s.section}>
-              {`Membres (${membres.length})`}
-            </Text>
-            {membres.map((m) => (
-              <View key={m.id} style={s.ligne}>
-                <View style={s.ligneTexte}>
-                  <Text style={s.email} numberOfLines={1}>{m.email ?? 'Adresse inconnue'}</Text>
-                  <Text style={s.etat}>{libelleMembre(m)}</Text>
-                </View>
-                {moi && peutRetirer(moi, m) && (
-                  <Pressable onPress={() => demanderRetrait(m)} hitSlop={8}>
-                    <Text style={s.retirer}>Retirer</Text>
-                  </Pressable>
-                )}
-              </View>
-            ))}
-
-            <Text style={s.section}>Inviter quelqu&apos;un</Text>
-            <Text style={s.aide}>
-              La personne recevra un courriel. Elle verra le même catalogue, les mêmes
-              recettes et les mêmes listes que toi.
-            </Text>
-            <TextInput
-              style={s.champ}
-              value={adresse}
-              onChangeText={setAdresse}
-              placeholder="adresse@exemple.fr"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              textContentType="emailAddress"
-            />
-            {messageInvitation && <Text style={s.succes}>{messageInvitation}</Text>}
-            {erreurInvitation && <Text style={s.erreur}>{erreurInvitation}</Text>}
-            <Pressable
-              style={[s.bouton, (!adresse.trim() || envoiEnCours) && s.desactive]}
-              onPress={envoyerInvitation}
-              disabled={!adresse.trim() || envoiEnCours}
-            >
-              {envoiEnCours
-                ? <ActivityIndicator color={colors.accentContrast} />
-                : <Text style={s.boutonTexte}>Envoyer l&apos;invitation</Text>}
-            </Pressable>
-          </>
-        )}
-
-        <Pressable style={s.deconnexion} onPress={() => supabase.auth.signOut()}>
-          <Text style={s.deconnexionTexte}>Se déconnecter</Text>
-        </Pressable>
-      </ScrollView>
-    </SafeAreaView>
-  );
+      <Groupe titre="Compte">
+        {!!adresse && <Ligne icone="user" teinte="#6B7266" libelle={adresse} />}
+        <Ligne icone="log-out" teinte={colors.danger} libelle="Se déconnecter" danger onPress={() => { void supabase.auth.signOut(); }} derniere />
+      </Groupe>
+    </ScrollView>
+  </SafeAreaView>;
 }
 
 const s = StyleSheet.create({
-  ecran: { flex: 1, backgroundColor: colors.bg },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-  corps: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xxl },
-  titre: { fontSize: 26, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
-  section: {
-    fontSize: 13, fontWeight: '800', color: colors.textMuted,
-    textTransform: 'uppercase', letterSpacing: 0.4,
-    marginTop: spacing.xl, marginBottom: spacing.xs,
-  },
-  aide: { fontSize: 13, color: colors.textMuted, lineHeight: 18, marginBottom: spacing.xs },
-  personnes: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm,
-    backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md,
-  },
-  bloc: { gap: spacing.sm },
-  champ: {
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    padding: spacing.md, fontSize: 16, color: colors.text, backgroundColor: colors.surface,
-  },
-  ligne: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.surface, borderRadius: radius.md,
-    paddingVertical: spacing.md, paddingHorizontal: spacing.lg, gap: spacing.md,
-    marginBottom: spacing.xs,
-  },
-  ligneTexte: { flex: 1, gap: 2 },
-  email: { fontSize: 15, fontWeight: '600', color: colors.text },
-  etat: { fontSize: 12, color: colors.textMuted },
-  retirer: { fontSize: 13, fontWeight: '600', color: colors.danger },
-  succes: { fontSize: 13, fontWeight: '600', color: colors.accent, marginTop: spacing.xs },
-  erreur: { fontSize: 13, color: colors.danger, marginTop: spacing.xs },
-  bouton: {
-    backgroundColor: colors.accent, borderRadius: radius.md, padding: spacing.lg,
-    alignItems: 'center', marginTop: spacing.md,
-  },
-  boutonTexte: { color: colors.accentContrast, fontWeight: '700', fontSize: 16 },
-  desactive: { opacity: 0.4 },
-  secondaire: {
-    alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg,
-  },
-  secondaireTexte: { color: colors.text, fontWeight: '600', fontSize: 14 },
-  deconnexion: {
-    marginTop: spacing.xxl, borderWidth: 1, borderColor: colors.danger,
-    borderRadius: radius.md, padding: spacing.lg, alignItems: 'center',
-  },
-  deconnexionTexte: { color: colors.danger, fontWeight: '700', fontSize: 16 },
+  corps: { padding: 16, paddingBottom: 40, gap: 18 },
+  titre: { fontSize: 30, fontWeight: '700', color: colors.text, letterSpacing: -0.6, marginTop: 4 },
+  aide: { fontSize: 13, color: colors.textMuted, marginTop: -10, paddingHorizontal: 4 },
+  alerte: { backgroundColor: colors.dangerSoft, borderRadius: 12, padding: 12, gap: 4 },
+  lien: { minHeight: 44, justifyContent: 'center' },
+  champ: { flex: 1.4, minHeight: 44, fontSize: 15, color: colors.textMuted, textAlign: 'right' },
+  compteur: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg, borderRadius: 10 },
+  pas: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  signe: { fontSize: 20, color: colors.text },
+  nombre: { minWidth: 22, textAlign: 'center', fontSize: 16, fontWeight: '600', color: colors.text, fontVariant: ['tabular-nums'] },
 });

@@ -15,9 +15,10 @@ export function useRechercheOff() {
     active.current?.abort(); active.current = null;
     setEnRecherche(false); setResultats(null); setErreur(null); setTentative(1);
   }
-  async function chercher(texte: string) {
+  /** `garderClavier` : recherche lancée pendant la frappe, le clavier reste ouvert. */
+  async function chercher(texte: string, { garderClavier = false } = {}) {
     if (active.current || texte.trim().length < 3) return;
-    Keyboard.dismiss();
+    if (!garderClavier) Keyboard.dismiss();
     const controleur = new AbortController(); active.current = controleur;
     setEnRecherche(true); setTentative(1); setErreur(null); setResultats(null);
     const r = await rechercherParNom(texte, {

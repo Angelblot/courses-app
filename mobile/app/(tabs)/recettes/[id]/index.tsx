@@ -10,7 +10,8 @@ import { SelecteurIngredient, type ChoixIngredient } from '../../../../component
 import { useRecette, supprimerRecette, rattacherIngredient } from '../../../../stores/recipes';
 import { useProducts } from '../../../../stores/products';
 import { useWizard } from '../../../../contexts/WizardContext';
-import { formatDuree, quantitePourParts } from '../../../../lib/recettes-affichage';
+import { quantitePourParts } from '../../../../lib/recettes-affichage';
+import { ReperesRecette } from '../../../../components/ReperesRecette';
 import { formatIngredientQty } from '../../../../lib/unites';
 import { colors } from '../../../../lib/theme';
 
@@ -49,11 +50,7 @@ export default function DetailRecette() {
       <ScrollView contentContainerStyle={rs.body}>
         <Photo recipe name={recette.name} url={recette.image_url} style={{width:'100%',height:230,borderRadius:16}}/>
         <Text style={rs.title}>{recette.name}</Text>
-        <View style={[rs.row,{justifyContent:'flex-start',columnGap:22}]}>
-          {recette.prep_minutes!=null&&<Text style={rs.text}>Préparation · {formatDuree(recette.prep_minutes)??'0 min'}</Text>}
-          {recette.cook_minutes!=null&&<Text style={rs.text}>Cuisson · {formatDuree(recette.cook_minutes)??'Sans cuisson'}</Text>}
-          {!!recette.kcal_per_serving&&<Text style={rs.text}>{recette.kcal_per_serving} kcal / personne</Text>}
-        </View>
+        <ReperesRecette prep={recette.prep_minutes} cuisson={recette.cook_minutes} kcal={recette.kcal_per_serving}/>
         <View style={[rs.row,{paddingVertical:12,borderTopWidth:1,borderBottomWidth:1,borderColor:colors.border}]}>
           <View><Text style={rs.label}>À table pour</Text><Text style={rs.text}>{n} personne{n>1?'s':''}</Text></View>
           <Portions value={n} onChange={v=>{setParts(v);setAvis('');}}/>

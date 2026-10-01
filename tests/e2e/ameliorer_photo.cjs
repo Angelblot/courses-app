@@ -25,7 +25,7 @@ const reprise={image_url:OFF,image_originale:null,image_reprise:null,reprise_sta
  await page.addInitScript(({session})=>{localStorage.setItem('sb-qmymwicsgilhoihtfdjm-auth-token',JSON.stringify(session));},{session});
  const dir=process.env.CAPTURES||'/tmp/ameliorer-photo';fs.mkdirSync(dir,{recursive:true});const shot=n=>page.screenshot({path:`${dir}/${n}.png`});
  const btn=(name)=>page.getByRole('button',{name,exact:true});
- await page.goto('http://localhost:8082/favoris');await btn('Consulter Houmous extra au basilic').click({timeout:60000});
+ await page.goto('http://localhost:8082/favoris');await page.getByRole('button',{name:/^Consulter Houmous extra au basilic/}).click({timeout:60000});
  await btn('Améliorer la photo').click();await page.getByText('Photo en cours de reprise',{exact:true}).waitFor();await shot('attente');
  await page.getByText('Garder la nouvelle photo ?',{exact:true}).waitFor({timeout:20000});await page.waitForTimeout(500);await shot('choix');
  if(demandes!==1)throw Error('Function called '+demandes+' times');
