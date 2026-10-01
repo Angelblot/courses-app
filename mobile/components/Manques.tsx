@@ -11,13 +11,36 @@ import { manquesDuBrouillon, manqueActif, manquesAPreciser, type Manque } from '
 import { colors } from '../lib/theme';
 import { Action, Head, Photo, Raison, ui, useAnnulation, useChampVisible } from './MaisonUI';
 import { revenirAuBilan } from './SessionProgress';
+import { AssocierSiri } from './AssocierSiri';
 export const sources:Record<string,string>={widget:'Widget',siri:'Siri',manuel:'Noté',precedent:'Ajout précédent'};
 /**
  * Un manque. Prêt d'office s'il désigne un produit du catalogue : on le
  * touche seulement pour changer la quantité ou le format. Un libellé libre
  * ou un produit disparu s'ouvre directement pour être précisé.
  */
-export function ManqueRow({lineKey,manque,products,aPreciser,onRetrait}:{lineKey:string;manque:Manque;products:Product[];aPreciser:boolean;onRetrait?:(texte:string,annuler:()=>void)=>void}) {
+export function ManqueRow({lineKey,manque,products,aPreciser,onRetrait,onProduitsChange}:{lineKey:string;manque:Manque;products:Product[];aPreciser:boolean;onRetrait?:(texte:string,annuler:()=>void)=>void;onProduitsChange?:()=>void}) {
+ if(aPreciser&&lineKey.startsWith('extra:siri-'))return <ManqueSiri lineKey={lineKey} manque={manque} products={products} onProduitsChange={onProduitsChange}/>;
+ return <ManqueCatalogue lineKey={lineKey} manque={manque} products={products} aPreciser={aPreciser} onRetrait={onRetrait}/>;
+}
+/**
+ * Un besoin dicté à Siri que l'app n'a pas reconnu (RS1) : la ligne le dit,
+ * et un tap ouvre le choix du produit, retenu pour la fois suivante.
+ */
+function ManqueSiri({lineKey,manque,products,onProduitsChange}:{lineKey:string;manque:Manque;products:Product[];onProduitsChange?:()=>void}) {
+ const w=useWizard(),extra=w.extras.find(x=>`extra:${x.id}`===lineKey),nom=extra?.name??manque.name,quantite=extra?.quantity??1;
+ const [ouvert,setOuvert]=useState(false);
+ return <View style={[m.carte,m.aPreciser]}>
+ <Pressable accessibilityRole="button" accessibilityLabel={`${nom}, dit à Siri, produit pas reconnu. Choisir le produit`} onPress={()=>setOuvert(true)} style={({pressed})=>[ui.row,pressed&&{opacity:.85}]}>
+  <View style={m.micro}><Feather name="mic" size={18} color={colors.attentionText}/></View>
+  <View style={{flex:1,gap:2}}><Text style={ui.productName}>{nom}</Text><Text style={m.pasReconnu}>Siri · produit pas reconnu</Text><Text style={ui.link}>Choisir le produit</Text></View>
+  <Text style={ui.num}>× {quantite}</Text>
+ </Pressable>
+ <AssocierSiri visible={ouvert} nom={nom} produits={products} onFermer={()=>setOuvert(false)}
+  onAssocie={id=>{setOuvert(false);w.validerManque(lineKey,quantite,id);onProduitsChange?.();}}
+  onNote={()=>{setOuvert(false);w.validerManque(lineKey,quantite);}}/>
+ </View>;
+}
+function ManqueCatalogue({lineKey,manque,products,aPreciser,onRetrait}:{lineKey:string;manque:Manque;products:Product[];aPreciser:boolean;onRetrait?:(texte:string,annuler:()=>void)=>void}) {
  const w=useWizard(),id=lineKey.startsWith('produit:')?lineKey.slice(8):undefined;
  const product=products.find(p=>p.id===id),extra=w.extras.find(x=>`extra:${x.id}`===lineKey);
  const [qty,setQty]=useState(id?w.quotidienQty[id]??1:extra?.quantity??1),[chosen,setChosen]=useState(id),[search,setSearch]=useState(''),[edit,setEdit]=useState(false);
@@ -50,7 +73,7 @@ export function Manques({session=false}:{session?:boolean}) {
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView ref={champ.ref} onScroll={champ.onScroll} scrollEventThrottle={16} keyboardShouldPersistTaps="handled" contentContainerStyle={[ui.content,{paddingBottom:28+champ.espace}]}>
  <Head title="Mes manques" back={!session} avatar={!session}/>{!session&&<Text style={ui.subtitle}>Les produits notés au fil des jours avec le widget, Siri ou dans l’app.</Text>}
  {loading&&<ActivityIndicator/>}{erreur&&<><Text style={ui.error}>{erreur}</Text><Action secondary onPress={()=>{p.recharger();r.recharger();}}>Réessayer</Action></>}{w.sauvegardeErreur&&<Text style={ui.error}>{w.sauvegardeErreur}</Text>}
- {!loading&&entries.map(([key,m])=><ManqueRow key={key} lineKey={key} manque={m} products={p.produits} aPreciser={aPreciser.has(key)} onRetrait={annulation.proposer}/>)}
+ {!loading&&entries.map(([key,m])=><ManqueRow key={key} lineKey={key} manque={m} products={p.produits} aPreciser={aPreciser.has(key)} onRetrait={annulation.proposer} onProduitsChange={p.recharger}/>)}
  {!loading&&entries.length>0&&<Text style={ui.detail}>Touche un produit pour changer son format ou sa quantité.</Text>}
  {!entries.length&&!loading&&!erreur&&<View style={ui.notice}><Text style={ui.productName}>Rien ne manque pour le moment.</Text><Text style={ui.subtitle}>Ajoute un produit dès que tu remarques qu’il manque à la maison.</Text></View>}
  {!session&&<Action secondary onPress={()=>router.push('/ajout')}>Noter un manque</Action>}
@@ -60,5 +83,7 @@ const m=StyleSheet.create({
  carte:{backgroundColor:colors.surface,padding:12,borderRadius:12,gap:10},
  aPreciser:{borderWidth:1.5,borderColor:colors.attention},
  drapeau:{alignSelf:'flex-start',marginTop:4,fontSize:12,fontWeight:'600',color:colors.attentionText,backgroundColor:colors.attentionSoft,borderRadius:6,paddingHorizontal:6,paddingVertical:2,overflow:'hidden'},
+ micro:{width:44,height:44,borderRadius:10,backgroundColor:colors.attentionSoft,alignItems:'center',justifyContent:'center'},
+ pasReconnu:{fontSize:13,fontWeight:'600',color:colors.attentionText},
  pret:{width:28,height:28,borderRadius:14,backgroundColor:colors.accentSoft,alignItems:'center',justifyContent:'center'},
 });

@@ -7,6 +7,7 @@ import type { Product } from '../stores/products';
 import { PastilleNutri } from './PastilleNutri';
 import { ReprisePhoto } from './ReprisePhoto';
 import { ClassementProduit } from './ClassementProduit';
+import { ReglagesProduit } from './ReglagesProduit';
 import { libelleRayon, rayonDepuisLibelle } from '../lib/rayons.ts';
 import { colors, radius, spacing, texte } from '../lib/theme';
 
@@ -81,6 +82,7 @@ export function DetailProduit({
           <View style={s.nutri}><PastilleNutri note={produit.nutriscore} /></View>
 
           {produits && <ClassementProduit produit={produit} produits={produits} onChange={onChange} />}
+          {produits && <ReglagesProduit produit={produit} produits={produits} onChange={onChange} />}
 
           {erreur && <Text style={s.erreur}>{erreur}</Text>}
 

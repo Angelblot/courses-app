@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { FicheProduit } from '../lib/openfoodfacts.ts';
 import { estErreurReseau } from '../lib/postgrest.ts';
+import type { VenduChez } from '../lib/references.ts';
 
 // Message affiché à l'utilisateur en cas d'échec de chargement : une phrase
 // française, jamais le `message` brut de postgrest-js (souvent en anglais
@@ -25,10 +26,14 @@ export type Product = {
   nutriscore: string | null;
   /** Alternatives dans l'ordre d'essai (références seulement). */
   alternatives?: string[] | null;
+  /** Phrases dites à Siri qui désignent ce produit. */
+  phrases_siri?: string[] | null;
+  /** Drive choisi à la main ; null = déduit de la marque. */
+  vendu_chez?: VenduChez | null;
 };
 
 const CHAMPS =
-  'id, ean13, name, brand, category, unit, favorite, image_url, grammage_g, volume_ml, product_type, nutriscore, alternatives';
+  'id, ean13, name, brand, category, unit, favorite, image_url, grammage_g, volume_ml, product_type, nutriscore, alternatives, phrases_siri, vendu_chez';
 
 export function useProducts() {
   const [produits, setProduits] = useState<Product[]>([]);
@@ -190,6 +195,20 @@ export async function enregistrerAlternatives(
     if (error) {
       console.error('[enregistrerAlternatives]', error);
       return { ok: false, erreur: 'Impossible d’enregistrer cet ordre. Réessaie.' };
+    }
+  }
+  return { ok: true };
+}
+
+/** Enregistre les phrases Siri ou le drive de produits, ligne par ligne. */
+export async function enregistrerReglages(
+  ecritures: ({ id: string } & Partial<Pick<Product, 'phrases_siri' | 'vendu_chez'>>)[],
+): Promise<{ ok: boolean; erreur?: string }> {
+  for (const { id, ...champs } of ecritures) {
+    const { error } = await supabase.from('products').update(champs).eq('id', id);
+    if (error) {
+      console.error('[enregistrerReglages]', error);
+      return { ok: false, erreur: 'Impossible d’enregistrer ce réglage. Réessaie.' };
     }
   }
   return { ok: true };

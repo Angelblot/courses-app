@@ -9,7 +9,12 @@ import { normalizeProductType } from './typology.ts';
 export type ProduitClasse = {
  id: string; name: string; brand: string | null; product_type: string | null;
  alternatives?: string[] | null; grammage_g?: number | null; volume_ml?: number | null;
+ /** Phrases dites à Siri qui désignent ce produit (« PQ »), retenues au fil des ratés. */
+ phrases_siri?: string[] | null;
+ /** Drive choisi à la main ; null = déduit de la marque. */
+ vendu_chez?: VenduChez | null;
 };
+export type VenduChez = 'partout' | Enseigne;
 export type Enseigne = 'carrefour' | 'leclerc';
 
 /** Produits cités comme alternative d'une autre référence. */
@@ -54,11 +59,59 @@ export function reordonner(ancienneReference: string, ordre: string[]): { id: st
  return ecritures;
 }
 
-/** La référence d'un besoin dit à Siri (« papier toilette ») : par type de produit. */
+/** Une phrase dite à Siri, comparable : minuscules, sans accents ni ponctuation. */
+export function phraseSiri(s: string): string {
+ return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/œ/g, 'oe').replace(/[^a-z0-9+]+/g, ' ').trim();
+}
+/** Deux phrases sont la même si seuls l'espacement et la ponctuation changent (« P.Q. » = « pq »). */
+const memePhrase = (a: string, b: string) => phraseSiri(a).replace(/ /g, '') === phraseSiri(b).replace(/ /g, '');
+
+/**
+ * La référence d'un besoin dit à Siri. Une phrase retenue (« PQ ») l'emporte ;
+ * sinon le type de produit (« papier toilette »).
+ */
 export function referencePourNom<P extends ProduitClasse>(nom: string, produits: P[]): P | undefined {
+ const dite = phraseSiri(nom);
+ const retenu = dite ? produits.find(p => (p.phrases_siri ?? []).some(x => memePhrase(x, dite))) : undefined;
+ if (retenu) return referenceDe(retenu.id, produits);
  const type = normalizeProductType(nom);
  if (!type) return undefined;
  return references(produits).find(p => p.product_type === type || normalizeProductType(p.name) === type);
+}
+
+/**
+ * Les produits qu'un besoin non reconnu désigne sans doute, les plus
+ * probables d'abord : même type, puis mots en commun avec le nom.
+ */
+export function produitsProbables<P extends ProduitClasse>(nom: string, produits: P[], n = 4): P[] {
+ const type = normalizeProductType(nom);
+ const mots = phraseSiri(nom).split(' ').filter(m => m.length >= 2);
+ const score = (p: P) => {
+  const texte = ` ${phraseSiri(`${p.name} ${p.product_type ?? ''} ${p.brand ?? ''}`)} `;
+  return (type && p.product_type === type ? 3 : 0) + mots.filter(m => texte.includes(` ${m}`)).length;
+ };
+ return references(produits).map(p => ({ p, s: score(p) })).filter(x => x.s > 0)
+  .sort((a, b) => b.s - a.s || a.p.name.localeCompare(b.p.name)).slice(0, n).map(x => x.p);
+}
+
+/**
+ * Retient `phrase` pour `produitId` : elle s'ajoute à ses phrases et quitte
+ * celles d'un autre produit, pour qu'une phrase ne désigne qu'un produit.
+ * Rend les écritures à faire.
+ */
+export function retenirPhrase(produitId: string, phrase: string, produits: ProduitClasse[]): { id: string; phrases_siri: string[] }[] {
+ const dite = phraseSiri(phrase), texte = phrase.trim().toLowerCase();
+ if (!dite) return [];
+ const ecritures: { id: string; phrases_siri: string[] }[] = [];
+ for (const p of produits) {
+  const actuelles = p.phrases_siri ?? [];
+  if (p.id === produitId) {
+   if (!actuelles.some(x => memePhrase(x, dite))) ecritures.push({ id: p.id, phrases_siri: [...actuelles, texte] });
+  } else if (actuelles.some(x => memePhrase(x, dite))) {
+   ecritures.push({ id: p.id, phrases_siri: actuelles.filter(x => !memePhrase(x, dite)) });
+  }
+ }
+ return ecritures;
 }
 
 /** Marques distributeur : un produit qui n'est vendu que par son enseigne. */
@@ -66,10 +119,16 @@ const MARQUES: { enseigne: Enseigne; motifs: RegExp }[] = [
  { enseigne: 'carrefour', motifs: /\b(carrefour|reflets de france|simpl|grand jury|bebe cash)\b/ },
  { enseigne: 'leclerc', motifs: /\b(leclerc|marque repere|eco\+|nos regions ont du talent|bio village|pouce|delisse|les croises|repere)\b/ },
 ];
-const plat = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const plat = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
-/** L'enseigne à laquelle un produit est réservé, ou null s'il se trouve partout. */
-export function enseigneExclusive(p: { name: string; brand: string | null }): Enseigne | null {
+/** L'enseigne que la marque laisse deviner, ou null si rien ne la désigne. */
+export function enseigneDeduite(p: { name: string; brand: string | null }): Enseigne | null {
  const texte = plat(`${p.brand ?? ''} ${p.name}`);
  return MARQUES.find(m => m.motifs.test(texte))?.enseigne ?? null;
+}
+
+/** L'enseigne à laquelle un produit est réservé, ou null s'il se trouve partout. Le choix manuel l'emporte. */
+export function enseigneExclusive(p: { name: string; brand: string | null; vendu_chez?: VenduChez | null }): Enseigne | null {
+ if (p.vendu_chez) return p.vendu_chez === 'partout' ? null : p.vendu_chez;
+ return enseigneDeduite(p);
 }
