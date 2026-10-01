@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type TextStyle } from 'react-native';
-import { Button, ContextMenu, Divider, Host, RNHostView } from '@expo/ui/swift-ui';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -8,6 +7,7 @@ import { useProducts, type Product } from '../../stores/products';
 import { classement, references } from '../../lib/references';
 import { useWizard } from '../../contexts/WizardContext';
 import { DetailProduit, type OuvertureFiche } from '../../components/DetailProduit';
+import { MenuProduit } from '../../components/MenuProduit';
 import { Action, Head, Photo, ui, useAnnulation } from '../../components/MaisonUI';
 import { RAYONS, rayonDepuisLibelle, type CleRayon } from '../../lib/rayons';
 import { colors } from '../../lib/theme';
@@ -69,22 +69,11 @@ export default function Favoris() {
       </View>
       {p.chargement && !p.produits.length && <ActivityIndicator color={colors.accent} />}
       {p.erreur && <><Text style={ui.error}>{p.erreur}</Text><Action secondary onPress={p.recharger}>Réessayer</Action></>}
-      <View style={s.grille}>{produits.map(x => Platform.OS !== 'ios' ? <View key={x.id}>{tuile(x)}</View> :
-        <Host key={x.id} matchContents={{ vertical: true }} style={{ width: largeurTuile }}>
-          <ContextMenu>
-            <ContextMenu.Items>
-              <Button label="Ajouter à ma liste" systemImage="cart.badge.plus" onPress={() => ajouterListe(x)} />
-              <Divider />
-              <Button label="Modifier" systemImage="pencil" onPress={() => ouvrir(x, 'modifier')} />
-              {!!x.ean13 && <Button label="Actualiser les infos" systemImage="arrow.clockwise" onPress={() => ouvrir(x, 'actualiser')} />}
-              <Divider />
-              <Button label="Supprimer" systemImage="trash" role="destructive" onPress={() => ouvrir(x, 'supprimer')} />
-            </ContextMenu.Items>
-            <ContextMenu.Trigger>
-              <RNHostView matchContents>{tuile(x)}</RNHostView>
-            </ContextMenu.Trigger>
-          </ContextMenu>
-        </Host>)}</View>
+      <View style={s.grille}>{produits.map(x =>
+        <MenuProduit key={x.id} largeur={largeurTuile} onAjouter={() => ajouterListe(x)} onModifier={() => ouvrir(x, 'modifier')}
+          onActualiser={x.ean13 ? () => ouvrir(x, 'actualiser') : undefined} onSupprimer={() => ouvrir(x, 'supprimer')}>
+          {tuile(x)}
+        </MenuProduit>)}</View>
       {!p.chargement && !p.erreur && !produits.length && <View style={ui.notice}><Text style={ui.productName}>{query ? 'Aucun produit ne correspond.' : filtre === 'tous' ? 'Pas encore de produit.' : 'Aucun produit dans ce rayon.'}</Text><Text style={ui.subtitle}>Scanne un produit pour l’ajouter : il rejoindra tes habitudes.</Text></View>}
     </ScrollView>
     {annulation.toast}
