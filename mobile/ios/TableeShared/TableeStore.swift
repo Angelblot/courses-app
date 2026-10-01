@@ -16,6 +16,8 @@ struct TableeProduct: Codable, Identifiable {
   let imageURL: String?
   var imageFile: String? = nil
   var inList: Bool
+  /// Autres façons de le dire à Siri : phrases retenues, type de produit.
+  var synonyms: [String]? = nil
 }
 struct TableeData: Codable {
   var account: String? = nil

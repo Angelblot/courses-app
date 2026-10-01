@@ -1,5 +1,5 @@
 import { ProductSuggestions, productSuggestion } from './ProductSuggestions';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -12,27 +12,28 @@ import { colors } from '../lib/theme';
 import { Action, Head, Photo, Raison, ui, useAnnulation, useChampVisible } from './MaisonUI';
 import { revenirAuBilan } from './SessionProgress';
 import { AssocierSiri } from './AssocierSiri';
-export const sources:Record<string,string>={widget:'Widget',siri:'Siri',manuel:'Noté',precedent:'Ajout précédent'};
+export const sources:Record<string,string>={widget:'Widget',siri:'Siri',rappels:'Rappels',manuel:'Noté',precedent:'Ajout précédent'};
 /**
  * Un manque. Prêt d'office s'il désigne un produit du catalogue : on le
  * touche seulement pour changer la quantité ou le format. Un libellé libre
  * ou un produit disparu s'ouvre directement pour être précisé.
  */
 export function ManqueRow({lineKey,manque,products,aPreciser,onRetrait,onProduitsChange}:{lineKey:string;manque:Manque;products:Product[];aPreciser:boolean;onRetrait?:(texte:string,annuler:()=>void)=>void;onProduitsChange?:()=>void}) {
- if(aPreciser&&lineKey.startsWith('extra:siri-'))return <ManqueSiri lineKey={lineKey} manque={manque} products={products} onProduitsChange={onProduitsChange}/>;
+ if(aPreciser&&(lineKey.startsWith('extra:siri-')||lineKey.startsWith('extra:rappel-')))return <ManqueSiri lineKey={lineKey} manque={manque} products={products} onProduitsChange={onProduitsChange}/>;
  return <ManqueCatalogue lineKey={lineKey} manque={manque} products={products} aPreciser={aPreciser} onRetrait={onRetrait}/>;
 }
 /**
- * Un besoin dicté à Siri que l'app n'a pas reconnu (RS1) : la ligne le dit,
- * et un tap ouvre le choix du produit, retenu pour la fois suivante.
+ * Un besoin dicté à Siri, ou rangé par Siri dans Rappels, que l'app n'a pas
+ * reconnu (RS1) : la ligne le dit, et un tap ouvre le choix du produit,
+ * retenu pour la fois suivante.
  */
 function ManqueSiri({lineKey,manque,products,onProduitsChange}:{lineKey:string;manque:Manque;products:Product[];onProduitsChange?:()=>void}) {
  const w=useWizard(),extra=w.extras.find(x=>`extra:${x.id}`===lineKey),nom=extra?.name??manque.name,quantite=extra?.quantity??1;
- const [ouvert,setOuvert]=useState(false);
+ const [ouvert,setOuvert]=useState(false),rappel=manque.source==='rappels',origine=rappel?'repris de Rappels':'dit à Siri';
  return <View style={[m.carte,m.aPreciser]}>
- <Pressable accessibilityRole="button" accessibilityLabel={`${nom}, dit à Siri, produit pas reconnu. Choisir le produit`} onPress={()=>setOuvert(true)} style={({pressed})=>[ui.row,pressed&&{opacity:.85}]}>
-  <View style={m.micro}><Feather name="mic" size={18} color={colors.attentionText}/></View>
-  <View style={{flex:1,gap:2}}><Text style={ui.productName}>{nom}</Text><Text style={m.pasReconnu}>Siri · produit pas reconnu</Text><Text style={ui.link}>Choisir le produit</Text></View>
+ <Pressable accessibilityRole="button" accessibilityLabel={`${nom}, ${origine}, produit pas reconnu. Choisir le produit`} onPress={()=>setOuvert(true)} style={({pressed})=>[ui.row,pressed&&{opacity:.85}]}>
+  <View style={m.micro}><Feather name={rappel?'check-circle':'mic'} size={18} color={colors.attentionText}/></View>
+  <View style={{flex:1,gap:2}}><Text style={ui.productName}>{nom}</Text><Text style={m.pasReconnu}>{sources[manque.source]} · produit pas reconnu</Text><Text style={ui.link}>Choisir le produit</Text></View>
   <Text style={ui.num}>× {quantite}</Text>
  </Pressable>
  <AssocierSiri visible={ouvert} nom={nom} produits={products} onFermer={()=>setOuvert(false)}
@@ -69,9 +70,12 @@ export function Manques({session=false}:{session?:boolean}) {
  const {w,p,r,loading,erreur}=useMaison();
  const entries=Object.entries(manquesDuBrouillon(w)).filter(([key])=>manqueActif(w,key));
  const annulation=useAnnulation(),champ=useChampVisible();
+ // Ce que Siri a rangé dans Rappels vient d'arriver : un message discret, une fois, avec « Annuler » (RA1).
+ const reprise=w.derniereReprise;
+ useEffect(()=>{if(!reprise||reprise.vue)return;const n=reprise.ids.length;annulation.proposer(`${n} article${n>1?'s':''} repris de « ${reprise.liste} » et coché${n>1?'s':''} dans Rappels`,w.annulerRepriseRappels);w.voirReprise();},[reprise,annulation.proposer,w.annulerRepriseRappels,w.voirReprise]);
  const pending=manquesAPreciser(w,p.produits.map(x=>x.id)),aPreciser=new Set(pending.map(([key])=>key)),prets=entries.length-pending.length;
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView ref={champ.ref} onScroll={champ.onScroll} scrollEventThrottle={16} keyboardShouldPersistTaps="handled" contentContainerStyle={[ui.content,{paddingBottom:28+champ.espace}]}>
- <Head title="Mes manques" back={!session} avatar={!session}/>{!session&&<Text style={ui.subtitle}>Les produits notés au fil des jours avec le widget, Siri ou dans l’app.</Text>}
+ <Head title="Mes manques" back={!session} avatar={!session}/>{!session&&<Text style={ui.subtitle}>Les produits notés au fil des jours avec le widget, Siri, Rappels ou dans l’app.</Text>}
  {loading&&<ActivityIndicator/>}{erreur&&<><Text style={ui.error}>{erreur}</Text><Action secondary onPress={()=>{p.recharger();r.recharger();}}>Réessayer</Action></>}{w.sauvegardeErreur&&<Text style={ui.error}>{w.sauvegardeErreur}</Text>}
  {!loading&&entries.map(([key,m])=><ManqueRow key={key} lineKey={key} manque={m} products={p.produits} aPreciser={aPreciser.has(key)} onRetrait={annulation.proposer} onProduitsChange={p.recharger}/>)}
  {!loading&&entries.length>0&&<Text style={ui.detail}>Touche un produit pour changer son format ou sa quantité.</Text>}

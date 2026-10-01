@@ -20,7 +20,7 @@ export function etapeDeReprise(v: string | undefined): SessionStep | undefined {
  if (v === 'recettes' || v === 'recap') return v;
  return CORRECTIONS.some(c => c.cle === v) ? 'recap' : undefined;
 }
-export type Manque = { name: string; source: 'widget' | 'siri' | 'manuel' | 'precedent'; valide?: boolean };
+export type Manque = { name: string; source: 'widget' | 'siri' | 'rappels' | 'manuel' | 'precedent'; valide?: boolean };
 export const normaliserNom = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/œ/g,'oe').replace(/[^a-z0-9]+/g,' ').trim();
 
 /** Old drafts did not retain the source. Keep them, without inventing a widget origin. */
@@ -29,7 +29,7 @@ export function manquesDuBrouillon(e: Etat): Record<string, Manque> {
  const result: Record<string, Manque> = {};
  for (const [id, status] of Object.entries(e.quotidien))
   if (status === 'needed' && !e.habitudesVues?.[id]) result[`produit:${id}`] = { name: 'Produit enregistré', source: 'precedent' };
- for (const x of e.extras) result[`extra:${x.id}`] = { name: x.name, source: x.id.startsWith('siri-') ? 'siri' : 'precedent' };
+ for (const x of e.extras) result[`extra:${x.id}`] = { name: x.name, source: x.id.startsWith('siri-') ? 'siri' : x.id.startsWith('rappel-') ? 'rappels' : 'precedent' };
  return result;
 }
 export function manqueActif(e: Etat, key: string) {

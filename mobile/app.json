@@ -12,7 +12,9 @@
       "bundleIdentifier": "com.coursesapp.mobile",
       "buildNumber": "2",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSRemindersFullAccessUsageDescription": "Courses reprend les articles que Siri range dans ta liste Rappels de courses, puis les coche.",
+        "NSRemindersUsageDescription": "Courses reprend les articles que Siri range dans ta liste Rappels de courses, puis les coche."
       },
       "entitlements": {
         "com.apple.security.application-groups": [

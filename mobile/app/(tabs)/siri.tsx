@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { nativeInbox } from '../../lib/native-inbox';
 import { Action, Head, ui } from '../../components/MaisonUI';
 import { colors } from '../../lib/theme';
+import { LiaisonRappels } from '../../components/LiaisonRappels';
 
 /** Mode d'emploi de Siri et du widget, ouvert depuis Réglages. */
 export default function Siri() {
@@ -15,10 +16,12 @@ export default function Siri() {
       <Text style={ui.subtitle}>Noter un manque sans ouvrir l’app : il rejoint ta liste à la prochaine ouverture de Courses, sur le même compte.</Text>
       <View style={s.carte}>
         <View style={s.tete}><View style={[s.pastille, { backgroundColor: '#6E4F9A' }]}><Feather name="mic" size={17} color="#FFFFFF" /></View><Text style={ui.productName}>Avec Siri</Text></View>
-        <Text style={s.texte}>{nativeInbox
-          ? 'Dis « Siri, ajoute un produit dans Courses ». Siri te demande le produit et confirme l’ajout. Tu peux aussi régler la quantité dans l’app Raccourcis, action « Noter un produit manquant ».'
-          : 'Siri est disponible dans la version iPhone, avec les raccourcis natifs. Il ne fonctionne pas dans cet aperçu web ni dans Expo Go.'}</Text>
+        {nativeInbox ? <>
+          <Text style={s.texte}>Dis « Ajoute crème fraîche dans Courses » : ça marche en une phrase pour tes produits et les phrases retenues dans leur fiche.</Text>
+          <Text style={[s.texte, s.discret]}>Pour un produit nouveau : « Ajoute un produit dans Courses », Siri te demande lequel.</Text>
+        </> : <Text style={s.texte}>Siri est disponible dans la version iPhone, avec les raccourcis natifs. Il ne fonctionne pas dans cet aperçu web ni dans Expo Go.</Text>}
       </View>
+      <LiaisonRappels />
       <View style={s.carte}>
         <View style={s.tete}><View style={[s.pastille, { backgroundColor: colors.accent }]}><Feather name="grid" size={17} color="#FFFFFF" /></View><Text style={ui.productName}>Depuis l’écran d’accueil</Text></View>
         <Text style={s.texte}>Ajoute le widget Courses « Les essentiels ». Le grand format affiche six produits habituels avec leurs photos : touche + pour en ajouter un, puis « Suivants » pour changer de sélection. La coche confirme l’enregistrement sur cet appareil.</Text>
@@ -35,4 +38,5 @@ const s = StyleSheet.create({
   tete: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   pastille: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   texte: { fontSize: 15, lineHeight: 22, color: colors.text },
+  discret: { fontSize: 14, lineHeight: 20, color: colors.textMuted },
 });

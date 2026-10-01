@@ -2,7 +2,9 @@ import { abandonner, cleDistinct, etapeDeReprise, manquesDuBrouillon, restaurerH
 import { retenirFrequent, type Frequent } from '../lib/extras-frequents';
 import { WidgetSync } from '../components/WidgetSync';
 import { importerAjouts } from '../lib/widget-products';
-import { nativeInbox } from '../lib/native-inbox';
+import { annulerReprise, cleRappel, importerRappels, lireArticles, type Reprise } from '../lib/rappels';
+import { nativeInbox, nativeRappels } from '../lib/native-inbox';
+import { enregistrerLiaison, lireLiaison } from '../stores/rappels';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, AppState, View, Text } from 'react-native';
 import {
@@ -25,6 +27,8 @@ export type Etat = {
   /** Paires déclarées distinctes à la saisie (cleDistinct) : plus jamais redemandées. */
   distincts?: string[];
   importsExternes?: string[];
+  /** Articles repris de Rappels à la dernière ouverture : le message et son « Annuler ». */
+  derniereReprise?: Reprise;
   /** Extras déjà notés, proposés en un tap. Survit à la remise à zéro de la liste. */
   extrasFrequents?: Record<string, Frequent>;
   habitudesVues?: Record<string, boolean>;
@@ -84,6 +88,14 @@ type Contexte = Etat & {
   abandonEnAttente: boolean;
   annulerAbandon: () => void;
   oublierAbandon: () => void;
+  /** Le message de reprise Rappels a été montré. */
+  voirReprise: () => void;
+  /** Retire la dernière reprise Rappels et décoche ses articles dans Rappels. */
+  annulerRepriseRappels: () => void;
+  /** Relit tout de suite les ajouts Siri, widget et Rappels (après avoir relié une liste). */
+  actualiserAjouts: () => void;
+  /** Le compte connecté : clé des réglages propres à cet appareil. */
+  compte: string | null;
 };
 
 const WizardCtx = createContext<Contexte | null>(null);
@@ -94,6 +106,11 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   const [stockagePret, setStockagePret] = useState(false);
   const [sauvegardeErreur, setSauvegardeErreur] = useState<string | null>(null);
   const ecritures = useRef(Promise.resolve());
+  // Articles lus dans Rappels, cochés là-bas une fois enregistrés ici.
+  const aCocher = useRef<string[]>([]);
+  const etatRef = useRef(etat);
+  const relancer = useRef<() => void>(() => {});
+  etatRef.current = etat;
   const cle = `tablee-maison-v1:${userId}`;
   useEffect(() => {
     let actif = true;
@@ -121,6 +138,12 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
           try { await nativeInbox.acknowledge(userId, etat.importsExternes ?? []); }
           catch { setSauvegardeErreur('Ta liste est enregistrée. La synchronisation des ajouts Siri et widget sera retentée à la prochaine ouverture.'); }
         }
+        const repris = new Set(etat.importsExternes ?? []);
+        const ids = aCocher.current.filter(id => repris.has(cleRappel(id)));
+        if (nativeRappels && ids.length) {
+          // En cas d'échec, l'article reste non coché dans Rappels mais n'est pas repris deux fois.
+          try { await nativeRappels.cocher(ids, true); aCocher.current = aCocher.current.filter(id => !ids.includes(id)); } catch { /* retenté à la prochaine ouverture */ }
+        }
       })
       .catch(() => setSauvegardeErreur('Le brouillon n’a pas pu être enregistré sur cet appareil.'));
   }, [etat, pret, stockagePret, cle, userId]);
@@ -137,8 +160,26 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
           return importerAjouts(e, pending);
         });
       } catch { if (actif) setSauvegardeErreur('Les ajouts Siri et widget ne sont pas accessibles. Ouvre les réglages pour vérifier la configuration iPhone.'); }
+      await reprendreRappels();
+    }
+    // Ce que Siri a rangé dans la liste Rappels reliée. Silencieux en cas d'échec : la liste attend la prochaine ouverture.
+    async function reprendreRappels() {
+      try {
+        if (!nativeRappels || !userId || !stockagePret) return;
+        const liaison = await lireLiaison(userId);
+        if (!liaison || await nativeRappels.statut() !== 'autorise') return;
+        const lu = await nativeRappels.lire(liaison.id);
+        if (!actif || !lu) return;
+        const articles = lireArticles(lu.articles);
+        aCocher.current = [...new Set([...aCocher.current, ...articles.map(a => a.id)])];
+        const deja = new Set(etatRef.current.importsExternes ?? []);
+        const n = articles.filter(a => !deja.has(cleRappel(a.id))).length;
+        setEtat(e => importerRappels(e, lu.titre, articles));
+        if (n) await enregistrerLiaison(userId, { ...liaison, titre: lu.titre, derniere: { n, le: new Date().toISOString() } });
+      } catch { /* prochaine ouverture */ }
     }
     void importer();
+    relancer.current = () => { void importer(); };
     const listener = AppState.addEventListener('change', state => { if (state === 'active') void importer(); });
     return () => { actif = false; listener.remove(); };
   }, [userId, stockagePret]);
@@ -255,16 +296,23 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   const abandonnerSession = useCallback(() => { setAvantAbandon(etat); setEtat(abandonner(etat)); }, [etat]);
   const annulerAbandon = useCallback(() => { if (avantAbandon) setEtat(avantAbandon); setAvantAbandon(null); }, [avantAbandon]);
   const oublierAbandon = useCallback(() => setAvantAbandon(null), []);
+  const actualiserAjouts = useCallback(() => relancer.current(), []);
+  const voirReprise = useCallback(() => setEtat(e => e.derniereReprise && !e.derniereReprise.vue ? { ...e, derniereReprise: { ...e.derniereReprise, vue: true } } : e), []);
+  const annulerRepriseRappels = useCallback(() => {
+    const ids = etatRef.current.derniereReprise?.ids ?? [];
+    setEtat(annulerReprise);
+    if (nativeRappels && ids.length) void nativeRappels.cocher(ids, false).catch(() => {});
+  }, []);
 
   const valeur = useMemo<Contexte>(() => ({
     ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes,
     toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser, retenirEnvoi,
-    abandonnerSession, abandonEnAttente: avantAbandon !== null, annulerAbandon, oublierAbandon,
+    abandonnerSession, abandonEnAttente: avantAbandon !== null, annulerAbandon, oublierAbandon, voirReprise, annulerRepriseRappels, actualiserAjouts, compte: userId,
   }), [
     etat, demarrerSession, allerEtape, validerManque, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser, retenirEnvoi,
-    abandonnerSession, avantAbandon, annulerAbandon, oublierAbandon,
+    abandonnerSession, avantAbandon, annulerAbandon, oublierAbandon, voirReprise, annulerRepriseRappels, actualiserAjouts, userId,
   ]);
 
   if (!pret) return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F7F2' }}><ActivityIndicator color="#48613A" /><Text>Restauration de ta liste…</Text></View>;
