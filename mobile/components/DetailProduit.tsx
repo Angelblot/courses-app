@@ -9,7 +9,7 @@ import { PastilleNutri } from './PastilleNutri';
 import { ReprisePhoto } from './ReprisePhoto';
 import { ClassementProduit } from './ClassementProduit';
 import { ReglagesProduit } from './ReglagesProduit';
-import { SelecteurRayon } from './SelecteurRayon';
+import { ChoixRayon } from './ChoixRayon';
 import { ActualiserSheet } from './ActualiserSheet';
 import { SupprimerSheet } from './SupprimerSheet';
 import { libelleRayon, rayonDepuisLibelle, type CleRayon } from '../lib/rayons.ts';
@@ -70,17 +70,16 @@ export function DetailProduit({
   const [info, setInfo] = useState<string | null>(null);
   const [edition, setEdition] = useState(false);
   const [brouillon, setBrouillon] = useState({ name: '', brand: '', contenance: '', category: 'autre' as CleRayon });
-  const [choixRayon, setChoixRayon] = useState(false);
   const [feuille, setFeuille] = useState<'actualiser' | 'supprimer' | null>(null);
 
   const commencerEdition = (p: Product) => {
     setBrouillon({ name: p.name, brand: p.brand ?? '', contenance: formaterContenance(p) ?? '', category: rayonDepuisLibelle(p.category) });
-    setChoixRayon(false); setErreur(null); setInfo(null); setEdition(true);
+    setErreur(null); setInfo(null); setEdition(true);
   };
   // Chaque ouverture repart de la fiche en lecture, ou du geste choisi dans
   // l'appui long de la grille.
   useEffect(() => {
-    setEdition(false); setFeuille(null); setErreur(null); setInfo(null); setChoixRayon(false);
+    setEdition(false); setFeuille(null); setErreur(null); setInfo(null);
     if (!produit) return;
     if (ouverture === 'modifier') commencerEdition(produit);
     else if (ouverture === 'actualiser' || ouverture === 'supprimer') ouvrirFeuille(ouverture, produit);
@@ -151,12 +150,7 @@ export function DetailProduit({
               <Champ libelle="Contenance" valeur={brouillon.contenance} placeholder="150 g, 1,5 L, 75 cl" onChange={(contenance) => setBrouillon((b) => ({ ...b, contenance }))}
                 erreur={contenanceLue ? null : 'Écris un nombre et une unité : 150 g, 1,5 L, 75 cl.'} />
             </View>
-            {choixRayon
-              ? <View style={s.selecteur}><SelecteurRayon valeur={brouillon.category} onChoisir={(category) => { setBrouillon((b) => ({ ...b, category })); setChoixRayon(false); }} onFermer={() => setChoixRayon(false)} /></View>
-              : <Pressable accessibilityRole="button" accessibilityLabel={`Rayon : ${libelleRayon(brouillon.category)}. Changer`} onPress={() => setChoixRayon(true)} style={s.ligneChoix}>
-                  <Text style={s.libelle}>Rayon</Text>
-                  <View style={s.valeurChoix}><Text style={[s.valeur, { color: colors.accent }]}>{libelleRayon(brouillon.category)}</Text><Feather name="chevron-right" size={18} color={colors.accent} /></View>
-                </Pressable>}
+            <View style={s.selecteur}><ChoixRayon valeur={brouillon.category} onChoisir={(category) => setBrouillon((b) => ({ ...b, category }))} /></View>
             {erreur && <Text accessibilityLiveRegion="polite" style={s.erreur}>{erreur}</Text>}
           </> : <>
             <ReprisePhoto key={produit.id} produitId={produit.id} nom={produit.name} onChange={onChange} />
@@ -253,10 +247,5 @@ const s = StyleSheet.create({
   champ: { gap: 6 },
   saisie: { ...ui.input },
   erreurChamp: { fontSize: 13, color: colors.danger },
-  ligneChoix: {
-    alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.lg,
-    minHeight: 52, marginTop: spacing.lg, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.card,
-  },
-  valeurChoix: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
   selecteur: { alignSelf: 'stretch', marginTop: spacing.lg },
 });
