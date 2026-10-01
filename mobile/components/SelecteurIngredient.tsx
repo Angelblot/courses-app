@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { useProducts, ajouterProduit, type Product } from '../stores/products';
 import { PastilleNutri } from './PastilleNutri';
 import { Photo, ui } from './MaisonUI';
 import { colors } from '../lib/theme';
+import { ScanRapide } from './ScanRapide';
 
 export type ChoixIngredient = {
   name: string;
@@ -29,6 +30,18 @@ type Props = {
   suggestions?: Product[];
   /** Produits à ne pas proposer (déjà dans le classement). */
   exclure?: string[];
+  /** Recherche de départ (le nom à préciser). */
+  requeteInitiale?: string;
+  /** Produits proches, toujours proposés en tête sous « Proches dans tes produits ». */
+  proches?: Product[];
+  /** Au-dessus du champ : ce qu'on est en train de préciser. */
+  entete?: ReactNode;
+  /** Remplace la sortie « sans produit » collée en bas. */
+  pied?: ReactNode;
+  /** Le bouton de scan du code-barres dans le champ (iPhone). */
+  scan?: boolean;
+  /** Verbe annoncé sur chaque résultat (« Ajouter », « Choisir »). */
+  verbe?: string;
 };
 
 const MAX_CATALOGUE = 8;
@@ -60,15 +73,17 @@ function useHauteurClavier() {
  * après une pause de frappe. « Ajouter « x » sans produit » reste collé en
  * bas, au-dessus du clavier.
  */
-export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un ingrédient', sansProduit = true, suggestions = [], exclure = [] }: Props) {
+export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un ingrédient', sansProduit = true, suggestions = [], exclure = [], requeteInitiale = '', proches = [], entete, pied, scan = Platform.OS !== 'web', verbe = 'Ajouter' }: Props) {
   const { produits, recharger } = useProducts();
   const insets = useSafeAreaInsets(), clavier = useHauteurClavier();
-  const [requete, setRequete] = useState(''), [focus, setFocus] = useState(false);
+  const [requete, setRequete] = useState(requeteInitiale), [focus, setFocus] = useState(false), [scanner, setScanner] = useState(false);
   const off = useRechercheOff();
   const [erreur, setErreur] = useState<string | null>(null), [ajout, setAjout] = useState<string | null>(null);
   const texte = requete.trim();
   const exclus = new Set(exclure);
-  const duCatalogue = filtrerCatalogue(produits.filter(p => !exclus.has(p.id)), requete).slice(0, MAX_CATALOGUE);
+  const prochesVus = proches.filter(p => !exclus.has(p.id));
+  const dejaProches = new Set(prochesVus.map(p => p.id));
+  const duCatalogue = filtrerCatalogue(produits.filter(p => !exclus.has(p.id) && !dejaProches.has(p.id)), requete).slice(0, MAX_CATALOGUE);
   const memeType = texte ? [] : suggestions.filter(p => !exclus.has(p.id));
 
   useEffect(() => {
@@ -91,7 +106,7 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
   };
 
   const ligne = (cle: string, nom: string, detail: string | null, image: string | null, note: Product['nutriscore'], plein: boolean, onPress: () => void, occupe = false) =>
-    <Pressable key={cle} accessibilityRole="button" accessibilityLabel={`Ajouter ${nom}${detail ? `, ${detail}` : ''}`} disabled={occupe} onPress={onPress} style={({ pressed }) => [s.ligne, pressed && { backgroundColor: colors.surface }]}>
+    <Pressable key={cle} accessibilityRole="button" accessibilityLabel={`${verbe} ${nom}${detail ? `, ${detail}` : ''}`} disabled={occupe} onPress={onPress} style={({ pressed }) => [s.ligne, pressed && { backgroundColor: colors.surface }]}>
       <View style={s.vignette}><Photo name={nom} url={image} style={s.photo} /></View>
       <View style={{ flex: 1, gap: 2 }}><Text style={ui.productName} numberOfLines={2}>{nom}</Text>{!!detail && <Text style={[ui.detail, { marginTop: 0 }]} numberOfLines={1}>{detail}</Text>}</View>
       <PastilleNutri note={note} />
@@ -104,20 +119,25 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
         <Text style={s.titre} accessibilityRole="header" numberOfLines={1}>{titre}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} style={s.fermer}><View style={s.fermerRond}><Feather name="x" size={18} color={colors.text} /></View></Pressable>
       </View>
+      {entete}
       <View style={[s.champ, focus && s.champActif]}>
         <Feather name="search" size={18} color={colors.textMuted} />
         <TextInput style={[s.saisie, sansCadreWeb]} value={requete} onChangeText={t => { setRequete(t); setErreur(null); }} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
-          returnKeyType="search" placeholder="Lardons, crème, spaghetti…" placeholderTextColor={colors.textMuted} accessibilityLabel="Chercher un ingrédient" autoFocus autoCorrect={false} />
+          returnKeyType="search" placeholder="Lardons, crème, spaghetti…" placeholderTextColor={colors.textMuted} accessibilityLabel="Chercher un produit" autoFocus={!requeteInitiale} autoCorrect={false} />
         {!!requete && <Pressable accessibilityRole="button" accessibilityLabel="Effacer la recherche" onPress={() => setRequete('')} style={s.effacer}><Feather name="x-circle" size={18} color={colors.textMuted} /></Pressable>}
+        {scan && <Pressable accessibilityRole="button" accessibilityLabel="Scanner un code-barres" onPress={() => { Keyboard.dismiss(); setScanner(true); }} style={s.scan}><Feather name="maximize" size={18} color={colors.accent} /></Pressable>}
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: (sansProduit ? 96 : 24) + clavier }} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: (sansProduit || pied ? 140 : 24) + clavier }} keyboardShouldPersistTaps="handled">
+        {prochesVus.length > 0 && <><Text style={s.section}>Proches dans tes produits</Text>
+          {prochesVus.map(p => ligne(`proche-${p.id}`, p.name, [p.brand, contenance(p.grammage_g, p.volume_ml)].filter(Boolean).join(' · ') || null, p.image_url, p.nutriscore, true, () => onChoisir(depuisProduit(p))))}</>}
         {memeType.length > 0 && <><Text style={s.section}>Même type dans tes produits</Text>
           {memeType.map(p => ligne(`type-${p.id}`, p.name, [p.brand, contenance(p.grammage_g, p.volume_ml)].filter(Boolean).join(' · ') || null, p.image_url, p.nutriscore, true, () => onChoisir(depuisProduit(p))))}</>}
-        <Text style={s.section}>{memeType.length ? 'Tous tes produits' : 'Dans tes produits'}</Text>
+        {/* Avec un en-tête (« Préciser »), « pas un de tes produits » est déjà dit : pas de section vide. */}
+        {(duCatalogue.length > 0 || (!prochesVus.length && !entete)) && <Text style={s.section}>{memeType.length || prochesVus.length ? 'Tous tes produits' : 'Dans tes produits'}</Text>}
         {duCatalogue.length
           ? duCatalogue.map(p => ligne(p.id, p.name, [p.brand, contenance(p.grammage_g, p.volume_ml)].filter(Boolean).join(' · ') || null, p.image_url, p.nutriscore, true, () => onChoisir(depuisProduit(p))))
-          : <Text style={s.vide}>Aucun de tes produits ne correspond.</Text>}
+          : !prochesVus.length && !entete && <Text style={s.vide}>Aucun de tes produits ne correspond.</Text>}
 
         {texte.length >= 3 && <>
           <Text style={s.section}>Sur Open Food Facts</Text>
@@ -132,7 +152,9 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
         {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { paddingHorizontal: 16 }]}>{erreur}</Text>}
       </ScrollView>
 
-      {sansProduit && !!texte && <View style={[s.pied, { bottom: clavier, paddingBottom: clavier ? 10 : 10 + insets.bottom }]}>
+      {!!pied && <View style={[s.pied, { bottom: clavier, paddingBottom: clavier ? 10 : 10 + insets.bottom }]}>{pied}</View>}
+      <ScanRapide visible={scanner} onFermer={() => setScanner(false)} onFiche={f => { setScanner(false); void choisirFiche(f); }} />
+      {!pied && sansProduit && !!texte && <View style={[s.pied, { bottom: clavier, paddingBottom: clavier ? 10 : 10 + insets.bottom }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={`Ajouter « ${texte} » sans produit. L'extension le cherchera par son nom.`} onPress={() => onChoisir({ name: texte, product_id: null, unit: 'unité', rayon: 'autre' })} style={({ pressed }) => [s.sansProduit, pressed && { opacity: .85 }]}>
           <Feather name="edit-2" size={17} color={colors.accent} />
           <View style={{ flex: 1 }}><Text style={s.sansProduitTitre} numberOfLines={1}>Ajouter « {texte} » sans produit</Text><Text style={[ui.detail, { marginTop: 0 }]}>L’extension le cherchera par son nom</Text></View>
@@ -152,6 +174,7 @@ const s = StyleSheet.create({
   champActif: { borderWidth: 2, borderColor: colors.accent },
   saisie: { flex: 1, minHeight: 46, fontSize: 16, color: colors.text },
   effacer: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
+  scan: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center', marginRight: -4 },
   section: { fontSize: 13, fontWeight: '600', color: colors.textMuted, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
   ligne: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, paddingHorizontal: 16, paddingVertical: 8 },
   vignette: { width: 48, height: 48, borderRadius: 10, backgroundColor: 'white', borderWidth: 1, borderColor: colors.border, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },

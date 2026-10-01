@@ -1,92 +1,136 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Feuille } from './Feuille';
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRef, type ReactNode } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { useWizard } from '../contexts/WizardContext';
 import type { Product } from '../stores/products';
 import type { LigneMaison } from '../lib/liste-maison';
 import { produitsProches, type Manque } from '../lib/session-courses';
 import { sources } from './Manques';
-import { Action, Photo, ui, nomDialogue } from './MaisonUI';
-import { Feather } from '@expo/vector-icons';
+import { SelecteurIngredient } from './SelecteurIngredient';
+import { Photo, ui } from './MaisonUI';
 import { colors } from '../lib/theme';
 
 type Doublon = { id: string; a: LigneMaison; b: LigneMaison };
+type Point = { type: 'manque'; key: string; manque: Manque } | { type: 'doublon'; doublon: Doublon };
 
 /**
- * « Préciser … » : les manques notés à la main et les doublons
- * possibles, réglés sans quitter le bilan. Un manque s'ouvre sur les
- * produits qui lui ressemblent : un tap le précise ; sinon il part tel quel. Le bilan ferme la feuille
+ * « Préciser » au bilan (variante PR1) : un manque ou un doublon à la fois,
+ * toujours nommé en haut, avec ses issues juste dessous. Un manque se
+ * précise avec la recherche commune (tes produits, Open Food Facts, scan),
+ * se garde sous son nom ou se retire ; un doublon se règle en gardant l'un
+ * des deux (DB1). On passe tout seul au suivant ; le bilan ferme la feuille
  * dès qu'il ne reste plus rien.
  */
 export function ReglerSheet({ visible, onFermer, manques, doublons, products, onRetrait, toast }: { visible: boolean; onFermer: () => void; manques: [string, Manque][]; doublons: Doublon[]; products: Product[]; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode }) {
- const insets = useSafeAreaInsets(), { height } = useWindowDimensions(), w = useWizard();
- const nb = manques.length + doublons.length;
- const titreCourant = manques.length === 1 && !doublons.length ? `Préciser « ${manques[0][1].name} »` : doublons.length === 1 && !manques.length ? 'Lequel garder ?' : `Préciser ${nb} produit${nb > 1 ? 's' : ''}`;
- // Figé tant qu'il reste quelque chose : pendant la fermeture, la feuille
- // afficherait « Préciser 0 produit ».
- const [titre, setTitre] = useState(titreCourant);
- useEffect(() => { if (nb > 0) setTitre(titreCourant); }, [nb, titreCourant]);
- const retirer = (l: LigneMaison) => { const avant = w.ligneQuantites[l.key]; w.modifierLigne(l.key, 0); onRetrait(`${l.name} retiré de ta liste`, () => w.restaurerLigne(l.key, avant)); };
- return <Feuille visible={visible} onFermer={onFermer} nom={titre} clavier>
-   <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel={titre} onAccessibilityEscape={onFermer}>
-    <View style={s.entete}><Text style={[s.titre, { flex: 1, marginBottom: 0 }]} accessibilityRole="header">{titre}</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} hitSlop={6} style={s.fermer}><Feather name="x" size={22} color={colors.text} /></Pressable></View>
-    <ScrollView style={{ maxHeight: height * 0.72 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 12, paddingBottom: 8 }}>
-     {manques.map(([key, m]) => <PreciserManque key={key} lineKey={key} manque={m} products={products} seul={manques.length === 1 && !doublons.length} />)}
-     {/* Un doublon possible : on touche la photo du produit qu'on garde, l'autre est retiré (annulable). */}
-     {doublons.map(d => <View key={d.id} style={s.doublon}>
-      {(manques.length > 0 || doublons.length > 1) && <Text style={ui.productName}>Lequel garder ?</Text>}
-      <Text style={[ui.detail, { marginTop: 0 }]}>Touche celui que tu gardes, l’autre est retiré.</Text>
-      <View style={s.duo}>{[[d.a, d.b], [d.b, d.a]].map(([garde, autre]) => { const produit = products.find(p => p.id === garde.product_id); return <Pressable key={garde.key} accessibilityRole="button" accessibilityLabel={`Garder ${garde.name}, ${garde.totalQuantity} article${garde.totalQuantity > 1 ? 's' : ''}. Retire ${autre.name}`} onPress={() => retirer(autre)} style={({ pressed }) => [s.tuile, pressed && s.tuileAppuyee]}>
-       <View style={s.image}><Photo name={garde.name} url={produit?.image_url} style={s.photo} /></View>
-       <View style={s.texte}><Text style={ui.productName} numberOfLines={2}>{garde.name}</Text><Text style={[ui.detail, { marginTop: 2 }]} numberOfLines={1}>{[...new Set(garde.sources.map(x => x.label))].join(' · ')}</Text><Text style={s.qte}>× {garde.totalQuantity}</Text></View>
-      </Pressable>; })}</View>
-      <Action secondary onPress={() => w.accepterDoublon(d.id)}>Garder les deux</Action>
-     </View>)}
-    </ScrollView>
-    <View>{toast}</View>
-   </View>
- </Feuille>;
+ const points: Point[] = [...manques.map(([key, manque]) => ({ type: 'manque' as const, key, manque })), ...doublons.map(doublon => ({ type: 'doublon' as const, doublon }))];
+ // Le total de départ fixe la progression : « 2 sur 4 » même quand un point réglé disparaît.
+ const total = useRef(points.length);
+ if (!visible || points.length > total.current) total.current = points.length;
+ const n = Math.max(total.current, 1), position = Math.min(n, n - points.length + 1);
+ const titre = `Préciser · ${position} sur ${n}`, courant = points[0];
+ const progression = n > 1 ? <View style={s.pas} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{Array.from({ length: n }, (_, i) => <View key={i} style={[s.segment, i < position && s.segmentFait]} />)}</View> : null;
+
+ return <Modal visible={visible && !!courant} animationType="slide" presentationStyle="pageSheet" onRequestClose={onFermer}>
+  {courant?.type === 'manque'
+   ? <PreciserManque key={courant.key} titre={titre} progression={progression} lineKey={courant.key} manque={courant.manque} products={products} onFermer={onFermer} onRetrait={onRetrait} toast={toast} />
+   : courant?.type === 'doublon'
+    ? <GarderUn key={courant.doublon.id} titre={titre} progression={progression} doublon={courant.doublon} products={products} onFermer={onFermer} onRetrait={onRetrait} toast={toast} />
+    : null}
+ </Modal>;
 }
 
-/** Un manque à préciser : ses produits proches d'abord, « Laisser tel quel » ensuite. */
-function PreciserManque({ lineKey, manque, products, seul }: { lineKey: string; manque: Manque; products: Product[]; seul: boolean }) {
- const w = useWizard(), [search, setSearch] = useState('');
+/** Un manque : la recherche commune, et en bas « garder sans produit » ou « retirer ». */
+function PreciserManque({ titre, progression, lineKey, manque, products, onFermer, onRetrait, toast }: { titre: string; progression: ReactNode; lineKey: string; manque: Manque; products: Product[]; onFermer: () => void; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode }) {
+ const w = useWizard();
  const id = lineKey.startsWith('produit:') ? lineKey.slice(8) : undefined, extra = w.extras.find(x => `extra:${x.id}` === lineKey);
- const qty = id ? w.quotidienQty[id] ?? 1 : extra?.quantity ?? 1, nom = extra?.name ?? manque.name, q = search.trim().toLowerCase();
- const resultats = q.length >= 2 ? products.filter(p => p.name.toLowerCase().includes(q)).slice(0, 5) : produitsProches(nom, products);
- const detail = (p: Product) => [p.brand, p.volume_ml ? `${p.volume_ml} ml` : p.grammage_g ? `${p.grammage_g} g` : null].filter(Boolean).join(' · ');
- return <View style={[s.manque, !seul && s.carte]}>
-  {!seul && <Text style={ui.productName}>« {nom} »</Text>}
-  <Text style={[ui.detail, { marginTop: 0 }]}>{[sources[manque.source], `sans choix, l’extension cherchera « ${nom} »`].filter(Boolean).join(' · ')}</Text>
-  <TextInput style={ui.input} value={search} onChangeText={setSearch} placeholder="Chercher un autre produit…" placeholderTextColor={colors.textMuted} accessibilityLabel={`Chercher le produit exact pour ${nom}`} />
-  {resultats.length > 0 ? <View style={{ gap: 8 }}>
-   <Text style={[ui.detail, { marginTop: 0 }]}>{q.length >= 2 ? 'Résultats' : 'Dans tes produits'}</Text>
-   {resultats.map(p => <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`Choisir : ${p.name}${detail(p) ? `, ${detail(p)}` : ''}`} onPress={() => { Keyboard.dismiss(); w.validerManque(lineKey, qty, p.id); }} style={({ pressed }) => [s.produit, pressed && { opacity: .85 }]}>
-    <Photo name={p.name} url={p.image_url} />
-    <View style={{ flex: 1 }}><Text style={ui.productName}>{p.name}</Text>{!!detail(p) && <Text style={[ui.detail, { marginTop: 1 }]}>{detail(p)}</Text>}</View>
-    <Text style={ui.link}>Choisir</Text>
-   </Pressable>)}
-  </View> : <Text style={[ui.detail, { marginTop: 0 }]}>{q.length >= 2 ? 'Aucun produit trouvé. Essaie un autre nom.' : `Aucun de tes produits ne ressemble à « ${nom} ». Cherche-le par un autre nom.`}</Text>}
-  <Action secondary onPress={() => { Keyboard.dismiss(); w.validerManque(lineKey, qty); }}>{`Laisser « ${nom} » tel quel`}</Action>
+ const qty = id ? w.quotidienQty[id] ?? 1 : extra?.quantity ?? 1, nom = extra?.name ?? manque.name;
+ const disparu = !!id && !products.some(p => p.id === id);
+ const origine = [sources[manque.source], disparu ? 'produit retiré de ton catalogue' : 'pas encore un de tes produits'].filter(Boolean).join(' · ');
+ const retirer = () => { const avant = w.ligneQuantites[lineKey]; w.modifierLigne(lineKey, 0); onRetrait(`${nom} retiré de ta liste`, () => w.restaurerLigne(lineKey, avant)); };
+ const entete = <View style={{ gap: 10, paddingBottom: 10 }}>
+  {progression}
+  <View style={s.heros}>
+   <View style={s.inconnu}><Feather name={manque.source === 'siri' ? 'mic' : manque.source === 'rappels' ? 'check-circle' : 'edit-2'} size={20} color={colors.attentionText} /></View>
+   <View style={{ flex: 1, gap: 2 }}><Text style={s.nom} numberOfLines={2}>« {nom} »</Text><Text style={[ui.detail, { marginTop: 0 }]}>{origine}</Text></View>
+   <Text style={s.qte}>× {qty}</Text>
+  </View>
  </View>;
+ const pied = <View style={{ gap: 6 }}>
+  {toast}
+  <View style={s.issues}>
+   <Pressable accessibilityRole="button" accessibilityLabel={`Garder « ${nom} » sans produit. L’extension le cherchera par son nom.`} onPress={() => w.validerManque(lineKey, qty)} style={({ pressed }) => [s.garderNom, pressed && { opacity: .85 }]}>
+    <Text style={s.garderNomTexte} numberOfLines={2}>Garder « {nom} » sans produit</Text>
+   </Pressable>
+   <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${nom} de ta liste`} onPress={retirer} style={({ pressed }) => [s.retirer, pressed && { opacity: .85 }]}>
+    <Feather name="trash-2" size={17} color={colors.danger} /><Text style={s.retirerTexte}>Retirer</Text>
+   </Pressable>
+  </View>
+  <Text style={s.explication}>Sans produit, l’extension cherche « {nom} » sur le drive.</Text>
+ </View>;
+ return <SelecteurIngredient titre={titre} verbe="Choisir" sansProduit={false} requeteInitiale={nom} proches={produitsProches(nom, products)} entete={entete} pied={pied}
+  onFermer={onFermer} onChoisir={c => { if (c.product_id) w.validerManque(lineKey, qty, c.product_id); }} />;
+}
+
+/** Un doublon possible (DB1) : « Garder celui-ci » sous chaque photo ; l'autre est retiré, annulable. */
+function GarderUn({ titre, progression, doublon, products, onFermer, onRetrait, toast }: { titre: string; progression: ReactNode; doublon: Doublon; products: Product[]; onFermer: () => void; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode }) {
+ const w = useWizard(), insets = useSafeAreaInsets();
+ const retirer = (l: LigneMaison) => { const avant = w.ligneQuantites[l.key]; w.modifierLigne(l.key, 0); onRetrait(`${l.name} retiré de ta liste`, () => w.restaurerLigne(l.key, avant)); };
+ const { a, b } = doublon;
+ const tuile = (garde: LigneMaison, autre: LigneMaison) => {
+  const produit = products.find(p => p.id === garde.product_id), origine = [...new Set(garde.sources.map(x => x.label))].join(' · ');
+  return <View style={s.tuile}>
+   <View style={s.image}><Photo name={garde.name} url={produit?.image_url} style={s.photo} /></View>
+   <View style={s.texte}><Text style={ui.productName} numberOfLines={3}>{garde.name}</Text><Text style={[ui.detail, { marginTop: 2 }]} numberOfLines={1}>{[origine, `× ${garde.totalQuantity}`].filter(Boolean).join(' · ')}</Text></View>
+   <Pressable accessibilityRole="button" accessibilityLabel={`Garder ${garde.name}, ${garde.totalQuantity} article${garde.totalQuantity > 1 ? 's' : ''}. ${autre.name} sera retiré`} onPress={() => retirer(autre)} style={({ pressed }) => [s.garder, pressed && { opacity: .85 }]}>
+    <Text style={s.garderTexte}>Garder celui-ci</Text>
+   </Pressable>
+  </View>;
+ };
+ return <SafeAreaView edges={['top']} style={s.ecran}>
+  <View style={s.entete}><Text style={s.titre} accessibilityRole="header" numberOfLines={1}>{titre}</Text>
+   <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} style={s.fermer}><View style={s.fermerRond}><Feather name="x" size={18} color={colors.text} /></View></Pressable></View>
+  {progression}
+  <View style={{ paddingHorizontal: 16, paddingTop: 14, gap: 14, flex: 1 }}>
+   <Text style={s.question}>Le même achat, noté deux fois ?</Text>
+   <View style={s.duo}>{tuile(a, b)}<Text style={s.ou}>ou</Text>{tuile(b, a)}</View>
+  </View>
+  <View style={[s.basDoublon, { paddingBottom: 12 + insets.bottom }]}>
+   {toast}
+   <Pressable accessibilityRole="button" onPress={() => w.declarerDistinct(a.name, b.name)} style={({ pressed }) => [s.differents, pressed && { opacity: .85 }]}><Text style={s.garderNomTexte}>Ce sont deux achats différents</Text></Pressable>
+   <Text style={s.explication}>Garder l’un retire l’autre de ta liste ; « Annuler » reste possible.</Text>
+  </View>
+ </SafeAreaView>;
 }
 
 const s = StyleSheet.create({
- manque: { gap: 10 },
- carte: { backgroundColor: colors.surface, borderRadius: 12, padding: 12 },
- produit: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, padding: 10, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.traitControle },
- fond: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(20,28,16,0.32)' },
- panneau: { backgroundColor: colors.bg, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 16, paddingTop: 10 },
- entete: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, paddingLeft: 4 },
- fermer: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
- titre: { fontSize: 20, fontWeight: '700', color: colors.text, letterSpacing: -0.4, paddingHorizontal: 4, marginBottom: 12 },
- doublon: { gap: 10 },
- duo: { flexDirection: 'row', gap: 10 },
- tuile: { flex: 1, backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.traitControle, overflow: 'hidden' },
- tuileAppuyee: { borderWidth: 3, borderColor: colors.accent },
+ ecran: { flex: 1, backgroundColor: colors.bg },
+ entete: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 16, paddingRight: 8, paddingTop: 12, paddingBottom: 8 },
+ titre: { flex: 1, fontSize: 20, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
+ fermer: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+ fermerRond: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.off, alignItems: 'center', justifyContent: 'center' },
+ pas: { flexDirection: 'row', gap: 4, paddingHorizontal: 16 },
+ segment: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border },
+ segmentFait: { backgroundColor: colors.accent },
+ heros: { marginHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, backgroundColor: colors.surface },
+ inconnu: { width: 52, height: 52, borderRadius: 12, backgroundColor: colors.attentionSoft, alignItems: 'center', justifyContent: 'center' },
+ nom: { fontSize: 17, fontWeight: '700', color: colors.text },
+ qte: { fontSize: 15, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+ issues: { flexDirection: 'row', gap: 8 },
+ garderNom: { flex: 1, minHeight: 50, borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, backgroundColor: colors.surface },
+ garderNomTexte: { fontSize: 15, fontWeight: '600', color: colors.accent, textAlign: 'center' },
+ retirer: { minHeight: 50, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12 },
+ retirerTexte: { fontSize: 15, fontWeight: '600', color: colors.danger },
+ explication: { fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
+ question: { fontSize: 17, fontWeight: '700', color: colors.text },
+ duo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+ ou: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+ tuile: { flex: 1, alignSelf: 'stretch', backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
  image: { height: 112, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' },
  photo: { width: 92, height: 92, borderRadius: 8 },
- texte: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10 },
- qte: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 4, fontVariant: ['tabular-nums'] },
+ texte: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, flex: 1 },
+ garder: { margin: 8, marginTop: 0, minHeight: 44, borderRadius: 10, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
+ garderTexte: { fontSize: 15, fontWeight: '700', color: colors.accent },
+ basDoublon: { paddingHorizontal: 16, paddingTop: 10, gap: 6 },
+ differents: { minHeight: 50, borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
 });

@@ -17,14 +17,17 @@ const IMAGE='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
  await page.goto('http://localhost:8082');await page.getByText('Les courses, à ton rythme.',{exact:true}).waitFor({timeout:60000});
  await btn('Préparer mes courses').click();await btn('Voir le bilan').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  await page.getByRole('button',{name:/^Manques :.*1 doublon possible.*Préciser$/}).last().click();
- await page.getByRole('dialog').getByText('Lequel garder ?',{exact:true}).waitFor();await page.waitForTimeout(700);await shot('doublon');
- const garder=btn('Garder Pommes de terre, 2 articles. Retire Pommes de terre bio');await garder.waitFor();
+ // PR1 : un point à la fois ; le manque « lessive » vient d'abord, gardé sous son nom.
+ await btn('Garder « lessive » sans produit. L’extension le cherchera par son nom.').click();
+ await page.getByText('Le même achat, noté deux fois ?',{exact:true}).waitFor();await page.waitForTimeout(700);await shot('doublon');
+ const garder=btn('Garder Pommes de terre, 2 articles. Pommes de terre bio sera retiré');await garder.waitFor();
  // Toujours une image : le produit noté à la main reçoit celle de la fonction.
- await page.waitForTimeout(800);const img=await page.getByRole('dialog').evaluate(d=>d.innerHTML.includes('image/png;base64'));if(!img||!demandesImage.includes('Pommes de terre bio'))throw Error('No image for a hand-noted product '+JSON.stringify({img,demandesImage}));
+ await page.waitForTimeout(800);const img=await page.evaluate(()=>document.body.innerHTML.includes('image/png;base64'));if(!img||!demandesImage.includes('Pommes de terre bio'))throw Error('No image for a hand-noted product '+JSON.stringify({img,demandesImage}));
  const bords=await garder.evaluate(e=>getComputedStyle(e).borderTopWidth);
  await garder.click();await btn('Annuler : Pommes de terre bio retiré de ta liste').last().click();
- // Annulé : la question revient dans la feuille ; « Garder les deux » la clôt pour de bon.
- await garder.waitFor();await btn('Garder les deux').last().click();
+ // Le dernier point réglé ferme la feuille ; « Annuler » reste au bilan, et la question revient.
+ await page.getByRole('button',{name:/^Manques :.*1 doublon possible.*Préciser$/}).last().click();
+ await garder.waitFor();await btn('Ce sont deux achats différents').last().click();
  await page.waitForTimeout(500);if(await page.getByRole('button',{name:/doublon possible/}).count())throw Error('Doublon still asked after keeping both');
  if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true,bords}));
  }catch(e){console.error(e);process.exitCode=1}finally{await b.close()}})();

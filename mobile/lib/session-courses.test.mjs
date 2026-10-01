@@ -98,3 +98,9 @@ test('produitsProches : type ou mot du libellé, sans faux voisin', async () => 
  assert.deepEqual(produitsProches('xy', produits), []);
  assert.deepEqual(produitsProches('ananas', produits), []);
 });
+
+test('deux noms ne sont pas des doublons pour leur seul premier mot',()=>{
+ const l=(key,name)=>({key,name,product_id:null,ean13:null,totalQuantity:1,unit:'unité',owned:false,sources:[]});
+ assert.equal(doublonsPossibles([l('extra:a','Papier aluminium'),l('extra:b','Papier film')]).length,0);
+ assert.equal(doublonsPossibles([l('extra:a','Lait'),l('extra:b','Lait demi-écrémé bio')]).length,1);
+});

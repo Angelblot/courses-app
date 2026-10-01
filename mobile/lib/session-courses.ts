@@ -56,7 +56,7 @@ export function doublonsPossibles(lignes: LigneMaison[], acceptes: string[] = []
  const actifs=lignes.filter(l=>!l.owned), result: {id:string;a:LigneMaison;b:LigneMaison}[]=[];
  for(let i=0;i<actifs.length;i++) for(let j=i+1;j<actifs.length;j++) {
   const a=actifs[i],b=actifs[j],na=normaliserNom(a.name),nb=normaliserNom(b.name);
-  const ta=normalizeProductType(a.name),tb=normalizeProductType(b.name);
+  const ta=normalizeProductType(a.name,null,{repli:false}),tb=normalizeProductType(b.name,null,{repli:false});
   if (!(a.ean13&&a.ean13===b.ean13) && na!==nb && !(ta&&ta===tb)) continue;
   if (distincts.includes(cleDistinct(a.name,b.name))) continue;
   const id=[a,b].map(l=>`${l.key}:${l.totalQuantity}:${l.name}:${l.unit}`).sort().join('|');

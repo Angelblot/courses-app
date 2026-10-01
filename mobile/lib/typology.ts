@@ -157,6 +157,7 @@ const TYPE_PAR_CATEGORIE: ReadonlyArray<readonly [string, string]> = [
 export function normalizeProductType(
   name: string | null | undefined,
   categories?: string[] | null,
+  { repli = true }: { repli?: boolean } = {},
 ): string | null {
   // Les catégories d'abord : elles décrivent la nature du produit, quand le nom
   // ne porte souvent que son arôme. Ce test précède volontairement le garde-fou
@@ -183,7 +184,10 @@ export function normalizeProductType(
     }
   }
 
-  // Repli : premier mot significatif, hors mots vides et unités.
+  // Repli : premier mot significatif, hors mots vides et unités. Sans repli,
+  // seul un type reconnu par une règle compte : « Papier aluminium » et
+  // « Papier film » ne se ressemblent pas pour un simple premier mot.
+  if (!repli) return null;
   const mots = nom
     .split(/\s+/)
     .filter((m) => m.length > 3 && !STOPWORDS.has(m) && !/^\d/.test(m));

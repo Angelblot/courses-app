@@ -31,10 +31,10 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await btn('Revenir à l’étape Repas').last().click();await texte('Étape 1 sur 2 · Repas').waitFor();await btn('Voir le bilan').last().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Correction Manques : produits du catalogue prêts, « lessive » à préciser plus tard.
  // B1 : la ligne Manques ouvre directement la feuille ; on peut la refermer sans rien trancher.
- await btn('Manques : 3 notés · « lessive » : l’extension cherchera ce nom. Préciser').last().click();await page.getByRole('dialog',{name:'Préciser « lessive »'}).waitFor();await page.waitForTimeout(700);await shot('3-verifier');
+ await btn('Manques : 3 notés · « lessive » : l’extension cherchera ce nom. Préciser').last().click();await texte('« lessive »').waitFor();await page.waitForTimeout(700);await shot('3-verifier');
  // F2 : la feuille ouvre sur les produits proches du mot noté.
- await btn('Choisir : Lessive liquide, Le Chat · 2000 ml').waitFor();
- await page.getByRole('dialog',{name:'Préciser « lessive »'}).getByRole('button',{name:'Fermer',exact:true}).click();await page.waitForTimeout(500);
+ await btn('Choisir Lessive liquide, Le Chat · 2 L').waitFor();
+ await btn('Fermer').last().click();await page.waitForTimeout(500);
  // Pause : abandonner s'annule depuis l'accueil, puis on reprend au bilan.
  await btn('Faire une pause').last().click();await btn('Abandonner ces courses').click();
  await btn('Annuler : Courses abandonnées. Tes manques restent notés.').click();
@@ -77,8 +77,8 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await texte('dont 2 cherchés par leur nom').waitFor();
  if(await page.getByText(/chose.? à vérifier/).count())throw Error('Banner still shown');
  await shot('6-bilan');
- await preciser.click();await texte('Préciser « lessive »').waitFor();await page.waitForTimeout(700);await shot('6b-verifier');
- await btn('Laisser « lessive » tel quel').click();await page.getByText('Préciser « lessive »',{exact:true}).waitFor({state:'detached'});
+ await preciser.click();await texte('« lessive »').waitFor();await page.waitForTimeout(700);await shot('6b-verifier');
+ await btn('Garder « lessive » sans produit. L’extension le cherchera par son nom.').click();await page.getByText('« lessive »',{exact:true}).waitFor({state:'detached'});
  await texte('produits dans ta liste').waitFor();if(!await btn('Envoyer au drive').last().isEnabled())throw Error('Send button disabled');
  await shot('6c-bilan-pret');
  await btn('Voir et ajuster la liste').last().click();await texte('Fruits & légumes').waitFor();
