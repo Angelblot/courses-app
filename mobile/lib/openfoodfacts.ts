@@ -149,10 +149,10 @@ export async function lookupEan(ean: string): Promise<ResultatRecherche> {
       signal: controleur.signal,
     });
     // Une réponse HTTP en erreur (5xx, proxy, etc.) est un problème de
-    // service, pas un verdict sur le produit : Open Food Facts signale un
-    // code-barres inconnu via `status` dans un corps 200, pas par un code
-    // HTTP d'erreur. On la traite donc comme `hors_ligne`.
-    if (!reponse.ok) return { etat: 'hors_ligne' };
+    // service, pas un verdict sur le produit : on la traite comme
+    // `hors_ligne`. Sauf 404 : l'API v2 répond ainsi à un code-barres
+    // inconnu, avec `status: 0` dans le corps (vérifié le 01/10/2026).
+    if (!reponse.ok && reponse.status !== 404) return { etat: 'hors_ligne' };
     const json = await reponse.json();
     if (json.status !== 1 || !json.product) return { etat: 'inconnu' };
     const fiche = mapOffProduct(ean, json.product);
