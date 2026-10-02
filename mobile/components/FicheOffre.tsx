@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import type { FicheProduit } from '../lib/openfoodfacts.ts';
 import { meilleurs, type Details, type Niveau } from '../lib/nutrition.ts';
@@ -34,7 +34,15 @@ export function Reperes({ d }: { d: Details }) {
  * puis un comparatif côte à côte avec des produits proches de la même
  * recherche (à la FD3), le meilleur de chaque ligne en vert.
  */
-export function FicheOffre({ fiche, proches, onChoisir, onFermer }: { fiche: FicheProduit | null; proches: FicheProduit[]; onChoisir: (f: FicheProduit) => void; onFermer: () => void }) {
+export function FicheOffre(props: { fiche: FicheProduit | null; proches: FicheProduit[]; onChoisir: (f: FicheProduit) => void; onFermer: () => void }) {
+  if (!props.fiche) return null;
+  // La modale a sa propre fenêtre : le fournisseur y rend les marges d'iOS (barre d'accueil).
+  return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={props.onFermer}>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}><Contenu {...props} /></SafeAreaProvider>
+  </Modal>;
+}
+
+function Contenu({ fiche, proches, onChoisir, onFermer }: { fiche: FicheProduit | null; proches: FicheProduit[]; onChoisir: (f: FicheProduit) => void; onFermer: () => void }) {
   const insets = useSafeAreaInsets();
   const [tout, setTout] = useState(false);
   if (!fiche) return null;
@@ -55,8 +63,7 @@ export function FicheOffre({ fiche, proches, onChoisir, onFermer }: { fiche: Fic
   ];
   const ingredients = d?.ingredients ?? null;
 
-  return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onFermer}>
-    <SafeAreaView edges={['top']} style={s.ecran}>
+  return <SafeAreaView edges={['top']} style={s.ecran}>
       <View style={s.entete}><Text style={s.titre} numberOfLines={1} accessibilityRole="header">{fiche.name}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} style={s.fermer}><View style={s.fermerRond}><Feather name="x" size={18} color={colors.text} /></View></Pressable></View>
       <ScrollView contentContainerStyle={{ paddingBottom: 100 + insets.bottom, gap: 14 }}>
@@ -105,8 +112,7 @@ export function FicheOffre({ fiche, proches, onChoisir, onFermer }: { fiche: Fic
       <View style={[s.pied, { paddingBottom: 10 + insets.bottom }]}>
         <Pressable accessibilityRole="button" onPress={() => onChoisir(fiche)} style={({ pressed }) => [s.choisir, pressed && { opacity: .85 }]}><Text style={s.choisirTexte}>Choisir ce produit</Text></Pressable>
       </View>
-    </SafeAreaView>
-  </Modal>;
+    </SafeAreaView>;
 }
 
 function Rang({ libelle, valeur, niveau, derniere = false }: { libelle: string; valeur: string; niveau?: Niveau; derniere?: boolean }) {

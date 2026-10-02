@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
@@ -29,14 +29,14 @@ export function ScanRapide({ visible, onFermer, onFiche }: { visible: boolean; o
     setMessage(r.etat === 'inconnu' ? 'Ce code-barres n’est pas sur Open Food Facts. Cherche le produit par son nom.' : 'Connexion indisponible. Réessaie dans un instant.');
   };
 
+  // La modale plein écran a sa propre fenêtre : sans fournisseur, les marges
+  // d'iOS y valent zéro et la croix passe sous l'heure et la Dynamic Island.
   return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onFermer}>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <View style={s.ecran}>
       {permission?.granted && visible && <CameraView style={StyleSheet.absoluteFill} facing="back"
         barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8'] }} onBarcodeScanned={lecture || message ? undefined : lu} />}
-      <SafeAreaView style={s.haut} edges={['top']}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Fermer le scan" onPress={onFermer} style={s.fermer}><Feather name="x" size={22} color="#FFFFFF" /></Pressable>
-        <Text style={s.consigne}>Vise le code-barres du produit</Text>
-      </SafeAreaView>
+      <Haut onFermer={onFermer} />
       {!permission?.granted && <View style={s.centre}>
         <Text style={s.texte}>L’appareil photo sert à lire le code-barres.</Text>
         <Pressable accessibilityRole="button" onPress={permission?.canAskAgain === false ? () => { void Linking.openSettings(); } : () => { void demander(); }} style={s.bouton}>
@@ -49,13 +49,25 @@ export function ScanRapide({ visible, onFermer, onFiche }: { visible: boolean; o
             <Pressable accessibilityRole="button" onPress={() => { verrou.current = false; setMessage(null); }} style={s.bouton}><Text style={s.boutonTexte}>Scanner à nouveau</Text></Pressable></>}
       </SafeAreaView>}
     </View>
+    </SafeAreaProvider>
   </Modal>;
+}
+
+/** La croix et la consigne, sous la barre d'état. */
+function Haut({ onFermer }: { onFermer: () => void }) {
+  const { top } = useSafeAreaInsets();
+  return <View style={[s.haut, { paddingTop: top + 8 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Fermer le scan" onPress={onFermer} hitSlop={8} style={({ pressed }) => [s.fermer, pressed && { opacity: .8 }]}>
+      <Feather name="x" size={24} color="#FFFFFF" />
+    </Pressable>
+    <Text style={s.consigne}>Vise le code-barres du produit</Text>
+  </View>;
 }
 
 const s = StyleSheet.create({
   ecran: { flex: 1, backgroundColor: '#000000' },
-  haut: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', gap: 8 },
-  fermer: { alignSelf: 'flex-start', width: 44, height: 44, marginLeft: 8, alignItems: 'center', justifyContent: 'center' },
+  haut: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', gap: 12, paddingHorizontal: 16 },
+  fermer: { alignSelf: 'flex-start', width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   consigne: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, overflow: 'hidden' },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
   texte: { color: '#FFFFFF', fontSize: 16, textAlign: 'center' },
