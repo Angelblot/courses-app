@@ -154,3 +154,15 @@ export async function enregistrerEquivalence(entree) {
     body: JSON.stringify({ ...entree, last_confirmed_at: new Date().toISOString() }),
   });
 }
+
+/**
+ * Offres relevées sur un drive pendant une recherche (prix, prix au kilo,
+ * Nutri-Score…). Le foyer est déduit côté base, du JWT.
+ */
+export async function enregistrerOffres(lignes) {
+  return appel('offres_drive', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify(lignes),
+  });
+}

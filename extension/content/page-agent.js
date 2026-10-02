@@ -181,6 +181,8 @@ export function pageAgent(cfg, item, mode) {
    * premiers titres, elle se trouve souvent plus bas dans la liste.
    */
   const MAX_CANDIDATES = 30;
+  // Cartes relevées pour le comparatif : assez pour voir les alternatives, sans alourdir l'envoi.
+  const MAX_RELEVE = 20;
 
   /**
    * Mots du candidat absents de la recherche, hors bruit.
@@ -581,6 +583,31 @@ export function pageAgent(cfg, item, mode) {
       return added.ok ? { ...added, via: 'chosen' } : added;
     }
 
+    // Relevé des offres affichées (prix, prix au kilo, Nutri-Score…) : le
+    // comparatif des alternatives s'en nourrit. Seuls des textes bruts
+    // remontent ; l'extension les comprend hors de la page.
+    const releve = cards.slice(0, MAX_RELEVE).map((card) => {
+      const lien =
+        [...card.querySelectorAll('a[href]')]
+          .map((a) => a.getAttribute('href'))
+          .find((h) => h && !h.startsWith('#')) ?? '';
+      const img = card.querySelector('img');
+      const nutri = card.querySelector('[alt*="utri" i], [aria-label*="utri" i], [class*="nutri" i], [title*="utri" i]');
+      let adresse = '';
+      try { adresse = lien ? new URL(lien, location.origin).href : ''; } catch { adresse = ''; }
+      return {
+        label: (textOf(queryFirst(card, cfg.title)) || textOf(card)).slice(0, 200),
+        href: adresse,
+        ean: eanFromUrl(lien),
+        prix: textOf(queryFirst(card, cfg.price)).slice(0, 40),
+        texte: textOf(card).slice(0, 400),
+        image: img ? img.currentSrc || img.getAttribute('src') || '' : '',
+        nutri: nutri
+          ? nutri.getAttribute('alt') || nutri.getAttribute('aria-label') || nutri.getAttribute('title') || String(nutri.getAttribute('class') ?? '')
+          : '',
+      };
+    });
+
     const { ranked, ignored } = rank(
       item.name,
       cards.slice(0, MAX_CANDIDATES).map((card) => {
@@ -605,7 +632,7 @@ export function pageAgent(cfg, item, mode) {
       const exact = ranked.find((c) => c.ean && c.ean === item.ean);
       if (exact) {
         const added = await addToCart(exact);
-        return added.ok ? { ...added, via: 'ean_match', certain: true } : added;
+        return { ...(added.ok ? { ...added, via: 'ean_match', certain: true } : added), releve };
       }
     }
 
@@ -618,6 +645,7 @@ export function pageAgent(cfg, item, mode) {
         bestLabel: best?.label ?? null,
         bestScore: best?.score ?? 0,
         ignored,
+        releve,
       };
     }
 
@@ -639,12 +667,13 @@ export function pageAgent(cfg, item, mode) {
           .slice(0, 3)
           .map((c) => ({ label: c.label.slice(0, 70), score: Number(c.score.toFixed(2)) })),
         ignored,
+        releve,
       };
     }
 
     const added = await addToCart(best);
     // Des termes écartés signifient un produit approchant, pas exact : c'est à
     // signaler, sans quoi l'utilisateur croirait avoir eu ce qu'il demandait.
-    return added.ok && ignored.length ? { ...added, ignored, approximate: true } : added;
+    return { ...(added.ok && ignored.length ? { ...added, ignored, approximate: true } : added), releve };
   })();
 }

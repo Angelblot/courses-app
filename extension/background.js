@@ -16,9 +16,10 @@ import { SITES } from './content/sites.js';
 import { pageAgent } from './content/page-agent.js';
 import {
   travauxEnAttente, travauxAbandonnes, revendiquer,
-  progresser, terminer, equivalencesDe, enregistrerEquivalence,
+  progresser, terminer, equivalencesDe, enregistrerEquivalence, enregistrerOffres,
 } from './supabase.js';
 import { strategie, indexer } from './lib/equivalences.js';
+import { offresDepuisReleve } from './lib/offres.js';
 import { candidats, RAISONS_SUIVANT } from './lib/alternatives.js';
 
 /**
@@ -246,6 +247,16 @@ async function attempt(tabId, cfg, item, baseOrigin, equivalences = {}) {
   return directUrl && !found.ok ? { ...enriched, triedDirect: true } : enriched;
 }
 
+/**
+ * Enregistre les offres d'une recherche. Un échec ne doit jamais bloquer le
+ * remplissage du panier : le relevé est un bonus, pas une étape.
+ */
+async function releverOffres(releve, contexte) {
+  const lignes = offresDepuisReleve(releve, contexte);
+  if (!lignes.length) return;
+  try { await enregistrerOffres(lignes); } catch { /* relevé perdu, panier intact */ }
+}
+
 /** Boucle principale : déroule la liste jusqu'au bout, une pause, ou un arrêt. */
 async function processJob() {
   let state = await getState();
@@ -315,6 +326,13 @@ async function processJob() {
     for (const essai of essais) {
       result = await attempt(tabId, cfg, essai, state.baseOrigin, state.equivalences ?? {});
       retenu = essai;
+      // Les offres vues pendant cette recherche alimentent le comparatif ;
+      // elles ne font pas partie du compte rendu envoyé au téléphone.
+      if (result.releve) {
+        if (state.jobId) await releverOffres(result.releve, { drive: state.site, recherche: essai.name, productId: essai.product_id ?? null, jobId: state.jobId, choisi: result.ok ? result.label : null });
+        const { releve: _releve, ...sansReleve } = result;
+        result = sansReleve;
+      }
       if (result.ok || !RAISONS_SUIVANT.has(result.reason)) break;
       if (!result.memorise && state.jobId && essai.product_id) {
         // L'absence apprise évite de réessayer ce produit à la prochaine commande.

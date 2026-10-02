@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { useFoyer, renommerFoyer, reglerPersonnes } from '../../stores/foyer';
 import { useProducts } from '../../stores/products';
 import { useWizard } from '../../contexts/WizardContext';
+import { usePistes } from '../../stores/pistes';
 import { Groupe, Ligne } from '../../components/GroupeReglages';
 import { ui } from '../../components/MaisonUI';
 import { references } from '../../lib/references';
@@ -21,6 +22,7 @@ const NOMS_DRIVES: Record<string, string> = { carrefour: 'Carrefour', leclerc: '
 export default function Compte() {
   const { foyer, membres, chargement, erreur, recharger } = useFoyer();
   const { produits } = useProducts(), w = useWizard();
+  const nbPistes = usePistes(w.compte).pistes.length;
   const [nom, setNom] = useState<string | null>(null);
   const [erreurReglage, setErreurReglage] = useState<string | null>(null);
   const [adresse, setAdresse] = useState<string | null>(null);
@@ -70,6 +72,7 @@ export default function Compte() {
 
       <Groupe titre="Courses">
         <Ligne icone="star" teinte="#9C7A12" libelle="Mes produits" valeur={references(produits).length || undefined} onPress={() => router.push('/favoris')} />
+        <Ligne icone="trending-down" teinte="#2F6B2F" libelle="Pistes" valeur={nbPistes || undefined} onPress={() => router.push('/pistes')} />
         <Ligne icone="shopping-cart" teinte={colors.accent} libelle="Drives et Chrome" valeur={drives} onPress={() => router.push('/wizard/generation')} />
         <Ligne icone="mic" teinte="#6E4F9A" libelle="Siri et widget" onPress={() => router.push('/siri')} derniere />
       </Groupe>
