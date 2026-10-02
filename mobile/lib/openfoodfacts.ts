@@ -5,6 +5,7 @@
  * 22/08/2026, dans l'historique git) : détection des
  * liquides et affectation de la quantité en grammes ou en millilitres.
  */
+import { CHAMPS_DETAILS, lireDetails, type Details, type OffNutrition } from './nutrition.ts';
 import { normalizeProductType } from './typology.ts';
 import { rayonDepuisCategories, type CleRayon } from './rayons.ts';
 
@@ -22,9 +23,11 @@ export type FicheProduit = {
   categoryKey: CleRayon | null;
   /** Note Open Food Facts. `null` est fréquent et légitime : sel, café, épices. */
   nutriscore: NoteNutri | null;
+  /** Repères nutritionnels, scores et allergènes, quand Open Food Facts les a (appui long sur un résultat). */
+  details?: Details;
 };
 
-type OffData = {
+type OffData = OffNutrition & {
   product_name?: string;
   brands?: string;
   image_url?: string;
@@ -90,6 +93,7 @@ export function mapOffProduct(ean: string, data: OffData): FicheProduit | null {
   const valide = Number.isFinite(quantite) && quantite > 0;
   const categories = data.categories_tags ?? [];
   const liquide = estLiquide(name, categories);
+  const details = lireDetails(data);
 
   return {
     ean13: ean,
@@ -104,11 +108,12 @@ export function mapOffProduct(ean: string, data: OffData): FicheProduit | null {
     productType: normalizeProductType(name, categories),
     categoryKey: rayonDepuisCategories(categories),
     nutriscore: litNutriscore(data.nutriscore_grade),
+    ...(details ? { details } : {}),
   };
 }
 
 const URL_OFF = 'https://world.openfoodfacts.org/api/v2/product';
-const CHAMPS = 'product_name,brands,image_url,product_quantity,categories_tags,nutriscore_grade';
+const CHAMPS = `product_name,brands,image_url,product_quantity,categories_tags,nutriscore_grade,${CHAMPS_DETAILS}`;
 
 // Délai avant d'abandonner la requête. La source Python (enrich_ean.py) pose
 // 10 secondes, mais elle tourne côté serveur pour un traitement par lot :

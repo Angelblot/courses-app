@@ -11,6 +11,8 @@ import { PastilleNutri } from './PastilleNutri';
 import { Photo, ui } from './MaisonUI';
 import { colors } from '../lib/theme';
 import { ScanRapide } from './ScanRapide';
+import { ApercuOffre } from './ApercuOffre';
+import { FicheOffre } from './FicheOffre';
 
 export type ChoixIngredient = {
   name: string;
@@ -77,6 +79,8 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
   const { produits, recharger } = useProducts();
   const insets = useSafeAreaInsets(), clavier = useHauteurClavier();
   const [requete, setRequete] = useState(requeteInitiale), [focus, setFocus] = useState(false), [scanner, setScanner] = useState(false);
+  // Résultat Open Food Facts dont on regarde la fiche complète (appui long).
+  const [detail, setDetail] = useState<FicheProduit | null>(null);
   const off = useRechercheOff();
   const [erreur, setErreur] = useState<string | null>(null), [ajout, setAjout] = useState<string | null>(null);
   const texte = requete.trim();
@@ -105,8 +109,8 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
     setErreur(r.erreur ?? "Impossible d'ajouter ce produit à ton catalogue.");
   };
 
-  const ligne = (cle: string, nom: string, detail: string | null, image: string | null, note: Product['nutriscore'], plein: boolean, onPress: () => void, occupe = false) =>
-    <Pressable key={cle} accessibilityRole="button" accessibilityLabel={`${verbe} ${nom}${detail ? `, ${detail}` : ''}`} disabled={occupe} onPress={onPress} style={({ pressed }) => [s.ligne, pressed && { backgroundColor: colors.surface }]}>
+  const ligne = (cle: string, nom: string, detail: string | null, image: string | null, note: Product['nutriscore'], plein: boolean, onPress: () => void, occupe = false, onLongPress?: () => void) =>
+    <Pressable key={cle} accessibilityRole="button" accessibilityLabel={`${verbe} ${nom}${detail ? `, ${detail}` : ''}`} accessibilityHint={onLongPress ? 'Appui long pour voir la fiche détaillée' : undefined} disabled={occupe} onPress={onPress} onLongPress={Platform.OS === 'ios' ? undefined : onLongPress} style={({ pressed }) => [s.ligne, pressed && { backgroundColor: colors.surface }]}>
       <View style={s.vignette}><Photo name={nom} url={image} style={s.photo} /></View>
       <View style={{ flex: 1, gap: 2 }}><Text style={ui.productName} numberOfLines={2}>{nom}</Text>{!!detail && <Text style={[ui.detail, { marginTop: 0 }]} numberOfLines={1}>{detail}</Text>}</View>
       <PastilleNutri note={note} />
@@ -146,13 +150,17 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
           {off.resultats?.length === 0 && <Text style={s.vide}>Aucun produit trouvé pour « {texte} ».</Text>}
           {off.resultats?.map(f => {
             const deja = produits.some(p => p.ean13 && p.ean13 === f.ean13);
-            return ligne(f.ean13, f.name, [f.brand, contenance(f.grammageG, f.volumeMl), deja ? 'déjà dans tes produits' : null].filter(Boolean).join(' · ') || null, f.imageUrl, f.nutriscore, false, () => choisirFiche(f), ajout === f.ean13);
+            const rang = ligne(f.ean13, f.name, [f.brand, contenance(f.grammageG, f.volumeMl), deja ? 'déjà dans tes produits' : null].filter(Boolean).join(' · ') || null, f.imageUrl, f.nutriscore, false, () => choisirFiche(f), ajout === f.ean13, () => setDetail(f));
+            // Appui long : l'aperçu natif sur iPhone (FD2), la fiche complète ailleurs.
+            return <ApercuOffre key={f.ean13} fiche={f} onChoisir={() => { void choisirFiche(f); }} onVoir={() => setDetail(f)}>{rang}</ApercuOffre>;
           })}
         </>}
         {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { paddingHorizontal: 16 }]}>{erreur}</Text>}
       </ScrollView>
 
       {!!pied && <View style={[s.pied, { bottom: clavier, paddingBottom: clavier ? 10 : 10 + insets.bottom }]}>{pied}</View>}
+      <FicheOffre fiche={detail} proches={[...(off.resultats ?? [])].filter(x => x.details).sort((a, b) => Number(b.productType === detail?.productType) - Number(a.productType === detail?.productType))} onFermer={() => setDetail(null)}
+        onChoisir={f => { setDetail(null); void choisirFiche(f); }} />
       <ScanRapide visible={scanner} onFermer={() => setScanner(false)} onFiche={f => { setScanner(false); void choisirFiche(f); }} />
       {!pied && sansProduit && !!texte && <View style={[s.pied, { bottom: clavier, paddingBottom: clavier ? 10 : 10 + insets.bottom }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={`Ajouter « ${texte} » sans produit. L'extension le cherchera par son nom.`} onPress={() => onChoisir({ name: texte, product_id: null, unit: 'unité', rayon: 'autre' })} style={({ pressed }) => [s.sansProduit, pressed && { opacity: .85 }]}>
