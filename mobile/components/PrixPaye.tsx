@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { echelleTemps, reperesPrix, type Achat } from '../lib/historique-prix.ts';
+import { ENSEIGNES } from '../lib/commandes.ts';
 import { useHistoriquePrix } from '../stores/historique';
 import { ui } from './MaisonUI';
 import { colors } from '../lib/theme';
@@ -10,6 +11,8 @@ const BAISSE = '#2F6B2F', HAUSSE = '#9A3A22', LECLERC = '#2E5683', POINTILLE = '
 const euros = (v: number) => `${v.toFixed(2).replace('.', ',')} €`;
 const jour = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 const mois = (iso: string, annee = true) => new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', annee ? { month: 'short', year: 'numeric' } : { month: 'short' });
+/** Le marchand : l'enseigne, puis le magasin quand on le connaît (« Carrefour Lattes »). */
+const marchand = (a: Achat) => { const e = ENSEIGNES[a.drive] ?? a.drive; return a.lieu === e ? e : `${e} ${a.lieu}`; };
 const pourcent = (v: number) => `${v < 0 ? '−' : '+'}${Math.abs(Math.round(v * 100))} %`;
 
 /** Un trait pointillé, fait de petits segments : les bordures pointillées d'iOS ne tiennent pas sur un seul côté. */
@@ -67,7 +70,8 @@ export function PrixPaye({ produitId, ean13 }: { produitId: string; ean13?: stri
 
   return <View style={s.zone}>
     <View style={s.tete}><Text style={s.titre} accessibilityRole="header">Prix payé</Text><Text style={ui.detail}>{achats.length} achat{achats.length > 1 ? 's' : ''}</Text></View>
-    <View style={s.carte}>
+    {/* Un seul achat : la ligne d'historique dit tout, sans le répéter en grand. */}
+    {achats.length > 1 && <View style={s.carte}>
       <View style={s.kpi} accessible accessibilityLabel={resume}>
         <Text style={s.prix}>{euros(dernier.paye)}</Text>
         {ecart != null && depuis && <Text style={[s.ecart, { color: stable ? colors.textMuted : ecart < 0 ? BAISSE : HAUSSE }]}>{stable ? 'stable' : pourcent(ecart)} depuis {new Date(`${depuis}T12:00:00`).getFullYear()}</Text>}
@@ -104,12 +108,12 @@ export function PrixPaye({ produitId, ean13 }: { produitId: string; ean13?: stri
           <View style={s.cle}><View style={s.cleTiret}><View style={s.cleTiretBout} /><View style={s.cleTiretBout} /></View><Text style={s.cleTexte}>prix affiché</Text></View>
         </View>
       </>}
-    </View>
+    </View>}
     <View style={s.liste}>
       {affiches.map((a, i) => <View key={`${a.jour}${a.lieu}`} style={[s.ligne, i > 0 && s.separe]}
-        accessible accessibilityLabel={`${jour(a.jour)}, ${a.lieu}, ${euros(a.paye)}${a.remise > 0 ? `, en promotion, ${pourcent(-a.remise)}, au lieu de ${euros(a.affiche)}` : ''}${a.releve ? ', prix relevé sur le drive' : ''}`}>
+        accessible accessibilityLabel={`${jour(a.jour)}, ${marchand(a)}, ${euros(a.paye)}${a.remise > 0 ? `, en promotion, ${pourcent(-a.remise)}, au lieu de ${euros(a.affiche)}` : ''}${a.releve ? ', prix relevé sur le drive' : ''}`}>
         <View style={s.ligneTexte}>
-          <Text style={s.ligneDate}>{jour(a.jour)} · {a.lieu}</Text>
+          <Text style={s.ligneDate}>{jour(a.jour)} · {marchand(a)}</Text>
           {a.remise > 0 && <Text style={s.pastille}>{pourcent(-a.remise)}</Text>}
           {a.releve && <Text style={s.releve}>relevé sur le drive</Text>}
         </View>
