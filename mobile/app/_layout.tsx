@@ -1,6 +1,7 @@
 import { WizardProvider } from '../contexts/WizardContext';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import type { ErrorBoundaryProps } from 'expo-router';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import type { Session } from '@supabase/supabase-js';
@@ -47,7 +48,8 @@ export default function RootLayout() {
     );
   }
 
-  return <WizardProvider key={session?.user.id ?? "anonyme"} userId={session?.user.id ?? null}><Stack screenOptions={{ headerShown: false }} /></WizardProvider>;
+  // Racine des gestes : sans elle, le glisser pour retirer ne répond pas.
+  return <GestureHandlerRootView style={{ flex: 1 }}><WizardProvider key={session?.user.id ?? "anonyme"} userId={session?.user.id ?? null}><Stack screenOptions={{ headerShown: false }} /></WizardProvider></GestureHandlerRootView>;
 }
 
 /**

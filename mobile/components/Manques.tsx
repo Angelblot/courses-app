@@ -12,6 +12,7 @@ import { colors } from '../lib/theme';
 import { Action, Head, Photo, Raison, ui, useAnnulation, useChampVisible } from './MaisonUI';
 import { revenirAuBilan } from './SessionProgress';
 import { AssocierSiri } from './AssocierSiri';
+import { GlisserRetirer } from './GlisserRetirer';
 export const sources:Record<string,string>={widget:'Widget',siri:'Siri',rappels:'Rappels',manuel:'Noté',precedent:'Ajout précédent'};
 /**
  * Un manque. Prêt d'office s'il désigne un produit du catalogue : on le
@@ -70,6 +71,7 @@ export function Manques({session=false}:{session?:boolean}) {
  const {w,p,r,loading,erreur}=useMaison();
  const entries=Object.entries(manquesDuBrouillon(w)).filter(([key])=>manqueActif(w,key));
  const annulation=useAnnulation(),champ=useChampVisible();
+ const nomManque=(key:string,m:Manque)=>{const id=key.startsWith('produit:')?key.slice(8):undefined;return p.produits.find(x=>x.id===id)?.name??w.extras.find(x=>`extra:${x.id}`===key)?.name??m.name;};
  // Ce que Siri a rangé dans Rappels vient d'arriver : un message discret, une fois, avec « Annuler » (RA1).
  const reprise=w.derniereReprise;
  useEffect(()=>{if(!reprise||reprise.vue)return;const n=reprise.ids.length;annulation.proposer(`${n} article${n>1?'s':''} repris de « ${reprise.liste} » et coché${n>1?'s':''} dans Rappels`,w.annulerRepriseRappels);w.voirReprise();},[reprise,annulation.proposer,w.annulerRepriseRappels,w.voirReprise]);
@@ -77,8 +79,10 @@ export function Manques({session=false}:{session?:boolean}) {
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView ref={champ.ref} onScroll={champ.onScroll} scrollEventThrottle={16} keyboardShouldPersistTaps="handled" contentContainerStyle={[ui.content,{paddingBottom:28+champ.espace}]}>
  <Head title="Mes manques" back={!session} avatar={!session}/>{!session&&<Text style={ui.subtitle}>Les produits notés au fil des jours avec le widget, Siri, Rappels ou dans l’app.</Text>}
  {loading&&<ActivityIndicator/>}{erreur&&<><Text style={ui.error}>{erreur}</Text><Action secondary onPress={()=>{p.recharger();r.recharger();}}>Réessayer</Action></>}{w.sauvegardeErreur&&<Text style={ui.error}>{w.sauvegardeErreur}</Text>}
- {!loading&&entries.map(([key,m])=><ManqueRow key={key} lineKey={key} manque={m} products={p.produits} aPreciser={aPreciser.has(key)} onRetrait={annulation.proposer} onProduitsChange={p.recharger}/>)}
- {!loading&&entries.length>0&&<Text style={ui.detail}>Touche un produit pour changer son format ou sa quantité.</Text>}
+ {!loading&&entries.map(([key,m])=>{const nom=nomManque(key,m);return <GlisserRetirer key={key} nom={nom} onRetirer={()=>{const avant=w.ligneQuantites[key];w.modifierLigne(key,0);annulation.proposer(`${nom} retiré de tes manques`,()=>w.restaurerLigne(key,avant));}}>
+  <ManqueRow lineKey={key} manque={m} products={p.produits} aPreciser={aPreciser.has(key)} onRetrait={annulation.proposer} onProduitsChange={p.recharger}/>
+ </GlisserRetirer>;})}
+ {!loading&&entries.length>0&&<Text style={ui.detail}>Touche un produit pour changer son format ou sa quantité ; glisse-le vers la gauche pour le retirer.</Text>}
  {!entries.length&&!loading&&!erreur&&<View style={ui.notice}><Text style={ui.productName}>Rien ne manque pour le moment.</Text><Text style={ui.subtitle}>Ajoute un produit dès que tu remarques qu’il manque à la maison.</Text></View>}
  {!session&&<Action secondary onPress={()=>router.push('/ajout')}>Noter un manque</Action>}
  </ScrollView><View style={ui.footer}>{annulation.toast}{session?<><Action disabled={loading||!!erreur} onPress={revenirAuBilan}>{pending.length?`Revenir au bilan · ${pending.length} à préciser`:'Revenir au bilan'}</Action>{pending.length>0&&!loading&&<Raison>{pending.length>1?`${pending.length} produits restent à préciser, maintenant ou au bilan.`:`« ${pending[0][1].name} » reste à préciser, maintenant ou au bilan.`}</Raison>}</>:<Action onPress={()=>{w.demarrerSession();router.navigate(`/wizard/${w.sessionEtape??'recettes'}`);}}>{w.sessionEtape?'Reprendre mes courses':'Préparer mes courses'}</Action>}</View></SafeAreaView>;
