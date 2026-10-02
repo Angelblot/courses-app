@@ -19,13 +19,16 @@ const job={id:'j1',status:'done',created_at:'2026-09-30T18:00:00Z',finished_at:'
  {item:'oignons',ok:true,quantity:1,label:'Oignons jaunes',product_id:'oig',prix:1.89},
  {item:'pancetta',ok:true,quantity:1,label:'Pancetta Carrefour',product_id:'pan',prix:2},
 ]}};
+const job2={id:'j2',status:'done',created_at:'2026-10-01T18:00:00Z',finished_at:'2026-10-01T18:40:00Z',progress:{},error:null,results:{
+ carrefour:[{item:'papier toilette',ok:true,quantity:1,label:'Papier toilette Essential',product_id:'pq',prix:4.69},{item:'oignons',ok:true,quantity:1,label:'Oignons jaunes',product_id:'oig',prix:1.33},{item:'pancetta',ok:true,quantity:1,label:'Pancetta Carrefour',product_id:'pan',prix:2}],
+ leclerc:[{item:'papier toilette',ok:true,quantity:1,label:'Papier toilette Marque Repère',product_id:'pq-mr',prix:4.35},{item:'oignons',ok:true,quantity:1,label:'Oignons filet',product_id:'oig',prix:1.59},{item:'pancetta',ok:false,reason:'no_match'}]}};
 const dossier=process.env.CAPTURES||'/tmp';
 (async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{
  const page=await b.newPage({viewport:{width:390,height:844},serviceWorkers:'block'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('https://qmymwicsgilhoihtfdjm.supabase.co/**',async route=>{const req=route.request(),url=req.url();let data=[];
   if(url.includes('/auth/v1/user'))data=user;else if(url.includes('/auth/v1/token'))data=session;
   else if(url.includes('/rest/v1/purchase_lines'))data=factures;
-  else if(url.includes('/rest/v1/cart_jobs'))data=url.includes('id=eq.')?job:[job];
+  else if(url.includes('/rest/v1/cart_jobs'))data=url.includes('id=eq.j2')?job2:url.includes('id=eq.')?job:[job2,job];
   else if(url.includes('/rest/v1/offres_drive'))data=[];
   else if(url.includes('/rest/v1/products'))data=products;
   await route.fulfill({json:data});});
@@ -38,9 +41,22 @@ const dossier=process.env.CAPTURES||'/tmp';
  await page.getByText('3 produits · 8,02 € → 8,48 €',{exact:true}).waitFor();
  await page.getByText('1,33 € → 1,89 € · déc. 2025',{exact:true}).waitFor();
  await page.screenshot({path:dossier+'/ep2a.png'});
+ // CM1 : deux drives remplis, le verdict entre eux.
+ await page.goto('http://localhost:8082/suivi/envoye?id=j2&n=3&drives=carrefour,leclerc');
+ await page.getByText('Paniers remplis.',{exact:true}).waitFor();
+ await page.getByText('Sur les 2 produits trouvés des deux côtés',{exact:true}).waitFor();
+ await page.getByText('E.Leclerc est moins cher de 0,08 €',{exact:true}).waitFor();
+ await page.getByText('1 introuvable',{exact:true}).waitFor();
+ await page.getByText('1 moins cher chez Carrefour',{exact:true}).waitFor();
+ await page.getByText('1 chez E.Leclerc',{exact:true}).waitFor();
+ await page.screenshot({path:dossier+'/cm1.png'});
+ await page.getByRole('button',{name:/^E\.Leclerc : /}).click();
+ await page.getByText('Commande',{exact:true}).waitFor();
+ await page.getByText('Oignons filet',{exact:true}).waitFor();await page.getByRole('tab',{name:'Nouveaux · 1'}).click();await page.getByText('Papier toilette Marque Repère',{exact:true}).waitFor();
  // EP2c : Mes commandes, puis le résumé d'une facture.
  await page.goto('http://localhost:8082/commandes');
  await page.getByText('Mes commandes',{exact:true}).waitFor();
+ await page.getByText('E.Leclerc moins cher de 0,08 €',{exact:true}).waitFor();
  await page.getByText('Panier rempli · Carrefour · 3 produits',{exact:true}).waitFor();
  await page.getByText('Carrefour Lattes · 3 produits',{exact:true}).first().waitFor();
  await page.getByText('Premiers achats, rien à comparer',{exact:true}).waitFor();

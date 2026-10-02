@@ -7,8 +7,9 @@ import { Action, ui } from '../../../components/MaisonUI';
 import { useSuiviTravail } from '../../../stores/suivi';
 import { useCommandes } from '../../../stores/commandes';
 import { useImagesCommande } from '../../../stores/images-commande';
-import { comparerHistorique } from '../../../lib/commandes.ts';
+import { comparerDrives, comparerHistorique } from '../../../lib/commandes.ts';
 import { ComparaisonCommande } from '../../../components/ComparaisonCommande';
+import { VerdictDrives } from '../../../components/VerdictDrives';
 import { etapesEnvoi, resume, type EtapeEnvoi } from '../../../lib/suivi-libelles.ts';
 import { CONSIGNES_EXTENSION } from '../../../lib/extension-consignes';
 import { colors } from '../../../lib/theme';
@@ -34,6 +35,9 @@ export default function Envoye() {
  const { commandes } = useCommandes(remplie === 'fait' ? travail?.status : null);
  const image = useImagesCommande();
  const commande = remplie === 'fait' && id ? commandes.find(c => c.id === `panier:${id}`) : undefined;
+ // Plusieurs drives remplis : le verdict entre eux prend la place des étapes (CM1).
+ const plusieurs = !!commande && commande.drives.length > 1;
+ const introuvables = Object.fromEntries(Object.entries(travail?.results ?? {}).map(([d, r]) => [d, (r ?? []).filter(x => !x.ok).length]));
  const drivesTexte = noms.length ? noms.join(' et ') : 'le drive';
  const etapes: { etat: EtapeEnvoi; titre: string; detail: string; aide?: boolean; attente?: boolean }[] = [
   { etat: envoyee, titre: 'Liste envoyée', detail: `${total} produit${total > 1 ? 's' : ''}, à ${heure}` },
@@ -43,9 +47,10 @@ export default function Envoye() {
  ];
  return <SafeAreaView style={ui.screen}>
   <ScrollView contentContainerStyle={e.corps}>
-   <Text accessibilityRole="header" style={ui.heading}>{remplie === 'fait' ? 'Panier rempli.' : `Liste prête pour ${drivesTexte}.`}</Text>
+   <Text accessibilityRole="header" style={ui.heading}>{remplie === 'fait' ? (plusieurs ? 'Paniers remplis.' : 'Panier rempli.') : `Liste prête pour ${drivesTexte}.`}</Text>
+   {plusieurs && <Text style={[ui.subtitle, { marginTop: -10 }]}>Sur {commande!.lieu}.</Text>}
    {prise !== 'fait' && <Text style={ui.subtitle}>Elle t’attend dans Chrome, sur ton ordinateur. Rien ne presse.</Text>}
-   <View style={e.frise} accessibilityLiveRegion="polite">
+   {!plusieurs && <View style={e.frise} accessibilityLiveRegion="polite">
     {etapes.map((t, i) => <View key={i}>
      {/* L'étape se lit d'un bloc ; le lien d'aide reste un bouton à part, atteignable par VoiceOver. */}
      <View style={e.etape} accessible accessibilityLabel={`${t.titre}, ${t.attente ? 'en attente' : LIBELLES[t.etat]}. ${t.detail}`}>
@@ -57,8 +62,11 @@ export default function Envoye() {
      </View>
      {t.aide && <Pressable accessibilityRole="button" onPress={() => { void Share.share({ message: CONSIGNES_EXTENSION }); }} style={e.aide}><Text style={ui.link}>Elle n’est pas installée ?</Text></Pressable>}
     </View>)}
-   </View>
-   {commande && commande.drives.map(d => <ComparaisonCommande key={d} comparaison={comparerHistorique(commande, commandes, d)} drive={commande.drives.length > 1 ? d : undefined}
+   </View>}
+   {plusieurs && <VerdictDrives comparaison={comparerDrives(commande!)} introuvables={introuvables}
+    historique={commande!.drives.map(d => { const h = comparerHistorique(commande!, commandes, d); return { drive: d, ecart: h.ecart, communs: h.communs }; })}
+    onDrive={d => router.push({ pathname: '/commandes/[id]', params: { id: commande!.id, drive: d } })} />}
+   {commande && !plusieurs && commande.drives.map(d => <ComparaisonCommande key={d} comparaison={comparerHistorique(commande, commandes, d)} drive={commande.drives.length > 1 ? d : undefined}
     image={ev => image(ev.ligne)} onVoir={() => router.push({ pathname: '/commandes/[id]', params: { id: commande.id, drive: d } })} />)}
   </ScrollView>
   <View style={ui.footer}>

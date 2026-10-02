@@ -5,7 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Action, Head, ui } from '../../../components/MaisonUI';
 import { useCommandes } from '../../../stores/commandes';
-import { comparerHistorique, type Commande } from '../../../lib/commandes.ts';
+import { comparerDrives, comparerHistorique, ENSEIGNES, type Commande } from '../../../lib/commandes.ts';
 import { euros, jourLong, pourcent, teinteEcart } from '../../../lib/format-commande.ts';
 import { colors } from '../../../lib/theme';
 
@@ -33,18 +33,23 @@ export default function Commandes() {
 
 function Carte({ commande: c, toutes }: { commande: Commande; toutes: Commande[] }) {
   const comparaison = useMemo(() => comparerHistorique(c, toutes, c.drives.length > 1 ? c.drives[0] : undefined), [c, toutes]);
-  const n = new Set(c.lignes.map(l => l.product_id ?? l.ean13 ?? l.libelle)).size;
+  // Sur plusieurs drives, la ligne donne le verdict entre eux (CM1).
+  const duel = useMemo(() => c.drives.length > 1 ? comparerDrives(c) : null, [c]);
+  const verdict = duel ? duel.moinsCher ? `${ENSEIGNES[duel.moinsCher] ?? duel.moinsCher} moins cher de ${euros(duel.economie)}` : duel.communs.length ? 'Même total sur les drives' : null : null;
+  const n = new Set(c.lignes.map(l => l.article ?? l.product_id ?? l.ean13 ?? l.libelle)).size;
   const ecart = comparaison.communs ? comparaison.ecart : null;
   const ecartTexte = ecart == null ? null : Math.abs(ecart) < 0.01 ? 'Stable' : pourcent(ecart);
   const detail = `${c.source === 'panier' ? `Panier rempli · ${c.lieu}` : c.lieu} · ${n} produit${n > 1 ? 's' : ''}`;
   return <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/commandes/[id]', params: { id: c.id } })}
-    accessibilityLabel={`${jourLong(c.jour)}, ${c.total != null ? euros(c.total) : ''}, ${detail}${ecartTexte ? `, ${ecartTexte} sur ${comparaison.communs} produits déjà achetés` : ', premiers achats'}`}
+    accessibilityLabel={`${jourLong(c.jour)}, ${c.total != null ? euros(c.total) : ''}, ${detail}${verdict ? `, ${verdict} sur ${duel!.communs.length} produits communs` : ecartTexte ? `, ${ecartTexte} sur ${comparaison.communs} produits déjà achetés` : ', premiers achats'}`}
     style={({ pressed }) => [s.carte, pressed && { opacity: .85 }]}>
     <View style={s.tete}><Text style={s.jour}>{jourLong(c.jour)}</Text>{c.total != null && <Text style={s.total}>{euros(c.total)}</Text>}</View>
     <Text style={s.detail}>{detail}</Text>
     <View style={s.vs}>
-      {ecartTexte
-        ? <><Text style={[s.ecart, { color: teinteEcart(ecart, colors.textMuted) }]}>{ecartTexte}</Text><Text style={s.vsTexte}>sur {comparaison.communs} produit{comparaison.communs > 1 ? 's' : ''} déjà acheté{comparaison.communs > 1 ? 's' : ''}{c.drives.length > 1 ? ` (${c.lieu.split(' et ')[0]})` : ''}</Text></>
+      {verdict
+        ? <Text style={s.vsTexte}><Text style={s.ecart}>{verdict}</Text> sur {duel!.communs.length} produit{duel!.communs.length > 1 ? 's' : ''} commun{duel!.communs.length > 1 ? 's' : ''}</Text>
+        : ecartTexte
+        ? <><Text style={[s.ecart, { color: teinteEcart(ecart, colors.textMuted) }]}>{ecartTexte}</Text><Text style={s.vsTexte}>sur {comparaison.communs} produit{comparaison.communs > 1 ? 's' : ''} déjà acheté{comparaison.communs > 1 ? 's' : ''}</Text></>
         : <Text style={s.vsTexte}>Premiers achats, rien à comparer</Text>}
       <Feather name="chevron-right" size={18} color={colors.textMuted} style={{ marginLeft: 'auto' }} />
     </View>
