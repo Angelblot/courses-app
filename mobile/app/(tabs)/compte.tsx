@@ -72,6 +72,7 @@ export default function Compte() {
 
       <Groupe titre="Courses">
         <Ligne icone="star" teinte="#9C7A12" libelle="Mes produits" valeur={references(produits).length || undefined} onPress={() => router.push('/favoris')} />
+        <Ligne icone="file-text" teinte="#2E5683" libelle="Mes commandes" onPress={() => router.push('/commandes')} />
         <Ligne icone="trending-down" teinte="#2F6B2F" libelle="Pistes" valeur={nbPistes || undefined} onPress={() => router.push('/pistes')} />
         <Ligne icone="shopping-cart" teinte={colors.accent} libelle="Drives et Chrome" valeur={drives} onPress={() => router.push('/wizard/generation')} />
         <Ligne icone="mic" teinte="#6E4F9A" libelle="Siri et widget" onPress={() => router.push('/siri')} derniere />

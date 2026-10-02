@@ -253,8 +253,10 @@ async function attempt(tabId, cfg, item, baseOrigin, equivalences = {}) {
  */
 async function releverOffres(releve, contexte) {
   const lignes = offresDepuisReleve(releve, contexte);
-  if (!lignes.length) return;
+  if (!lignes.length) return null;
   try { await enregistrerOffres(lignes); } catch { /* relevé perdu, panier intact */ }
+  // L'offre mise au panier : son prix part aussi dans le compte rendu.
+  return lignes.find((l) => l.choisi) ?? null;
 }
 
 /** Boucle principale : déroule la liste jusqu'au bout, une pause, ou un arrêt. */
@@ -323,13 +325,14 @@ async function processJob() {
     const essais = candidats(item, state.site);
     let result = { ok: false, reason: 'product_unavailable', autreEnseigne: true };
     let retenu = null;
+    let choisie = null;
     for (const essai of essais) {
       result = await attempt(tabId, cfg, essai, state.baseOrigin, state.equivalences ?? {});
       retenu = essai;
       // Les offres vues pendant cette recherche alimentent le comparatif ;
       // elles ne font pas partie du compte rendu envoyé au téléphone.
       if (result.releve) {
-        if (state.jobId) await releverOffres(result.releve, { drive: state.site, recherche: essai.name, productId: essai.product_id ?? null, jobId: state.jobId, choisi: result.ok ? result.label : null });
+        if (state.jobId) choisie = await releverOffres(result.releve, { drive: state.site, recherche: essai.name, productId: essai.product_id ?? null, jobId: state.jobId, choisi: result.ok ? result.label : null });
         const { releve: _releve, ...sansReleve } = result;
         result = sansReleve;
       }
@@ -346,6 +349,9 @@ async function processJob() {
       ...result,
       // Dit au téléphone qu'une alternative a pris le relais de la référence.
       ...(result.ok && retenu?.remplace ? { remplacePar: retenu.name } : {}),
+      // Le produit et son prix au panier : le téléphone compare la commande
+      // avec les précédentes, et les drives entre eux.
+      ...(result.ok ? { product_id: retenu?.product_id ?? item.product_id ?? null, prix: choisie?.prix ?? null, ean: choisie?.ean13 ?? result.ean ?? null } : {}),
     };
 
     // Un challenge n'est pas un échec de produit : c'est une main à rendre.

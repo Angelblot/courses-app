@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Action, ui } from '../../../components/MaisonUI';
 import { useSuiviTravail } from '../../../stores/suivi';
+import { useCommandes } from '../../../stores/commandes';
+import { useImagesCommande } from '../../../stores/images-commande';
+import { comparerHistorique } from '../../../lib/commandes.ts';
+import { ComparaisonCommande } from '../../../components/ComparaisonCommande';
 import { etapesEnvoi, resume, type EtapeEnvoi } from '../../../lib/suivi-libelles.ts';
 import { CONSIGNES_EXTENSION } from '../../../lib/extension-consignes';
 import { colors } from '../../../lib/theme';
@@ -26,6 +30,10 @@ export default function Envoye() {
  // iOS n'a pas de région live : VoiceOver annonce chaque étape franchie.
  const annonce = remplie === 'fait' ? 'Panier rempli.' : remplie === 'erreur' ? 'Le remplissage n’a pas abouti.' : remplie === 'attention' ? 'Une action t’attend sur l’ordinateur.' : prise === 'fait' ? 'Ton ordinateur a pris la liste.' : null, derniere = useRef<string | null>(null);
  useEffect(() => { if (Platform.OS === 'ios' && annonce && annonce !== derniere.current) AccessibilityInfo.announceForAccessibility(annonce); derniere.current = annonce; }, [annonce]);
+ // Dès que le panier est rempli, il se compare aux achats précédents (EP2a).
+ const { commandes } = useCommandes(remplie === 'fait' ? travail?.status : null);
+ const image = useImagesCommande();
+ const commande = remplie === 'fait' && id ? commandes.find(c => c.id === `panier:${id}`) : undefined;
  const drivesTexte = noms.length ? noms.join(' et ') : 'le drive';
  const etapes: { etat: EtapeEnvoi; titre: string; detail: string; aide?: boolean; attente?: boolean }[] = [
   { etat: envoyee, titre: 'Liste envoyée', detail: `${total} produit${total > 1 ? 's' : ''}, à ${heure}` },
@@ -34,7 +42,7 @@ export default function Envoye() {
   { etat: remplie, titre: remplie === 'fait' ? 'Panier rempli' : 'Remplir le panier', detail: remplie === 'avenir' ? 'Tu vérifies puis paies sur le site du drive.' : travail ? resume(travail) : '' },
  ];
  return <SafeAreaView style={ui.screen}>
-  <View style={e.corps}>
+  <ScrollView contentContainerStyle={e.corps}>
    <Text accessibilityRole="header" style={ui.heading}>{remplie === 'fait' ? 'Panier rempli.' : `Liste prête pour ${drivesTexte}.`}</Text>
    {prise !== 'fait' && <Text style={ui.subtitle}>Elle t’attend dans Chrome, sur ton ordinateur. Rien ne presse.</Text>}
    <View style={e.frise} accessibilityLiveRegion="polite">
@@ -50,7 +58,9 @@ export default function Envoye() {
      {t.aide && <Pressable accessibilityRole="button" onPress={() => { void Share.share({ message: CONSIGNES_EXTENSION }); }} style={e.aide}><Text style={ui.link}>Elle n’est pas installée ?</Text></Pressable>}
     </View>)}
    </View>
-  </View>
+   {commande && commande.drives.map(d => <ComparaisonCommande key={d} comparaison={comparerHistorique(commande, commandes, d)} drive={commande.drives.length > 1 ? d : undefined}
+    image={ev => image(ev.ligne)} onVoir={() => router.push({ pathname: '/commandes/[id]', params: { id: commande.id, drive: d } })} />)}
+  </ScrollView>
   <View style={ui.footer}>
    <Action onPress={() => router.replace('/')}>Terminer</Action>
    {!!id && <Pressable accessibilityRole="button" onPress={() => router.replace(`/suivi/${id}`)} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Text style={ui.link}>Voir le détail du remplissage</Text></Pressable>}
@@ -71,7 +81,7 @@ function Pastille({ etat, attente }: { etat: EtapeEnvoi; attente?: boolean }) {
 }
 
 const e = StyleSheet.create({
- corps: { flex: 1, justifyContent: 'center', padding: 24, gap: 18 },
+ corps: { flexGrow: 1, justifyContent: 'center', padding: 24, gap: 18 },
  frise: { backgroundColor: colors.surface, borderRadius: 16, padding: 18, gap: 18 },
  etape: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
  pastille: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, borderColor: colors.traitControle, alignItems: 'center', justifyContent: 'center' },
