@@ -3,7 +3,7 @@ import { ActivityIndicator, Keyboard, Platform, Pressable, ScrollView, StyleShee
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { filtrerCatalogue } from '../lib/recettes-affichage.ts';
-import { type FicheProduit } from '../lib/openfoodfacts.ts';
+import { lookupEan, type FicheProduit, type NoteNutri } from '../lib/openfoodfacts.ts';
 import { useRechercheOff } from '../hooks/useRechercheOff';
 import { rayonDepuisLibelle, type CleRayon } from '../lib/rayons.ts';
 import { useProducts, ajouterProduit, type Product } from '../stores/products';
@@ -64,6 +64,12 @@ const ATTENTE_OFF_MS = 700;
 function depuisProduit(p: Product): ChoixIngredient {
   return { name: p.name, product_id: p.id, unit: p.unit ?? 'unité', rayon: rayonDepuisLibelle(p.category) };
 }
+/** Un produit du catalogue vu comme une fiche, pour l'aperçu et la fiche complète. */
+function ficheDepuisProduit(p: Product): FicheProduit {
+  const note = p.nutriscore?.toLowerCase();
+  return { ean13: p.ean13 ?? p.id, name: p.name, brand: p.brand, imageUrl: p.image_url, grammageG: p.grammage_g, volumeMl: p.volume_ml,
+    productType: p.product_type, categoryKey: rayonDepuisLibelle(p.category), nutriscore: note && 'abcde'.includes(note) ? note as NoteNutri : null };
+}
 const contenance = (g: number | null, ml: number | null) => ml ? (ml >= 1000 ? `${String(ml / 1000).replace('.', ',')} L` : `${ml} ml`) : g ? `${g} g` : null;
 
 /** Hauteur du clavier, pour garder la sortie « sans produit » au-dessus. */
@@ -90,6 +96,8 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
   const [requete, setRequete] = useState(requeteInitiale), [focus, setFocus] = useState(false), [scanner, setScanner] = useState(false);
   // Résultat Open Food Facts dont on regarde la fiche complète (appui long).
   const [detail, setDetail] = useState<FicheProduit | null>(null), [largeur, setLargeur] = useState(0);
+  // Produit du catalogue dont on regarde la fiche : « Choisir » le reprend tel quel, sans passer par Open Food Facts.
+  const [detailCatalogue, setDetailCatalogue] = useState<Product | null>(null);
   const off = useRechercheOff();
   const [erreur, setErreur] = useState<string | null>(null), [ajout, setAjout] = useState<string | null>(null);
   // Le pied change de hauteur (état de l'extension) : la liste garde toujours sa fin visible au-dessus.
@@ -120,6 +128,16 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
     setErreur(r.erreur ?? "Impossible d'ajouter ce produit à ton catalogue.");
   };
 
+  const voirProduit = (p: Product) => {
+    const fiche = ficheDepuisProduit(p);
+    setDetailCatalogue(p); setDetail(fiche);
+    // Le catalogue ne garde pas les repères nutritionnels : on les lit sur Open Food Facts à l'ouverture.
+    if (p.ean13) void lookupEan(p.ean13).then(r => {
+      if (r.etat === 'trouve' && r.fiche.details) setDetail(d => d?.ean13 === fiche.ean13 ? { ...d, details: r.fiche.details } : d);
+    });
+  };
+  const fermerDetail = () => { setDetail(null); setDetailCatalogue(null); };
+
   const ligne = (cle: string, nom: string, detail: string | null, image: string | null, note: Product['nutriscore'], plein: boolean, onPress: () => void, occupe = false, onLongPress?: () => void) =>
     <Pressable key={cle} accessibilityRole="button" accessibilityLabel={`${verbe} ${nom}${detail ? `, ${detail}` : ''}`} accessibilityHint={onLongPress ? 'Appui long pour voir la fiche détaillée' : undefined} disabled={occupe} onPress={onPress} onLongPress={Platform.OS === 'ios' ? undefined : onLongPress} style={({ pressed }) => [s.ligne, pressed && { backgroundColor: colors.surface }]}>
       <View style={s.vignette}><Photo name={nom} url={image} style={s.photo} /></View>
@@ -127,6 +145,12 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
       <PastilleNutri note={note} />
       <View style={[s.plus, !plein && s.plusContour]}>{occupe ? <ActivityIndicator size="small" color={plein ? colors.accentContrast : colors.accent} /> : <Feather name="plus" size={18} color={plein ? colors.accentContrast : colors.accent} />}</View>
     </Pressable>;
+
+  // Appui long sur un de tes produits : même aperçu et même fiche qu'un résultat Open Food Facts.
+  const ligneProduit = (cle: string, p: Product) => {
+    const rang = ligne(cle, p.name, [p.brand, contenance(p.grammage_g, p.volume_ml)].filter(Boolean).join(' · ') || null, p.image_url, p.nutriscore, true, () => onChoisir(depuisProduit(p)), false, () => voirProduit(p));
+    return <ApercuOffre key={cle} largeur={largeur} fiche={ficheDepuisProduit(p)} reperes={false} onChoisir={() => onChoisir(depuisProduit(p))} onVoir={() => voirProduit(p)}>{rang}</ApercuOffre>;
+  };
 
   return (
     <View style={s.feuille} onLayout={e => setLargeur(e.nativeEvent.layout.width)}>
@@ -147,13 +171,13 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: (pied ? hautPied + 16 : sansProduit ? 140 : 24) + clavier }} keyboardShouldPersistTaps="handled">
         {catalogue && <>
         {prochesVus.length > 0 && <><Text style={s.section}>Proches dans tes produits</Text>
-          {prochesVus.map(p => ligne(`proche-${p.id}`, p.name, [p.brand, contenance(p.grammage_g, p.volume_ml)].filter(Boolean).join(' · ') || null, p.image_url, p.nutriscore, true, () => onChoisir(depuisProduit(p))))}</>}
+          {prochesVus.map(p => ligneProduit(`proche-${p.id}`, p))}</>}
         {memeType.length > 0 && <><Text style={s.section}>Même type dans tes produits</Text>
-          {memeType.map(p => ligne(`type-${p.id}`, p.name, [p.brand, contenance(p.grammage_g, p.volume_ml)].filter(Boolean).join(' · ') || null, p.image_url, p.nutriscore, true, () => onChoisir(depuisProduit(p))))}</>}
+          {memeType.map(p => ligneProduit(`type-${p.id}`, p))}</>}
         {/* Avec un en-tête (« Préciser »), « pas un de tes produits » est déjà dit : pas de section vide. */}
         {(duCatalogue.length > 0 || (!prochesVus.length && !entete)) && <Text style={s.section}>{memeType.length || prochesVus.length ? 'Tous tes produits' : 'Dans tes produits'}</Text>}
         {duCatalogue.length
-          ? duCatalogue.map(p => ligne(p.id, p.name, [p.brand, contenance(p.grammage_g, p.volume_ml)].filter(Boolean).join(' · ') || null, p.image_url, p.nutriscore, true, () => onChoisir(depuisProduit(p))))
+          ? duCatalogue.map(p => ligneProduit(p.id, p))
           : !prochesVus.length && !entete && <Text style={s.vide}>Aucun de tes produits ne correspond.</Text>}
 
         {/* Dans Préciser (en-tête), une section vide n'apprend rien : elle ne s'affiche qu'avec quelque chose dedans. */}
@@ -176,8 +200,12 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
 
       {/* Le dernier lien fait déjà 44 pt : sous lui, la zone de l'indicateur d'accueil suffit, sans marge en plus. */}
       {!!pied && <View onLayout={e => setHautPied(e.nativeEvent.layout.height)} style={[s.pied, { bottom: clavier, paddingBottom: clavier ? 8 : Math.max(8, insets.bottom - 16) }]}>{pied}</View>}
-      <FicheOffre fiche={detail} proches={[...(off.resultats ?? [])].filter(x => x.details).sort((a, b) => Number(b.productType === detail?.productType) - Number(a.productType === detail?.productType))} onFermer={() => setDetail(null)}
-        onChoisir={f => { setDetail(null); void choisirFiche(f); }} />
+      <FicheOffre fiche={detail} proches={[...(off.resultats ?? [])].filter(x => x.details).sort((a, b) => Number(b.productType === detail?.productType) - Number(a.productType === detail?.productType))} onFermer={fermerDetail}
+        onChoisir={f => {
+          const p = detailCatalogue && f.ean13 === (detailCatalogue.ean13 ?? detailCatalogue.id) ? detailCatalogue : null;
+          fermerDetail();
+          if (p) onChoisir(depuisProduit(p)); else void choisirFiche(f);
+        }} />
       <ScanRapide visible={scanner} onFermer={() => setScanner(false)} onFiche={f => { setScanner(false); void choisirFiche(f); }} />
       {!pied && sansProduit && !!texte && <View style={[s.pied, { bottom: clavier, paddingBottom: clavier ? 10 : 10 + insets.bottom }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={`Ajouter « ${texte} » sans produit. L'extension le cherchera par son nom.`} onPress={() => onChoisir({ name: texte, product_id: null, unit: 'unité', rayon: 'autre' })} style={({ pressed }) => [s.sansProduit, pressed && { opacity: .85 }]}>
