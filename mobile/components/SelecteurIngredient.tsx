@@ -80,7 +80,7 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
   const insets = useSafeAreaInsets(), clavier = useHauteurClavier();
   const [requete, setRequete] = useState(requeteInitiale), [focus, setFocus] = useState(false), [scanner, setScanner] = useState(false);
   // Résultat Open Food Facts dont on regarde la fiche complète (appui long).
-  const [detail, setDetail] = useState<FicheProduit | null>(null);
+  const [detail, setDetail] = useState<FicheProduit | null>(null), [largeur, setLargeur] = useState(0);
   const off = useRechercheOff();
   const [erreur, setErreur] = useState<string | null>(null), [ajout, setAjout] = useState<string | null>(null);
   const texte = requete.trim();
@@ -118,7 +118,7 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
     </Pressable>;
 
   return (
-    <View style={s.feuille}>
+    <View style={s.feuille} onLayout={e => setLargeur(e.nativeEvent.layout.width)}>
       <View style={s.entete}>
         <Text style={s.titre} accessibilityRole="header" numberOfLines={1}>{titre}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} style={s.fermer}><View style={s.fermerRond}><Feather name="x" size={18} color={colors.text} /></View></Pressable>
@@ -152,7 +152,7 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
             const deja = produits.some(p => p.ean13 && p.ean13 === f.ean13);
             const rang = ligne(f.ean13, f.name, [f.brand, contenance(f.grammageG, f.volumeMl), deja ? 'déjà dans tes produits' : null].filter(Boolean).join(' · ') || null, f.imageUrl, f.nutriscore, false, () => choisirFiche(f), ajout === f.ean13, () => setDetail(f));
             // Appui long : l'aperçu natif sur iPhone (FD2), la fiche complète ailleurs.
-            return <ApercuOffre key={f.ean13} fiche={f} onChoisir={() => { void choisirFiche(f); }} onVoir={() => setDetail(f)}>{rang}</ApercuOffre>;
+            return <ApercuOffre key={f.ean13} largeur={largeur} fiche={f} onChoisir={() => { void choisirFiche(f); }} onVoir={() => setDetail(f)}>{rang}</ApercuOffre>;
           })}
         </>}
         {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { paddingHorizontal: 16 }]}>{erreur}</Text>}

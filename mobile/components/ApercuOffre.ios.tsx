@@ -7,7 +7,9 @@ import { Reperes } from './FicheOffre';
 import { Photo } from './MaisonUI';
 import { colors } from '../lib/theme';
 
-export type ApercuOffreProps = { fiche: FicheProduit; onChoisir: () => void; onVoir: () => void; children: ReactElement };
+export type ApercuOffreProps = { fiche: FicheProduit; onChoisir: () => void; onVoir: () => void; children: ReactElement;
+  /** Largeur de la liste : la ligne s'y étend au lieu de prendre celle de son contenu. */
+  largeur?: number };
 
 /**
  * Appui long sur un résultat (variante FD2) : l'aperçu natif d'iOS fait
@@ -15,8 +17,8 @@ export type ApercuOffreProps = { fiche: FicheProduit; onChoisir: () => void; onV
  * avec « Choisir » et « Voir la fiche complète » dessous. Le repli web et
  * Android est dans `ApercuOffre.tsx`.
  */
-export function ApercuOffre({ fiche, onChoisir, onVoir, children }: ApercuOffreProps) {
-  const { width } = useWindowDimensions();
+export function ApercuOffre({ fiche, onChoisir, onVoir, children, largeur }: ApercuOffreProps) {
+  const fenetre = useWindowDimensions().width, width = largeur || fenetre;
   const d = fiche.details;
   return (
     <Host matchContents={{ vertical: true }} style={{ width }}>
@@ -26,7 +28,8 @@ export function ApercuOffre({ fiche, onChoisir, onVoir, children }: ApercuOffreP
           <Button label="Voir la fiche complète" systemImage="list.bullet.rectangle" onPress={onVoir} />
         </ContextMenu.Items>
         <ContextMenu.Trigger>
-          <RNHostView matchContents>{children}</RNHostView>
+          {/* Largeur fixée : sans elle, la ligne prend celle de son contenu et iOS la centre. */}
+          <RNHostView matchContents><View style={{ width }}>{children}</View></RNHostView>
         </ContextMenu.Trigger>
         <ContextMenu.Preview>
           <RNHostView matchContents>
