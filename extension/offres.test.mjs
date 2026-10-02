@@ -50,3 +50,13 @@ test('relevé : une ligne par carte, sans doublon, le choix marqué', () => {
   assert.deepEqual([rows[1].prix_unitaire, rows[1].disponible, rows[1].image_url, rows[1].choisi], [19.9, false, null, false]);
   assert.deepEqual(offresDepuisReleve(null, { drive: 'carrefour', recherche: 'x' }), []);
 });
+
+test('le relevé d’une fiche produit marque le produit mis au panier', () => {
+  const [ligne] = offresDepuisReleve(
+    [{ label: 'Papier toilette Essential', href: 'https://www.carrefour.fr/p/papier-3560070150403', ean: '3560070150403', prix: '4,69 €', texte: '4,69 €', image: '', nutri: '' }],
+    { drive: 'carrefour', recherche: 'papier toilette', productId: 'pq', jobId: 'j1', choisi: 'Papier toilette Essential' },
+  );
+  assert.equal(ligne.prix, 4.69);
+  assert.equal(ligne.choisi, true);
+  assert.equal(ligne.ean13, '3560070150403');
+});

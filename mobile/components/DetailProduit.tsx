@@ -10,6 +10,7 @@ import { ReprisePhoto } from './ReprisePhoto';
 import { ClassementProduit } from './ClassementProduit';
 import { ReglagesProduit } from './ReglagesProduit';
 import { NuagePrix } from './NuagePrix';
+import { PrixPaye } from './PrixPaye';
 import { referenceDe } from '../lib/references';
 import { ChoixRayon } from './ChoixRayon';
 import { ActualiserSheet } from './ActualiserSheet';
@@ -166,6 +167,7 @@ export function DetailProduit({
 
             {onAjouter && <View style={s.actions}><Action onPress={onAjouter}>Ajouter à ma liste</Action></View>}
 
+            <PrixPaye key={`prix-${produit.id}`} produitId={produit.id} ean13={produit.ean13} />
             {produits && <ClassementProduit produit={produit} produits={produits} onChange={onChange} />}
             {produits && <NuagePrix key={produit.id} reference={referenceDe(produit.id, produits) ?? produit} produits={produits} onChange={onChange} />}
             {produits && <ReglagesProduit produit={produit} produits={produits} onChange={onChange} />}

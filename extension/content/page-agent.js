@@ -314,6 +314,10 @@ export function pageAgent(cfg, item, mode) {
       return { ok: false, reason: 'click_no_effect', message: `Clic sans effet sur « ${label} »`, label };
     }
 
+    // Le prix de la fiche au moment de l'ajout : c'est lui qui nourrit
+    // l'historique des prix payés, commande après commande.
+    const prix = textOf(queryFirst(document, pp.price || [])).slice(0, 40);
+    const image = document.querySelector('meta[property="og:image"]')?.getAttribute('content') ?? '';
     return {
       ok: true,
       reason: 'added',
@@ -321,7 +325,8 @@ export function pageAgent(cfg, item, mode) {
       ean,
       url: location.href,
       via: 'product_page',
-      price: textOf(queryFirst(document, pp.price || [])).slice(0, 30) || null,
+      price: prix.slice(0, 30) || null,
+      releve: [{ label: label.slice(0, 200), href: location.href, ean, prix, texte: prix, image, nutri: '' }],
     };
   }
 
@@ -563,26 +568,6 @@ export function pageAgent(cfg, item, mode) {
       };
     }
 
-    // Choix explicite de l'utilisateur après une ambiguïté : on cible le
-    // libellé retenu et on n'évalue plus rien — il n'y a plus rien à décider.
-    if (item.exactLabel) {
-      const flatten = (t) => t.replace(/\s+/g, ' ').trim();
-      const wanted = flatten(item.exactLabel);
-      const target = cards
-        .map((card) => ({ card, label: textOf(queryFirst(card, cfg.title)) || textOf(card) }))
-        .find((c) => flatten(c.label) === wanted);
-
-      if (!target) {
-        return {
-          ok: false,
-          reason: 'candidate_gone',
-          message: `« ${item.exactLabel} » n'est plus dans les résultats`,
-        };
-      }
-      const added = await addToCart(target);
-      return added.ok ? { ...added, via: 'chosen' } : added;
-    }
-
     // Relevé des offres affichées (prix, prix au kilo, Nutri-Score…) : le
     // comparatif des alternatives s'en nourrit. Seuls des textes bruts
     // remontent ; l'extension les comprend hors de la page.
@@ -607,6 +592,26 @@ export function pageAgent(cfg, item, mode) {
           : '',
       };
     });
+
+    // Choix explicite de l'utilisateur après une ambiguïté : on cible le
+    // libellé retenu et on n'évalue plus rien — il n'y a plus rien à décider.
+    if (item.exactLabel) {
+      const flatten = (t) => t.replace(/\s+/g, ' ').trim();
+      const wanted = flatten(item.exactLabel);
+      const target = cards
+        .map((card) => ({ card, label: textOf(queryFirst(card, cfg.title)) || textOf(card) }))
+        .find((c) => flatten(c.label) === wanted);
+
+      if (!target) {
+        return {
+          ok: false,
+          reason: 'candidate_gone',
+          message: `« ${item.exactLabel} » n'est plus dans les résultats`,
+        };
+      }
+      const added = await addToCart(target);
+      return added.ok ? { ...added, via: 'chosen', releve } : added;
+    }
 
     const { ranked, ignored } = rank(
       item.name,
