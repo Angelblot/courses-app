@@ -1,8 +1,10 @@
-import { useCallback, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type TextStyle } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, ActivityIndicator, Animated, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type TextStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
 import { useProducts, type Product } from '../../stores/products';
 import { classement, references } from '../../lib/references';
 import { useWizard } from '../../contexts/WizardContext';
@@ -21,10 +23,11 @@ const contenance = (p: Product) => p.volume_ml ? (p.volume_ml >= 1000 ? `${Strin
  * habitudes. Une pastille « +2 » dit combien d'alternatives prendraient le
  * relais ; on les classe sur la fiche. Filtres par rayon en puces. Un appui
  * long ouvre le menu contextuel natif d'iOS : liste, modifier, actualiser,
- * supprimer.
+ * supprimer. Glisser la grille vers la gauche ou la droite passe au rayon
+ * suivant ou précédent.
  */
 export default function Favoris() {
-  const p = useProducts(), w = useWizard(), { width } = useWindowDimensions();
+  const p = useProducts(), w = useWizard(), { width, height } = useWindowDimensions();
   const [query, setQuery] = useState(''), [filtre, setFiltre] = useState<Filtre>('tous'), [detail, setDetail] = useState<Product | null>(null), [ouverture, setOuverture] = useState<OuvertureFiche>('consulter');
   const annulation = useAnnulation();
   useFocusEffect(useCallback(() => { p.recharger(); }, [p.recharger]));
@@ -39,6 +42,25 @@ export default function Favoris() {
     { cle: 'tous', label: 'Tous', n: refs.length },
     ...rayons.map(r => ({ ...r, n: refs.filter(x => rayonDepuisLibelle(x.category) === r.cle).length })),
   ];
+  // Glisser change de rayon ; la grille arrive du côté d'où l'on vient.
+  const glisse = useRef(new Animated.Value(0)).current, posPuces = useRef<Record<string, number>>({}), rangee = useRef<ScrollView>(null);
+  const [mouvementReduit, setMouvementReduit] = useState(false);
+  useEffect(() => { void AccessibilityInfo.isReduceMotionEnabled().then(setMouvementReduit); }, []);
+  const changerFiltre = (cle: Filtre, sens = 0) => {
+    setFiltre(cle);
+    const x = posPuces.current[cle];
+    if (x != null) rangee.current?.scrollTo({ x: Math.max(0, x - 16), animated: true });
+    if (sens && !mouvementReduit) { glisse.setValue(sens * 40); Animated.timing(glisse, { toValue: 0, duration: 200, useNativeDriver: true }).start(); }
+  };
+  const voisin = (sens: 1 | -1) => {
+    const i = puces.findIndex(c => c.cle === filtre), j = i + sens;
+    if (j < 0 || j >= puces.length) return;
+    void Haptics.selectionAsync().catch(() => {});
+    changerFiltre(puces[j].cle, sens);
+  };
+  const voisinRef = useRef(voisin); voisinRef.current = voisin;
+  const balayage = useMemo(() => Gesture.Pan().runOnJS(true).activeOffsetX([-24, 24]).failOffsetY([-14, 14])
+    .onEnd(e => { if (Math.abs(e.translationX) > 60 || Math.abs(e.velocityX) > 600) voisinRef.current(e.translationX < 0 ? 1 : -1); }), []);
   const ouvrir = (x: Product, o: OuvertureFiche = 'consulter') => { setOuverture(o); setDetail(x); };
   const ajouterListe = (x: Product) => { const avant = w.quotidien[x.id] ?? null; w.ajouterProduitListe(x.id); annulation.proposer(`${x.name} ajouté à ta liste`, () => w.marquerProduit(x.id, avant)); };
   const supprime = (x: Product) => {
@@ -63,18 +85,20 @@ export default function Favoris() {
           <View style={s.recherche}><Feather name="search" size={18} color={colors.textMuted} /><TextInput accessibilityLabel="Chercher un produit" style={[s.saisie, sansCadreWeb]} placeholder="Chercher un produit…" placeholderTextColor={colors.textMuted} value={query} onChangeText={setQuery} returnKeyType="search" /></View>
           <Pressable accessibilityRole="button" accessibilityLabel="Scanner un produit" onPress={() => router.push('/scan')} style={s.scan}><Feather name="maximize" size={20} color={colors.accent} /></Pressable>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.rangeePuces} contentContainerStyle={s.puces}>
-          {puces.map(c => { const actif = filtre === c.cle; return <Pressable key={c.cle} accessibilityRole="tab" accessibilityLabel={`${c.label}, ${c.n}`} accessibilityState={{ selected: actif }} aria-selected={actif} onPress={() => setFiltre(c.cle)} style={[s.puce, actif && s.puceActive]}><Text style={[s.puceTexte, actif && { color: colors.accentContrast }]}>{c.label}<Text style={[s.puceCompte, actif && { color: colors.accentContrast }]}>  {c.n}</Text></Text></Pressable>; })}
+        <ScrollView ref={rangee} horizontal showsHorizontalScrollIndicator={false} style={s.rangeePuces} contentContainerStyle={s.puces}>
+          {puces.map(c => { const actif = filtre === c.cle; return <Pressable key={c.cle} onLayout={e => { posPuces.current[c.cle] = e.nativeEvent.layout.x; }} accessibilityRole="tab" accessibilityLabel={`${c.label}, ${c.n}`} accessibilityState={{ selected: actif }} aria-selected={actif} onPress={() => changerFiltre(c.cle)} style={[s.puce, actif && s.puceActive]}><Text style={[s.puceTexte, actif && { color: colors.accentContrast }]}>{c.label}<Text style={[s.puceCompte, actif && { color: colors.accentContrast }]}>  {c.n}</Text></Text></Pressable>; })}
         </ScrollView>
       </View>
       {p.chargement && !p.produits.length && <ActivityIndicator color={colors.accent} />}
       {p.erreur && <><Text style={ui.error}>{p.erreur}</Text><Action secondary onPress={p.recharger}>Réessayer</Action></>}
+      <GestureDetector gesture={balayage}><Animated.View style={{ transform: [{ translateX: glisse }], minHeight: Math.max(320, height - 240) }}>
       <View style={s.grille}>{produits.map(x =>
         <MenuProduit key={x.id} largeur={largeurTuile} onAjouter={() => ajouterListe(x)} onModifier={() => ouvrir(x, 'modifier')}
           onActualiser={x.ean13 ? () => ouvrir(x, 'actualiser') : undefined} onSupprimer={() => ouvrir(x, 'supprimer')}>
           {tuile(x)}
         </MenuProduit>)}</View>
       {!p.chargement && !p.erreur && !produits.length && <View style={ui.notice}><Text style={ui.productName}>{query ? 'Aucun produit ne correspond.' : filtre === 'tous' ? 'Pas encore de produit.' : 'Aucun produit dans ce rayon.'}</Text><Text style={ui.subtitle}>Scanne un produit pour l’ajouter : il rejoindra tes habitudes.</Text></View>}
+      </Animated.View></GestureDetector>
     </ScrollView>
     {annulation.toast}
     <DetailProduit produit={detail ? p.produits.find(x => x.id === detail.id) ?? detail : null} produits={p.produits} ouverture={ouverture} onFermer={() => setDetail(null)} onChange={p.recharger} onSupprime={supprime}
