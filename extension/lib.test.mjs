@@ -94,3 +94,11 @@ test('quantité : même total quand les formats se comparent, sinon article pour
   assert.equal(quantitePour({ grammage_g: 200 }, { volume_ml: 500 }, 2), 2);
   assert.equal(quantitePour({}, {}, 0), 1);
 });
+
+import { SITES as SITES_FICHE } from './content/sites.js';
+test('une fiche Leclerc mémorisée se reconnaît à son adresse, pas une recherche', () => {
+  const r = new RegExp(SITES_FICHE.leclerc.productPagePattern);
+  assert.ok(r.test('https://fd3-courses.leclercdrive.fr/magasin-093401-093401-Le-Cres-Montpellier/fiche-produits-259249-produit.aspx'));
+  assert.ok(!r.test('https://fd3-courses.leclercdrive.fr/magasin-093401-093401-Le-Cres-Montpellier/recherche.aspx?TexteRecherche=somersby'));
+  assert.equal(SITES_FICHE.leclerc.productPage.addButton[0], 'a.aWCRS310_Add_Produit_Fiche');
+});

@@ -1,7 +1,7 @@
 /**
  * Configuration par enseigne.
  *
- * ATTENTION — `productUrlPattern` est une **chaîne**, pas une expression
+ * ATTENTION — `productUrlPattern` (et `productPagePattern`) est une **chaîne**, pas une expression
  * régulière. Cet objet traverse `chrome.scripting.executeScript`, dont les
  * arguments sont sérialisés en JSON : une RegExp y devient un objet vide, et
  * tout appel à `.test()` dans la page lève une exception. Le motif est donc
@@ -152,8 +152,13 @@ export const SITES = {
     // l'adresse, contrairement à Carrefour — l'accès direct par code-barres
     // n'est pas possible ici, et la recherche par nom reste la seule voie.
     productUrlPattern: '-(\\d{13})(?:[/?#]|$)',
+    // Une fiche Leclerc se reconnaît à son adresse fiche-produits-<id>-… ; elle
+    // ne contient pas de code-barres. C'est la voie des liens mémorisés.
+    productPagePattern: '/fiche-produits-\\d+-',
     productPage: {
-      addButton: ["a:has-text('Ajouter au panier')", "button:has-text('Ajouter')"],
+      // Le bouton de la fiche elle-même : les suggestions de la même page ont
+      // aussi des aWCRS310_Add, qu'il ne faut pas prendre (relevé du 03/10/2026).
+      addButton: ['a.aWCRS310_Add_Produit_Fiche', "a:has-text('Ajouter au panier')", "button:has-text('Ajouter')"],
       title: ['h1'],
       price: ['[class*="Prix"]', '[class*="price"]'],
     },

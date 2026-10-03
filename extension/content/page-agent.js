@@ -31,6 +31,8 @@ export function pageAgent(cfg, item, mode) {
   // Recompilé ici : les arguments d'executeScript sont sérialisés en JSON, une
   // RegExp transmise depuis le service worker arriverait vide.
   const productUrlRe = cfg.productUrlPattern ? new RegExp(cfg.productUrlPattern) : null;
+  // Reconnaît une fiche produit ; par défaut, l'adresse qui porte un code-barres.
+  const productPageRe = cfg.productPagePattern ? new RegExp(cfg.productPagePattern) : productUrlRe;
 
   const isVisible = (el) => {
     if (!el) return false;
@@ -556,7 +558,7 @@ export function pageAgent(cfg, item, mode) {
     if (mode === 'diagnose') return { ok: true, reason: 'diagnose', report: diagnose() };
 
     // Accès direct à une fiche : aucune recherche, donc aucune ambiguïté.
-    if (productUrlRe && productUrlRe.test(location.href)) {
+    if (productPageRe && productPageRe.test(location.href)) {
       return addFromProductPage();
     }
 
