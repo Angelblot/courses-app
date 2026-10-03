@@ -30,7 +30,7 @@ export default function FicheProduitEcran() {
 
   if (!produit) {
     const cherche = p.chargement && !p.erreur;
-    return <SafeAreaView edges={['bottom']} style={s.ecran}>
+    return <SafeAreaView edges={['top', 'bottom']} style={s.ecran}>
       <View style={s.barre}><Pressable accessibilityRole="button" onPress={fermer} style={s.bouton}><Text style={s.boutonTexte}>Fermer</Text></Pressable></View>
       <View style={s.vide}>
         {cherche ? <ActivityIndicator color={colors.accent} /> : <>

@@ -14,19 +14,25 @@ export function ouvrirFiche(cible: CibleFiche, ouverture: OuvertureFiche = 'cons
   router.push({ pathname: '/produit/[id]', params: ouverture === 'consulter' ? { id } : { id, ouverture } });
 }
 
+/** Ouvre l'aperçu d'un produit : photo, Nutri-Score, dernier prix payé, et le chemin vers sa fiche. */
+export function ouvrirApercu(cible: CibleFiche) {
+  const id = cle(cible);
+  if (id) router.push({ pathname: '/apercu/[id]', params: { id } });
+}
+
 /**
- * Les props d'une ligne de produit pour qu'un appui long ouvre sa fiche, avec
- * le petit choc d'un appui long iOS. Rien quand la ligne ne désigne aucun
- * produit du catalogue (un extra noté à la main, par exemple).
+ * Les props d'une ligne de produit pour qu'un appui long ouvre son aperçu,
+ * avec le petit choc d'un appui long iOS. Rien quand la ligne ne désigne
+ * aucun produit du catalogue (un extra noté à la main, par exemple).
  */
 export function appuiLongFiche(cible: CibleFiche) {
   if (!cle(cible)) return {};
   return {
     onLongPress: () => {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      ouvrirFiche(cible);
+      ouvrirApercu(cible);
     },
     delayLongPress: 350,
-    accessibilityHint: 'Appui long pour ouvrir la fiche du produit',
+    accessibilityHint: 'Appui long pour voir le produit et son dernier prix',
   };
 }

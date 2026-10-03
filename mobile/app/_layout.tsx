@@ -55,11 +55,13 @@ export default function RootLayout() {
   // Racine des gestes : sans elle, le glisser pour retirer ne répond pas.
   // Une seule pile pour tout ce qui s'ouvre depuis un onglet (Mes produits,
   // une commande, l'assistant de courses…) : le retour, bouton ou glisser
-  // depuis le bord, ramène toujours à l'écran d'où l'on vient. La fiche
-  // produit, ouverte par un appui long n'importe où, monte en feuille.
+  // depuis le bord, ramène toujours à l'écran d'où l'on vient. Un appui
+  // long sur un produit, n'importe où, ouvre son aperçu en feuille courte ;
+  // la fiche complète monte en feuille pleine.
   return <GestureHandlerRootView style={{ flex: 1 }}><WizardProvider key={session?.user.id ?? "anonyme"} userId={session?.user.id ?? null}>
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Screen name="produit/[id]" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="apercu/[id]" options={{ presentation: 'formSheet', sheetAllowedDetents: 'fitToContents', sheetGrabberVisible: true, sheetCornerRadius: 24 }} />
       <Stack.Screen name="login" options={{ animation: 'fade', gestureEnabled: false }} />
     </Stack>
   </WizardProvider></GestureHandlerRootView>;

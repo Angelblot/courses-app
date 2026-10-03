@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Modal, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { classement, enseigneExclusive, referenceDe, reordonner } from '../lib/references';
 import { enregistrerAlternatives, type Product } from '../stores/products';
 import { SelecteurIngredient } from './SelecteurIngredient';
 import { Photo, ui } from './MaisonUI';
+import { appuiLongFiche } from './FicheAppuiLong';
 import { colors } from '../lib/theme';
 
 /** Hauteur fixe d'une ligne : le glisser se mesure en lignes. */
@@ -15,16 +18,19 @@ const NOMS = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' } as const;
  * Référence et alternatives d'un produit (variante AL3) : une seule liste
  * classée. La première est la référence (fond vert) : Siri l'ajoute, le
  * panier l'essaie d'abord, puis les suivantes si elle manque au drive. On
- * réordonne en faisant glisser les poignées ; VoiceOver propose « monter »
- * et « descendre ».
+ * réordonne en faisant glisser les poignées, les autres lignes s'écartant
+ * en direct ; VoiceOver propose « monter » et « descendre ». Un appui long
+ * sur une ligne ouvre l'aperçu du produit, avec son dernier prix.
  */
-export function ClassementProduit({ produit, produits, onChange }: { produit: Product; produits: Product[]; onChange?: () => void }) {
+export function ClassementProduit({ produit, produits, onChange, onGlisse }: { produit: Product; produits: Product[]; onChange?: () => void;
+  /** Un glisser commence ou finit : la fiche fige son défilement et sa fermeture. */
+  onGlisse?: (enCours: boolean) => void }) {
   const reference = referenceDe(produit.id, produits) ?? produit;
   const depuisServeur = useMemo(() => classement(reference, produits).map(p => p.id), [reference, produits]);
   const [ordre, setOrdre] = useState(depuisServeur);
   useEffect(() => { setOrdre(depuisServeur); }, [depuisServeur.join(',')]);
   const [erreur, setErreur] = useState<string | null>(null), [ajout, setAjout] = useState(false);
-  const [actif, setActif] = useState<number | null>(null);
+  const [actif, setActif] = useState<number | null>(null), [cible, setCible] = useState<number | null>(null);
   const decalage = useRef(new Animated.Value(0)).current;
   const parId = new Map(produits.map(p => [p.id, p]));
   const lignes = ordre.map(id => parId.get(id)).filter((p): p is Product => !!p);
@@ -46,19 +52,26 @@ export function ClassementProduit({ produit, produits, onChange }: { produit: Pr
   };
   const retirer = (i: number) => { if (i > 0) void enregistrer(ordre.filter((_, k) => k !== i)); };
 
-  // Les poignées gardent la même identité d'un affichage à l'autre : un
-  // glisser en cours n'est pas interrompu quand la ligne se redessine.
-  const deplacerRef = useRef(deplacer);
-  deplacerRef.current = deplacer;
-  const poignees = useMemo(() => ordre.map((_, i) => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderTerminationRequest: () => false,
-    onPanResponderGrant: () => { setActif(i); decalage.setValue(0); },
-    onPanResponderMove: (_, g) => decalage.setValue(g.dy),
-    onPanResponderRelease: (_, g) => { setActif(null); decalage.setValue(0); deplacerRef.current(i, i + Math.round(g.dy / HAUTEUR)); },
-    onPanResponderTerminate: () => { setActif(null); decalage.setValue(0); },
-  })), [ordre.length, decalage]);
+  // Le geste d'une poignée démarre au toucher : ni le défilement de la fiche
+  // ni le glisser qui ferme la feuille ne peuvent le lui prendre.
+  const deplacerRef = useRef(deplacer), cibleRef = useRef<number | null>(null), onGlisseRef = useRef(onGlisse);
+  deplacerRef.current = deplacer; onGlisseRef.current = onGlisse;
+  const n = ordre.length;
+  const poignees = useMemo(() => ordre.map((_, i) => {
+    const vers = (dy: number) => Math.max(0, Math.min(n - 1, i + Math.round(dy / HAUTEUR)));
+    return Gesture.Pan().minDistance(0).runOnJS(true)
+      .onStart(() => { cibleRef.current = i; setActif(i); setCible(i); decalage.setValue(0); onGlisseRef.current?.(true); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); })
+      .onUpdate((e) => {
+        decalage.setValue(e.translationY);
+        const v = vers(e.translationY);
+        if (v !== cibleRef.current) { cibleRef.current = v; setCible(v); void Haptics.selectionAsync().catch(() => {}); }
+      })
+      .onEnd((e) => { deplacerRef.current(i, vers(e.translationY)); })
+      .onFinalize(() => { cibleRef.current = null; setActif(null); setCible(null); decalage.setValue(0); onGlisseRef.current?.(false); });
+  }), [n, decalage]);
+  // Pendant un glisser, les lignes entre la place d'origine et la cible s'écartent d'un rang.
+  const ecart = (k: number) => actif == null || cible == null || k === actif ? 0
+    : actif < cible && k > actif && k <= cible ? -HAUTEUR : actif > cible && k >= cible && k < actif ? HAUTEUR : 0;
   const suggestions = produits.filter(p => p.product_type && p.product_type === reference.product_type);
 
   return <View style={s.zone}>
@@ -67,19 +80,21 @@ export function ClassementProduit({ produit, produits, onChange }: { produit: Pr
     <View style={s.liste}>
       {lignes.map((p, i) => {
         const enseigne = enseigneExclusive(p);
-        return <Animated.View key={p.id} style={[s.ligne, i === 0 && s.ligneReference, i < lignes.length - 1 && s.separee, actif === i && { transform: [{ translateY: decalage }], zIndex: 2, elevation: 4, shadowColor: '#141C10', shadowOpacity: .18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }]}>
+        return <Animated.View key={p.id} style={[s.ligne, i === 0 && s.ligneReference, i < lignes.length - 1 && s.separee, actif === i ? s.souleve : { transform: [{ translateY: ecart(i) }] }, actif === i && { transform: [{ translateY: decalage }, { scale: 1.02 }] }]}>
           <View style={[s.rang, i === 0 && s.rangReference]}><Text style={[s.rangTexte, i === 0 && { color: colors.accentContrast }]}>{i + 1}</Text></View>
-          <Photo name={p.name} url={p.image_url} style={s.photo} />
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text style={ui.productName} numberOfLines={2}>{p.name}</Text>
-            <View style={s.puces}>{(enseigne ? [enseigne] : (['carrefour', 'leclerc'] as const)).map(e => <Text key={e} style={s.puce}>{NOMS[e]}</Text>)}</View>
-          </View>
+          <Pressable {...(p.id === produit.id ? {} : appuiLongFiche(p))} accessibilityLabel={p.name} style={s.produit}>
+            <Photo name={p.name} url={p.image_url} style={s.photo} />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={ui.productName} numberOfLines={2}>{p.name}</Text>
+              <View style={s.puces}>{(enseigne ? [enseigne] : (['carrefour', 'leclerc'] as const)).map(e => <Text key={e} style={s.puce}>{NOMS[e]}</Text>)}</View>
+            </View>
+          </Pressable>
           {i > 0 && <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${p.name} du classement`} onPress={() => retirer(i)} hitSlop={4} style={s.action}><Feather name="x" size={16} color={colors.textMuted} /></Pressable>}
-          <View {...poignees[i]?.panHandlers} accessible accessibilityRole="adjustable" accessibilityLabel={`${p.name}, rang ${i + 1} sur ${lignes.length}${i === 0 ? ', référence' : ''}. Fais glisser pour changer l’ordre`}
+          <GestureDetector gesture={poignees[i]}><View accessible accessibilityRole="adjustable" accessibilityLabel={`${p.name}, rang ${i + 1} sur ${lignes.length}${i === 0 ? ', référence' : ''}. Fais glisser pour changer l’ordre`}
             accessibilityActions={[{ name: 'increment', label: 'Descendre' }, { name: 'decrement', label: 'Monter' }]}
             onAccessibilityAction={e => deplacer(i, e.nativeEvent.actionName === 'increment' ? i + 1 : i - 1)} style={s.action}>
-            <Feather name="menu" size={18} color={colors.traitControle} />
-          </View>
+            <Feather name="menu" size={18} color={actif === i ? colors.accent : colors.traitControle} />
+          </View></GestureDetector>
         </Animated.View>;
       })}
     </View>
@@ -105,6 +120,8 @@ const s = StyleSheet.create({
   rangReference: { backgroundColor: colors.accent },
   rangTexte: { fontSize: 13, fontWeight: '700', color: colors.accent },
   photo: { width: 44, height: 44, borderRadius: 8 },
+  produit: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch' },
+  souleve: { zIndex: 2, elevation: 4, borderRadius: 14, shadowColor: '#141C10', shadowOpacity: .18, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
   puces: { flexDirection: 'row', gap: 4 },
   puce: { fontSize: 11, fontWeight: '600', color: '#3A5030', backgroundColor: colors.surface, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
   action: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },

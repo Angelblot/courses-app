@@ -1,6 +1,8 @@
 import { Action, Photo, ui } from './MaisonUI';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+// Le défilement de gesture-handler : le glisser d'une poignée d'« Ordre d'essai » prend la main sur lui.
+import { ScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import type { Product } from '../stores/products';
@@ -65,7 +67,7 @@ export function DetailProduit({
   onChange?: () => void;
   /** Ajoute le produit à la liste de courses. */
   onAjouter?: () => void;
-  /** La fiche passe en modification ou en sort : la feuille ne doit plus se fermer d'un glisser. */
+  /** La fiche passe en modification, ou un classement se fait glisser : la feuille ne doit plus se fermer d'un glisser. */
   onEdition?: (enCours: boolean) => void;
   /** Le produit vient d'être supprimé : l'appelant ferme et recharge. */
   onSupprime?: (p: Product) => void;
@@ -77,7 +79,8 @@ export function DetailProduit({
   const [edition, setEdition] = useState(false);
   const [brouillon, setBrouillon] = useState({ name: '', brand: '', contenance: '', category: 'autre' as CleRayon });
   const [feuille, setFeuille] = useState<'actualiser' | 'supprimer' | null>(null);
-  useEffect(() => { onEdition?.(edition); }, [edition]);
+  const [glisse, setGlisse] = useState(false);
+  useEffect(() => { onEdition?.(edition || glisse); }, [edition, glisse]);
   // Supprimer ou actualiser choisi dans le menu d'appui long : annuler la
   // feuille ramène à l'écran d'origine, pas à une fiche qu'on n'a pas demandée.
   const directe = useRef(false);
@@ -150,7 +153,7 @@ export function DetailProduit({
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={s.corps} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+        <ScrollView contentContainerStyle={s.corps} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets scrollEnabled={!glisse}>
           <View style={[s.cadreImage, edition && s.cadreImageReduit]}>
             <Photo name={produit.name} url={produit.image_url} style={edition ? s.imageReduite : s.image} />
           </View>
@@ -177,7 +180,7 @@ export function DetailProduit({
             {onAjouter && <View style={s.actions}><Action onPress={() => { onAjouter(); setErreur(null); setInfo('Ajouté à ta liste.'); }}>Ajouter à ma liste</Action></View>}
 
             <PrixPaye key={`prix-${produit.id}`} produitId={produit.id} ean13={produit.ean13} />
-            {produits && <ClassementProduit produit={produit} produits={produits} onChange={onChange} />}
+            {produits && <ClassementProduit produit={produit} produits={produits} onChange={onChange} onGlisse={setGlisse} />}
             {produits && <NuagePrix key={`nuage-${produit.id}`} reference={referenceDe(produit.id, produits) ?? produit} produits={produits} onChange={onChange} />}
             {produits && <ReglagesProduit produit={produit} produits={produits} onChange={onChange} />}
 
