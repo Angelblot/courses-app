@@ -21,6 +21,7 @@ import {
 import { strategie, indexer } from './lib/equivalences.js';
 import { offresDepuisReleve } from './lib/offres.js';
 import { candidats, RAISONS_SUIVANT } from './lib/alternatives.js';
+import { attenteAvantNavigation, ENTRE_PRODUITS_MS, LECTURE_MS } from './lib/rythme.js';
 
 /**
  * Période de sondage.
@@ -75,7 +76,7 @@ async function travauxRelevables() {
 const STATE_KEY = 'courses_job';
 
 /** Pause entre deux produits — rythme humain, pas de martèlement. */
-const DELAY_BETWEEN_ITEMS_MS = 2500;
+const DELAY_BETWEEN_ITEMS_MS = ENTRE_PRODUITS_MS;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -91,6 +92,20 @@ async function setState(patch) {
   // Le popup s'actualise s'il est ouvert ; sans lui l'erreur est sans effet.
   chrome.runtime.sendMessage({ type: 'state', state: next }).catch(() => {});
   return next;
+}
+
+let derniereNavigation = 0;
+
+/**
+ * Charge une page dans l'onglet en respectant le rythme : jamais deux
+ * chargements à moins de INTERVALLE_NAVIGATION_MS, puis un temps de lecture.
+ */
+async function naviguer(tabId, url) {
+  await sleep(attenteAvantNavigation(derniereNavigation, Date.now()));
+  derniereNavigation = Date.now();
+  await chrome.tabs.update(tabId, { url });
+  await waitForTab(tabId);
+  await sleep(LECTURE_MS);
 }
 
 /** Attend qu'un onglet ait fini de charger. */
@@ -208,8 +223,7 @@ async function attempt(tabId, cfg, item, baseOrigin, equivalences = {}) {
     return { ok: false, reason: 'product_unavailable', memorise: true };
   }
   if (voie.voie === 'url') {
-    await chrome.tabs.update(tabId, { url: voie.valeur });
-    await waitForTab(tabId);
+    await naviguer(tabId, voie.valeur);
     const r = await runAgent(tabId, cfg, item, 'run');
     if (r.ok) return { ...r, via: 'equivalence_url' };
     // La fiche mémorisée ne répond plus : on retombe sur la voie normale.
@@ -217,8 +231,7 @@ async function attempt(tabId, cfg, item, baseOrigin, equivalences = {}) {
   if (voie.voie === 'label') {
     // Seule voie déterministe chez Leclerc, dont les liens produit n'ont pas
     // d'adresse lisible.
-    await chrome.tabs.update(tabId, { url: searchUrl });
-    await waitForTab(tabId);
+    await naviguer(tabId, searchUrl);
     const r = await runAgent(tabId, cfg, { ...item, exactLabel: voie.valeur }, 'run');
     if (r.ok) return { ...r, searchUrl, via: 'equivalence_label' };
   }
@@ -230,16 +243,14 @@ async function attempt(tabId, cfg, item, baseOrigin, equivalences = {}) {
       : null);
 
   if (directUrl) {
-    await chrome.tabs.update(tabId, { url: directUrl });
-    await waitForTab(tabId);
+    await naviguer(tabId, directUrl);
     const direct = await runAgent(tabId, cfg, item, 'run');
     if (direct.ok) return { ...direct, via: direct.via ?? 'direct_url' };
     if (!RETRYABLE_VIA_SEARCH.has(direct.reason)) return direct;
     // Sinon : le produit n'est pas accessible par sa fiche, on tente le nom.
   }
 
-  await chrome.tabs.update(tabId, { url: searchUrl });
-  await waitForTab(tabId);
+  await naviguer(tabId, searchUrl);
   const found = await runAgent(tabId, cfg, item, 'run');
   // searchUrl est conservée pour pouvoir revenir sur cette page et y choisir
   // un candidat après coup, sans relancer toute la liste.
@@ -282,8 +293,7 @@ async function processJob() {
         // On repart de l'origine de l'enseigne suivante. Si la session n'y est
         // pas ouverte ou le magasin pas choisi, l'agent le signalera dès le
         // premier produit et on s'arrêtera proprement en `needs_action`.
-        await chrome.tabs.update(tabId, { url: cfgSuivant.origin });
-        await waitForTab(tabId);
+        await naviguer(tabId, cfgSuivant.origin);
         const onglet = await chrome.tabs.get(tabId);
         let origineSuivante = null;
         try {
@@ -422,8 +432,7 @@ async function chooseCandidate(index, label) {
   if (!entry?.searchUrl) throw new Error('Page de recherche inconnue pour cette ligne');
 
   const cfg = SITES[state.site];
-  await chrome.tabs.update(state.tabId, { url: entry.searchUrl });
-  await waitForTab(state.tabId);
+  await naviguer(state.tabId, entry.searchUrl);
 
   const item = { name: entry.item, quantity: entry.quantity, exactLabel: label };
   const result = await runAgent(state.tabId, cfg, item, 'run');

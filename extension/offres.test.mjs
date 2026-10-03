@@ -60,3 +60,10 @@ test('le relevé d’une fiche produit marque le produit mis au panier', () => {
   assert.equal(ligne.choisi, true);
   assert.equal(ligne.ean13, '3560070150403');
 });
+
+import { attenteAvantNavigation, INTERVALLE_NAVIGATION_MS } from './lib/rythme.js';
+test('deux chargements de page jamais à moins de l’intervalle', () => {
+  assert.equal(attenteAvantNavigation(0, 10000), 0);
+  assert.equal(attenteAvantNavigation(10000, 11000), INTERVALLE_NAVIGATION_MS - 1000);
+  assert.equal(attenteAvantNavigation(10000, 10000 + INTERVALLE_NAVIGATION_MS + 1), 0);
+});

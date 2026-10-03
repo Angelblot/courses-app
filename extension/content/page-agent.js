@@ -297,7 +297,8 @@ export function pageAgent(cfg, item, mode) {
     }
 
     btn.scrollIntoView({ block: 'center' });
-    await sleep(300);
+    // Le temps de voir le bouton avant de cliquer : pas de clic « surhumain ».
+    await sleep(800);
     const before = fingerprint(document.body);
     const cartBefore = cartCount();
     btn.click();
@@ -478,7 +479,8 @@ export function pageAgent(cfg, item, mode) {
     }
 
     addBtn.scrollIntoView({ block: 'center' });
-    await sleep(300);
+    // Le temps de voir le bouton avant de cliquer : pas de clic « surhumain ».
+    await sleep(800);
 
     // Empreinte avant clic : sans cette vérification, un clic sans effet était
     // rapporté comme un ajout réussi et le panier restait vide.
