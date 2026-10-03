@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mapOffProduct, estLiquide, echappe, analyserRechercheNom } from './openfoodfacts.ts';
+import { mapOffProduct, contenanceDuLot, estLiquide, echappe, analyserRechercheNom } from './openfoodfacts.ts';
 
 test('un solide reçoit un grammage', () => {
   const fiche = mapOffProduct('3760040427577', {
@@ -162,4 +162,20 @@ test('lookupEan : un 404 d’Open Food Facts est un code-barres inconnu, pas une
   } finally {
     globalThis.fetch = reel;
   }
+});
+
+test('un lot « 2x75g » compte la contenance du lot entier, pas d’un seul élément', () => {
+  assert.equal(contenanceDuLot('Allumettes de jambon Tradilège 2x75g', 75), 150);
+  assert.equal(contenanceDuLot('Couscous Grain moyen - 5x100g', 100), 500);
+  assert.equal(contenanceDuLot('Crème légère 18%mg - 3x20cl', 200), 600);
+  assert.equal(contenanceDuLot('Yaourt nature 4 x 125 g', 125), 500);
+  // Déjà le total, ou un lot qui ne parle pas de poids : on ne touche à rien.
+  assert.equal(contenanceDuLot('Bière DESPERADOS 6 x 33 cl', 1980), 1980);
+  assert.equal(contenanceDuLot('Poitrine fumée 2x7T - 200g', 200), 200);
+  assert.equal(contenanceDuLot('Lait demi-écrémé 1L', 1000), 1000);
+});
+
+test('mapOffProduct applique la contenance du lot', () => {
+  const f = mapOffProduct('3661112052256', { product_name: 'Allumettes de jambon Tradilège 2x75g', product_quantity: 75 });
+  assert.equal(f.grammageG, 150);
 });

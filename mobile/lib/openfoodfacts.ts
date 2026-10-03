@@ -85,11 +85,27 @@ function litNutriscore(brut: string | undefined): NoteNutri | null {
  * @returns null si la fiche n'a pas de nom — un produit sans libellé serait
  *   inutilisable dans le catalogue, mieux vaut basculer sur la saisie manuelle.
  */
+/**
+ * Open Food Facts donne parfois la contenance d'un seul élément d'un lot :
+ * 75 pour « Allumettes 2x75g ». Quand le nom annonce « N x Q » (g, kg, ml,
+ * cl, l) et que la quantité vaut Q, on rend celle du lot entier, N × Q.
+ * Une quantité qui est déjà le total, ou un lot sans unité de poids ou de
+ * volume (« 2x7T »), reste telle quelle.
+ */
+export function contenanceDuLot(nom: string, quantite: number): number {
+  const m = nom.match(/(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|cl|ml|l)\b/i);
+  if (!m) return quantite;
+  const facteur = { kg: 1000, g: 1, cl: 10, ml: 1, l: 1000 }[m[3].toLowerCase() as 'kg' | 'g' | 'cl' | 'ml' | 'l'];
+  const unite = Number(m[2].replace(',', '.')) * facteur, n = Number(m[1]);
+  return n > 1 && Math.abs(unite - quantite) < 0.5 ? Math.round(unite * n) : quantite;
+}
+
 export function mapOffProduct(ean: string, data: OffData): FicheProduit | null {
   const name = (data.product_name ?? '').trim();
   if (!name) return null;
 
-  const quantite = Number(data.product_quantity);
+  const lue = Number(data.product_quantity);
+  const quantite = Number.isFinite(lue) && lue > 0 ? contenanceDuLot(name, lue) : lue;
   const valide = Number.isFinite(quantite) && quantite > 0;
   const categories = data.categories_tags ?? [];
   const liquide = estLiquide(name, categories);
