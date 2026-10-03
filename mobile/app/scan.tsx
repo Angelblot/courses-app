@@ -1,18 +1,18 @@
-import { useWizard } from '../../contexts/WizardContext';
+import { useWizard } from '../contexts/WizardContext';
 import { useCallback, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FicheScannee } from '../../components/FicheScannee';
-import { lookupEan, type FicheProduit, type ResultatRecherche } from '../../lib/openfoodfacts.ts';
-import { normalizeProductType } from '../../lib/typology.ts';
-import type { CleRayon } from '../../lib/rayons.ts';
-import { fileScan } from '../../stores/queue.ts';
-import { ajouterProduit, basculerFavori } from '../../stores/products';
-import { enregistrerScanFavori } from '../../lib/scan-favori.ts';
-import { colors, radius, spacing } from '../../lib/theme';
+import { FicheScannee } from '../components/FicheScannee';
+import { lookupEan, type FicheProduit, type ResultatRecherche } from '../lib/openfoodfacts.ts';
+import { normalizeProductType } from '../lib/typology.ts';
+import type { CleRayon } from '../lib/rayons.ts';
+import { fileScan } from '../stores/queue.ts';
+import { ajouterProduit, basculerFavori } from '../stores/products';
+import { enregistrerScanFavori } from '../lib/scan-favori.ts';
+import { colors, radius, spacing } from '../lib/theme';
 
 type Message = { texte: string; erreur: boolean };
 
@@ -24,7 +24,7 @@ export default function Scan() {
   const scanQty = Math.min(99, Math.max(1, Math.round(Number(quantite)) || 1));
   const w = useWizard();
   const pourListe = destination === 'liste';
-  const retour = <Pressable accessibilityRole="button" style={s.bouton} onPress={()=>router.replace(pourListe?(manque==='0'?'/wizard/exceptions':'/ajout'):'/favoris')}><Text style={s.boutonTexte}>Revenir à mes produits</Text></Pressable>;
+  const retour = <Pressable accessibilityRole="button" style={s.bouton} onPress={()=>router.canGoBack()?router.back():router.replace(pourListe?(manque==='0'?'/wizard/exceptions':'/ajout'):'/favoris')}><Text style={s.boutonTexte}>Revenir à mes produits</Text></Pressable>;
   const [cameraActive, setCameraActive] = useState(false);
   useFocusEffect(useCallback(() => { setCameraActive(true); return () => setCameraActive(false); }, []));
   const [permission, demanderPermission] = useCameraPermissions();

@@ -1,6 +1,6 @@
 import { Action, Photo, ui } from './MaisonUI';
-import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import type { Product } from '../stores/products';
@@ -46,8 +46,9 @@ function Champ({ libelle, valeur, onChange, placeholder, erreur }: {
 }
 
 /**
- * Fiche détaillée d'un produit, en feuille montant du bas (variante B : la
- * barre de Contacts). « Fermer » à gauche, « Modifier » à droite ; en
+ * Fiche détaillée d'un produit (variante B : la barre de Contacts), posée
+ * dans la feuille de la route `/produit/[id]`, qu'un appui long ouvre depuis
+ * n'importe quelle ligne de produit. « Fermer » à gauche, « Modifier » à droite ; en
  * modification, « Annuler » et « OK ». Actualiser et Supprimer vivent en
  * bas de la fiche, visibles sans menu.
  *
@@ -55,15 +56,17 @@ function Champ({ libelle, valeur, onChange, placeholder, erreur }: {
  * rien et allonge la fiche.
  */
 export function DetailProduit({
-  produit, produits, onFermer, onChange, onAjouter, onSupprime, ouverture = 'consulter',
+  produit, produits, onFermer, onChange, onAjouter, onSupprime, onEdition, ouverture = 'consulter',
 }: {
   produit: Product | null;
   /** Le catalogue, pour classer la référence et ses alternatives. */
   produits?: Product[];
   onFermer: () => void;
   onChange?: () => void;
-  /** Ajoute le produit à la liste de courses (depuis Mes produits). */
+  /** Ajoute le produit à la liste de courses. */
   onAjouter?: () => void;
+  /** La fiche passe en modification ou en sort : la feuille ne doit plus se fermer d'un glisser. */
+  onEdition?: (enCours: boolean) => void;
   /** Le produit vient d'être supprimé : l'appelant ferme et recharge. */
   onSupprime?: (p: Product) => void;
   ouverture?: OuvertureFiche;
@@ -74,6 +77,11 @@ export function DetailProduit({
   const [edition, setEdition] = useState(false);
   const [brouillon, setBrouillon] = useState({ name: '', brand: '', contenance: '', category: 'autre' as CleRayon });
   const [feuille, setFeuille] = useState<'actualiser' | 'supprimer' | null>(null);
+  useEffect(() => { onEdition?.(edition); }, [edition]);
+  // Supprimer ou actualiser choisi dans le menu d'appui long : annuler la
+  // feuille ramène à l'écran d'origine, pas à une fiche qu'on n'a pas demandée.
+  const directe = useRef(false);
+  const fermerFeuille = () => { setFeuille(null); if (directe.current) { directe.current = false; onFermer(); } };
 
   const commencerEdition = (p: Product) => {
     setBrouillon({ name: p.name, brand: p.brand ?? '', contenance: formaterContenance(p) ?? '', category: rayonDepuisLibelle(p.category) });
@@ -84,8 +92,9 @@ export function DetailProduit({
   useEffect(() => {
     setEdition(false); setFeuille(null); setErreur(null); setInfo(null);
     if (!produit) return;
+    directe.current = false;
     if (ouverture === 'modifier') commencerEdition(produit);
-    else if (ouverture === 'actualiser' || ouverture === 'supprimer') ouvrirFeuille(ouverture, produit);
+    else if (ouverture === 'actualiser' || ouverture === 'supprimer') { directe.current = !!(ouverture === 'supprimer' || produit.ean13); ouvrirFeuille(ouverture, produit); }
   }, [produit?.id, ouverture]);
 
   if (!produit) return null;
@@ -127,7 +136,7 @@ export function DetailProduit({
   };
 
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={edition ? () => setEdition(false) : onFermer}>
+    <>
       <SafeAreaView style={s.ecran} edges={['bottom']}>
         <View style={s.barre}>
           <Pressable accessibilityRole="button" onPress={edition ? () => { setEdition(false); setErreur(null); } : onFermer} style={[s.bouton, { alignItems: 'flex-start' }]}>
@@ -165,11 +174,11 @@ export function DetailProduit({
             {info && <Text accessibilityLiveRegion="polite" style={s.info}>{info}</Text>}
             {erreur && <Text accessibilityLiveRegion="polite" style={s.erreur}>{erreur}</Text>}
 
-            {onAjouter && <View style={s.actions}><Action onPress={onAjouter}>Ajouter à ma liste</Action></View>}
+            {onAjouter && <View style={s.actions}><Action onPress={() => { onAjouter(); setErreur(null); setInfo('Ajouté à ta liste.'); }}>Ajouter à ma liste</Action></View>}
 
             <PrixPaye key={`prix-${produit.id}`} produitId={produit.id} ean13={produit.ean13} />
             {produits && <ClassementProduit produit={produit} produits={produits} onChange={onChange} />}
-            {produits && <NuagePrix key={produit.id} reference={referenceDe(produit.id, produits) ?? produit} produits={produits} onChange={onChange} />}
+            {produits && <NuagePrix key={`nuage-${produit.id}`} reference={referenceDe(produit.id, produits) ?? produit} produits={produits} onChange={onChange} />}
             {produits && <ReglagesProduit produit={produit} produits={produits} onChange={onChange} />}
 
             <View style={s.fiche}>
@@ -196,11 +205,11 @@ export function DetailProduit({
         </ScrollView>
       </SafeAreaView>
 
-      <ActualiserSheet produit={produit} visible={feuille === 'actualiser'} onFermer={() => setFeuille(null)}
-        onApplique={(n) => { setFeuille(null); setInfo(n > 1 ? `${n} infos mises à jour.` : 'Fiche mise à jour.'); onChange?.(); }} />
-      <SupprimerSheet produit={produit} produits={produits ?? []} visible={feuille === 'supprimer'} onFermer={() => setFeuille(null)}
-        onSupprime={() => { setFeuille(null); onSupprime?.(produit); }} />
-    </Modal>
+      <ActualiserSheet produit={produit} visible={feuille === 'actualiser'} onFermer={fermerFeuille}
+        onApplique={(n) => { directe.current = false; setFeuille(null); setInfo(n > 1 ? `${n} infos mises à jour.` : 'Fiche mise à jour.'); onChange?.(); }} />
+      <SupprimerSheet produit={produit} produits={produits ?? []} visible={feuille === 'supprimer'} onFermer={fermerFeuille}
+        onSupprime={() => { directe.current = false; setFeuille(null); onSupprime?.(produit); }} />
+    </>
   );
 }
 

@@ -1,19 +1,20 @@
-import { ProductSuggestions, productSuggestion } from '../../components/ProductSuggestions';
+import { ProductSuggestions, productSuggestion } from '../components/ProductSuggestions';
 import { useState, useRef } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Head, Action, Photo, ui, useAnnulation } from '../../components/MaisonUI';
-import { revenirAuBilan } from '../../components/SessionProgress';
-import { ajouterProduit, basculerFavori } from '../../stores/products';
-import { useMaison } from '../../contexts/useMaison';
-import { lignesSimilaires } from '../../lib/session-courses';
-import { type FicheProduit } from '../../lib/openfoodfacts';
-import { useRechercheOff } from '../../hooks/useRechercheOff';
-import { nombreArticles } from '../../lib/ajouts-quotidiens';
-import { suggestionsFrequentes, type Frequent } from '../../lib/extras-frequents';
-import { colors } from '../../lib/theme';
+import { Head, Action, Photo, ui, useAnnulation } from '../components/MaisonUI';
+import { appuiLongFiche } from '../components/FicheAppuiLong';
+import { revenirAuBilan } from '../components/SessionProgress';
+import { ajouterProduit, basculerFavori } from '../stores/products';
+import { useMaison } from '../contexts/useMaison';
+import { lignesSimilaires } from '../lib/session-courses';
+import { type FicheProduit } from '../lib/openfoodfacts';
+import { useRechercheOff } from '../hooks/useRechercheOff';
+import { nombreArticles } from '../lib/ajouts-quotidiens';
+import { suggestionsFrequentes, type Frequent } from '../lib/extras-frequents';
+import { colors } from '../lib/theme';
 type Ajoute = { key: string; name: string; qty: number };
 // Sur le web, le navigateur trace son propre cadre de focus dans le champ ;
 // la bordure verte du champ entier le remplace. `none` n'est pas typé par RN.
@@ -55,7 +56,7 @@ export default function Ajout({session=false}:{session?:boolean}){
  </View>
  {saisie?<>
   {/* Une ligne proche existe : deux réponses de même poids, aucune ne décide à ta place. */}
-  {similaires.length>0&&<><Text style={ui.section}>Déjà dans ta liste</Text>{similaires.map(l=><View key={l.key} style={[ui.product,a.proche]}><View style={[ui.row,{width:'100%'}]}><Photo name={l.name} url={p.produits.find(x=>x.id===l.product_id)?.image_url}/><View style={{flex:1}}><Text style={ui.productName}>{l.name}</Text><Text style={ui.detail}>{[`${l.totalQuantity} dans ta liste`,...new Set(l.sources.map(s=>s.label))].join(' · ')}</Text></View></View>
+  {similaires.length>0&&<><Text style={ui.section}>Déjà dans ta liste</Text>{similaires.map(l=><View key={l.key} style={[ui.product,a.proche]}><Pressable {...appuiLongFiche({id:l.product_id})} style={[ui.row,{width:'100%'}]}><Photo name={l.name} url={p.produits.find(x=>x.id===l.product_id)?.image_url}/><View style={{flex:1}}><Text style={ui.productName}>{l.name}</Text><Text style={ui.detail}>{[`${l.totalQuantity} dans ta liste`,...new Set(l.sources.map(s=>s.label))].join(' · ')}</Text></View></Pressable>
    <View style={a.choix}>{choix(`${qty} de plus`,`${qty} de plus : ${l.name}, passer à ${l.totalQuantity+qty}`,()=>ajouterALigne(l))}{similaires.length===1&&choix('Noter à part',`Noter à part : ${saisie}`,()=>noterAPart(saisie))}</View></View>)}
    {similaires.length>1&&choix(`Noter « ${saisie} » à part`,`Noter à part : ${saisie}`,()=>noterAPart(saisie))}</>}
   {!similaires.length&&<View style={ui.sectionRow}><Text style={ui.productName}>Nombre d’articles</Text><View style={ui.counter}><Pressable accessibilityRole="button" accessibilityLabel={`Diminuer la quantité de ${saisie}`} style={ui.iconButton} onPress={()=>setQty(nombreArticles(qty-1))}><Text style={ui.title}>−</Text></Pressable><Text style={ui.num}>{qty}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Augmenter la quantité de ${saisie}`} style={ui.iconButton} onPress={()=>setQty(nombreArticles(qty+1))}><Text style={ui.title}>+</Text></Pressable></View></View>}

@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useWizard } from '../../contexts/WizardContext';
-import { rythme, type Ligne, type Piste } from '../../lib/comparateur';
-import { annulerEssai, essayer, usePistes } from '../../stores/pistes';
-import { Action, Head, Photo, ui, useAnnulation } from '../../components/MaisonUI';
-import { PastilleNutri } from '../../components/PastilleNutri';
-import { colors } from '../../lib/theme';
+import { useWizard } from '../contexts/WizardContext';
+import { rythme, type Ligne, type Piste } from '../lib/comparateur';
+import { annulerEssai, essayer, usePistes } from '../stores/pistes';
+import { Action, Head, Photo, ui, useAnnulation, EspaceBas } from '../components/MaisonUI';
+import { PastilleNutri } from '../components/PastilleNutri';
+import { appuiLongFiche, type CibleFiche } from '../components/FicheAppuiLong';
+import { colors } from '../lib/theme';
 
 const VERT = '#2F6B2F', BLEU = '#2E5683';
 const DRIVES = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' } as const;
@@ -32,7 +33,7 @@ function gain(p: Piste): { titre: string; valeur: string; suite: string; teinte:
 export default function Pistes() {
   const w = useWizard(), { pistes, produits, chargement, erreur, ecarter, retablir, recharger } = usePistes(w.compte);
   const annulation = useAnnulation();
-  const retour = () => { if (router.canGoBack()) router.back(); else router.replace('/compte'); };
+  const retour = () => { if (router.canGoBack()) router.back(); else router.dismissTo('/compte'); };
   const vuLe = pistes.reduce<string | null>((m, p) => (!m || p.alternative.vu_le > m ? p.alternative.vu_le : m), null);
   return <SafeAreaView edges={['top']} style={ui.screen}>
     <ScrollView contentContainerStyle={[ui.content, { paddingBottom: 40 }]}>
@@ -50,7 +51,7 @@ export default function Pistes() {
           annulation.proposer(`${p.alternative.libelle} sera essayé à la prochaine commande`, () => { if (r.avant) void annulerEssai(r.avant).then(recharger); });
           return null;
         }} />)}
-    </ScrollView>
+    <EspaceBas /></ScrollView>
     <View style={{ marginBottom: 8 }}>{annulation.toast}</View>
   </SafeAreaView>;
 }
@@ -60,8 +61,8 @@ function Carte({ piste, onEcarter, onEssayer }: { piste: Piste; onEcarter: () =>
   const g = gain(piste);
   return <View style={s.carte} accessibilityLabel={`${g.titre}, ${g.valeur} ${g.suite}`}>
     <View style={s.tete}><Text style={[s.sorte, { color: g.teinte }]}>{g.titre.toUpperCase()}</Text><Text style={[s.valeur, { color: g.teinte }]}>{g.valeur} <Text style={s.suite}>{g.suite}</Text></Text></View>
-    <Rang etiquette="Aujourd’hui" ligne={piste.reference} />
-    <Rang etiquette="À la place" ligne={piste.alternative} apres moinsCher={piste.ecart != null && piste.ecart < 0} />
+    <Rang etiquette="Aujourd’hui" ligne={piste.reference} cible={{ id: piste.produit.id }} />
+    <Rang etiquette="À la place" ligne={piste.alternative} cible={piste.alternative.product_id ? { id: piste.alternative.product_id } : null} apres moinsCher={piste.ecart != null && piste.ecart < 0} />
     <Text style={s.pourquoi}>Tu en prends {rythme(piste.parAn)}.{piste.type === 'nutrition' ? '' : piste.alternative.nutriscore && piste.alternative.nutriscore === piste.reference.nutriscore ? ' Même Nutri-Score.' : ''}</Text>
     {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { paddingHorizontal: 14, marginTop: 0 }]}>{erreur}</Text>}
     <View style={s.actions}>
@@ -74,9 +75,9 @@ function Carte({ piste, onEcarter, onEssayer }: { piste: Piste; onEcarter: () =>
   </View>;
 }
 
-function Rang({ etiquette, ligne, apres = false, moinsCher = false }: { etiquette: string; ligne: Ligne; apres?: boolean; moinsCher?: boolean }) {
+function Rang({ etiquette, ligne, cible, apres = false, moinsCher = false }: { etiquette: string; ligne: Ligne; cible: CibleFiche; apres?: boolean; moinsCher?: boolean }) {
   const parUnite = ligne.unite_prix === 'l' ? '/L' : ligne.unite_prix === 'kg' ? '/kg' : '/pièce';
-  return <View style={[s.rang, apres && s.rangApres]}>
+  return <Pressable {...appuiLongFiche(cible)} style={[s.rang, apres && s.rangApres]}>
     <Photo name={ligne.libelle} url={ligne.image_url} style={s.photo} />
     <View style={{ flex: 1, gap: 3 }}>
       <Text style={[s.etiquette, apres && { color: VERT }]}>{etiquette.toUpperCase()}</Text>
@@ -87,7 +88,7 @@ function Rang({ etiquette, ligne, apres = false, moinsCher = false }: { etiquett
       {ligne.prix != null && <Text style={s.prixTexte}>{euros(ligne.prix)}</Text>}
       {ligne.prix_unitaire != null && <Text style={[s.unitaire, moinsCher && { color: VERT, fontWeight: '700' }]}>{euros(ligne.prix_unitaire)}{parUnite}</Text>}
     </View>
-  </View>;
+  </Pressable>;
 }
 
 const s = StyleSheet.create({

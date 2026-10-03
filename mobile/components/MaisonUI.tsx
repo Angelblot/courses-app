@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { AccessibilityInfo, Image, Keyboard, Platform, Pressable, Text, TextInput, View, StyleSheet, type ImageStyle, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollView, type StyleProp } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useSegments } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../lib/theme';
 import { photoSecours } from '../lib/photos-maison';
 import { teinteAplat } from '../lib/image-produit';
@@ -24,7 +25,16 @@ export function Photo({name,url,style,recipe=false}:{name:string;url?:string|nul
 export function Action({children,onPress,secondary=false,disabled=false}:{children:ReactNode;onPress:()=>void;secondary?:boolean;disabled?:boolean}) {return <Pressable accessibilityRole="button" accessibilityState={{disabled}} disabled={disabled} onPress={onPress} style={[ui.button,secondary&&ui.secondary,disabled&&ui.disabled]}><Text style={[ui.buttonText,secondary&&{color:colors.accent},disabled&&{color:colors.offText}]}>{children}</Text></Pressable>}
 /** La raison d'un bouton bloqué, sous le bouton, avec le geste qui le débloque. */
 export function Raison({children,action,onPress}:{children:ReactNode;action?:string;onPress?:()=>void}) {return <View accessibilityLiveRegion="polite" style={ui.raison}><Text style={[ui.detail,{marginTop:0,textAlign:'center'}]}>{children}</Text>{!!action&&!!onPress&&<Pressable accessibilityRole="button" onPress={onPress} hitSlop={10}><Text style={ui.link}>{action}</Text></Pressable>}</View>}
-export function Head({title,back=false,onBack,action,avatar=true}:{title:string;back?:boolean;onBack?:()=>void;action?:ReactNode;avatar?:boolean}) {return <View style={ui.header}>{back&&<Pressable accessibilityRole="button" accessibilityLabel="Revenir aux courses" onPress={onBack??(()=>router.replace('/'))} style={ui.iconButton}><Feather name="chevron-left" size={24} color={colors.text}/></Pressable>}<Text accessibilityRole="header" style={[ui.title,{flex:1}]}>{title}</Text>{action??(avatar&&<Pressable accessibilityRole="button" accessibilityLabel="Réglages" onPress={()=>router.push('/compte')} style={ui.avatar}><Feather name="user" size={21} color="white"/></Pressable>)}</View>}
+/** Fin d'une liste défilante : de quoi dégager la barre d'accueil de l'iPhone. */
+export function EspaceBas(){const {bottom}=useSafeAreaInsets();return <View style={{height:bottom}}/>}
+/** Prolonge un pied d'écran blanc sous la barre d'accueil de l'iPhone. */
+export function BasDeLEcran(){const {bottom}=useSafeAreaInsets();return <View style={{height:bottom,backgroundColor:colors.surface}}/>}
+/**
+ * Rejoint un onglet. Depuis un onglet, on y saute ; depuis un écran empilé
+ * au-dessus, on dépile jusqu'aux onglets plutôt que d'en empiler un second jeu.
+ */
+export const versOnglet=(href:'/'|'/compte'|'/recettes',dansLesOnglets:boolean)=>dansLesOnglets?router.navigate(href):router.dismissTo(href);
+export function Head({title,back=false,onBack,action,avatar=true}:{title:string;back?:boolean;onBack?:()=>void;action?:ReactNode;avatar?:boolean}) {const onglet=useSegments()[0]==='(tabs)';const revenir=()=>router.canGoBack()?router.back():versOnglet('/',onglet);return <View style={ui.header}>{back&&<Pressable accessibilityRole="button" accessibilityLabel="Revenir" onPress={onBack??revenir} style={ui.iconButton}><Feather name="chevron-left" size={24} color={colors.text}/></Pressable>}<Text accessibilityRole="header" style={[ui.title,{flex:1}]}>{title}</Text>{action??(avatar&&<Pressable accessibilityRole="button" accessibilityLabel="Réglages" onPress={()=>versOnglet('/compte',onglet)} style={ui.avatar}><Feather name="user" size={21} color="white"/></Pressable>)}</View>}
 /**
  * Retour à l'étape d'avant, dans le pied, sous le pouce : un carré à contour
  * posé à gauche du bouton principal. Dépile si possible, sinon remplace.

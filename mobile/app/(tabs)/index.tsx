@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useMaison } from '../../contexts/useMaison';
 import { Head, Photo, Action, ui, useAnnulation } from '../../components/MaisonUI';
+import { appuiLongFiche } from '../../components/FicheAppuiLong';
 import { manquesDuBrouillon, manqueActif, SESSION_STEPS } from '../../lib/session-courses';
 import { usePistes } from '../../stores/pistes';
 export default function Maison(){
@@ -27,7 +28,7 @@ export default function Maison(){
  </Pressable>}
  <View style={ui.sectionRow}><Text style={ui.section}>Mes manques</Text>{manques.length>0&&<Pressable accessibilityRole="button" accessibilityLabel={`Tout voir, ${manques.length} produit${manques.length>1?'s':''}`} onPress={()=>router.push('/manques')} style={[ui.iconButton,{marginTop:14}]}><Text style={ui.link}>Tout voir</Text></Pressable>}</View>
  {loading&&<ActivityIndicator/>}{erreur&&<><Text style={ui.error}>{erreur}</Text><Action secondary onPress={()=>{p.recharger();r.recharger();}}>Réessayer</Action></>}{w.sauvegardeErreur&&<Text style={ui.error}>{w.sauvegardeErreur}</Text>}
- {manques.slice(0,4).map(([key,m])=>{const id=key.startsWith('produit:')?key.slice(8):undefined,prod=p.produits.find(p=>p.id===id),extra=w.extras.find(x=>`extra:${x.id}`===key);const nom=prod?.name??extra?.name??m.name,qty=id?w.quotidienQty[id]??1:extra?.quantity??1;return <Pressable key={key} accessibilityRole="button" accessibilityLabel={`${nom}, ${qty} article${qty>1?'s':''}. Modifier`} onPress={()=>router.push('/manques')} style={({pressed})=>[ui.product,pressed&&{opacity:.85}]}><Photo name={nom} url={prod?.image_url}/><View style={{flex:1}}><Text style={ui.productName}>{nom}</Text><Text style={ui.detail}>{sources[m.source]??'Noté'}</Text></View><Text style={ui.num}>× {qty}</Text><Feather name="chevron-right" size={18} color={colors.textMuted}/></Pressable>})}
+ {manques.slice(0,4).map(([key,m])=>{const id=key.startsWith('produit:')?key.slice(8):undefined,prod=p.produits.find(p=>p.id===id),extra=w.extras.find(x=>`extra:${x.id}`===key);const nom=prod?.name??extra?.name??m.name,qty=id?w.quotidienQty[id]??1:extra?.quantity??1;return <Pressable key={key} accessibilityRole="button" accessibilityLabel={`${nom}, ${qty} article${qty>1?'s':''}. Modifier`} onPress={()=>router.push('/manques')} {...appuiLongFiche(prod)} style={({pressed})=>[ui.product,pressed&&{opacity:.85}]}><Photo name={nom} url={prod?.image_url}/><View style={{flex:1}}><Text style={ui.productName}>{nom}</Text><Text style={ui.detail}>{sources[m.source]??'Noté'}</Text></View><Text style={ui.num}>× {qty}</Text><Feather name="chevron-right" size={18} color={colors.textMuted}/></Pressable>})}
  {!loading&&!manques.length&&<Text style={ui.subtitle}>Rien de noté pour le moment. Le prochain produit ajouté au widget apparaîtra ici.</Text>}
  <Pressable accessibilityRole="button" accessibilityLabel="Noter un manque…" onPress={()=>router.push('/ajout')} style={({pressed})=>[ui.product,a.noter,pressed&&{opacity:.85}]}><Feather name="plus" size={22} color={colors.accent}/><Text style={ui.link}>Noter un manque…</Text></Pressable>
  </ScrollView><View style={{marginBottom:8}}>{annulation.toast}</View></SafeAreaView>;

@@ -70,7 +70,7 @@ export default function Reinitialisation() {
       }
       // La session de récupération vaut session ordinaire : la garde de
       // `_layout.tsx` mènera à l'accueil dès qu'on quitte cette route.
-      router.replace('/');
+      router.dismissTo('/');
     } catch (err) {
       console.error('[reinitialisation]', err);
       setErreur(ERREUR_GENERIQUE);

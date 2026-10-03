@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Action, Head, Photo, ui } from '../../../components/MaisonUI';
-import { useCommandes } from '../../../stores/commandes';
-import { useImagesCommande } from '../../../stores/images-commande';
-import { comparerHistorique, ENSEIGNES, type Evolution } from '../../../lib/commandes.ts';
-import { euros, jourLong, moisCourt, pourcent, BAISSE, HAUSSE } from '../../../lib/format-commande.ts';
-import { colors } from '../../../lib/theme';
+import { Action, Head, Photo, ui, EspaceBas } from '../../components/MaisonUI';
+import { appuiLongFiche } from '../../components/FicheAppuiLong';
+import { useCommandes } from '../../stores/commandes';
+import { useImagesCommande } from '../../stores/images-commande';
+import { comparerHistorique, ENSEIGNES, type Evolution } from '../../lib/commandes.ts';
+import { euros, jourLong, moisCourt, pourcent, BAISSE, HAUSSE } from '../../lib/format-commande.ts';
+import { colors } from '../../lib/theme';
 
 type Filtre = 'tous' | 'changes' | 'nouveaux';
 const change = (e: Evolution) => e.ecart != null && Math.abs(e.ligne.prix! - e.avant!.prix) >= 0.01;
@@ -53,7 +54,7 @@ export default function ResumeCommande() {
           {!!nouveaux.length && <Puce actif={actif === 'nouveaux'} onPress={() => setFiltre('nouveaux')}>{`Nouveaux · ${nouveaux.length}`}</Puce>}
         </View>
         <View style={s.liste}>
-          {lignes.map((e, i) => <View key={`${e.ligne.drive}${e.ligne.libelle}${i}`} style={[s.ligne, i > 0 && s.separe]} accessible
+          {lignes.map((e, i) => <Pressable key={`${e.ligne.drive}${e.ligne.libelle}${i}`} {...appuiLongFiche({ id: e.ligne.product_id, ean13: e.ligne.ean13 })} style={({ pressed }) => [s.ligne, i > 0 && s.separe, pressed && { backgroundColor: colors.off }]} accessible
             accessibilityLabel={`${e.ligne.libelle}${e.ligne.prix != null ? `, ${euros(e.ligne.prix)}` : ''}${e.avant ? `, avant ${euros(e.avant.prix)} en ${moisCourt(e.avant.jour)}${e.ecart != null && change(e) ? `, ${pourcent(e.ecart)}` : ', même prix'}` : ', nouveau'}`}>
             <Photo name={e.ligne.libelle} url={image(e.ligne)} style={s.photo} />
             <View style={{ flex: 1, gap: 1 }}>
@@ -64,10 +65,10 @@ export default function ResumeCommande() {
               {e.ligne.prix != null ? <Text style={s.prixTexte}>{euros(e.ligne.prix)}</Text> : <Text style={s.detail}>prix inconnu</Text>}
               {e.ecart != null && change(e) && <Text style={[s.ecart, { color: e.ecart > 0 ? HAUSSE : BAISSE }]}>{pourcent(e.ecart)}</Text>}
             </View>
-          </View>)}
+          </Pressable>)}
         </View>
       </>}
-    </ScrollView>
+    <EspaceBas /></ScrollView>
   </SafeAreaView>;
 }
 

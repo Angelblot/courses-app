@@ -36,8 +36,17 @@ export type Product = {
 const CHAMPS =
   'id, ean13, name, brand, category, unit, favorite, image_url, grammage_g, volume_ml, product_type, nutriscore, alternatives, phrases_siri, vendu_chez';
 
+// Le dernier catalogue lu, partagé par tous les écrans montés. Un écran qui
+// s'ouvre (la fiche d'un appui long, Mes produits…) l'affiche aussitôt puis le
+// relit ; une modification faite dans la fiche rafraîchit aussi la liste restée
+// dessous. Vidé à la déconnexion, pour ne rien montrer d'un autre foyer.
+let dernierCatalogue: Product[] = [];
+const abonnes = new Set<(p: Product[]) => void>();
+const publier = (p: Product[]) => { dernierCatalogue = p; abonnes.forEach((f) => f(p)); };
+supabase.auth.onAuthStateChange((evenement) => { if (evenement === 'SIGNED_OUT') publier([]); });
+
 export function useProducts() {
-  const [produits, setProduits] = useState<Product[]>([]);
+  const [produits, setProduits] = useState<Product[]>(dernierCatalogue);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   // Compteur de génération : incrémenté à chaque appel de `recharger`. Empêche
@@ -69,11 +78,12 @@ export function useProducts() {
       setProduits([]);
     } else {
       setErreur(null);
-      setProduits(data as Product[]);
+      publier(data as Product[]);
     }
     setChargement(false);
   }, []);
 
+  useEffect(() => { abonnes.add(setProduits); return () => { abonnes.delete(setProduits); }; }, []);
   useEffect(() => { recharger(); }, [recharger]);
 
   return { produits, chargement, erreur, recharger };

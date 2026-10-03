@@ -43,7 +43,7 @@ export function EtapeRecettes() {
         <EtatVide titre="Aucune recette">
           Le wizard compose ta liste à partir de tes recettes. Crée-en une pour commencer.
         </EtatVide>
-        <Pressable style={s.lien} onPress={() => router.push('/recettes/nouvelle')}>
+        <Pressable style={s.lien} onPress={() => router.push('/nouvelle-recette')}>
           <Text style={s.lienTexte}>Créer une recette</Text>
         </Pressable>
       </View>

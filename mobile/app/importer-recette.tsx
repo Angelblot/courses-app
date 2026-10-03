@@ -5,16 +5,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useProducts } from '../../../stores/products';
-import { creerRecette, lireFicheRecette, recupererRecette } from '../../../stores/recipes';
+import { useProducts } from '../stores/products';
+import { creerRecette, lireFicheRecette, recupererRecette } from '../stores/recipes';
 import {
   UNITES, produitPropose, rayonPropose, valideBrouillon,
   type Brouillon, type IngredientBrouillon,
-} from '../../../lib/recette-brouillon.ts';
-import { analyserLigne, type RecetteImportee } from '../../../lib/import-recette.ts';
-import { choisirFiche } from '../../../lib/photo-recette';
-import { libelleRayon } from '../../../lib/rayons.ts';
-import { colors, radius, spacing } from '../../../lib/theme';
+} from '../lib/recette-brouillon.ts';
+import { analyserLigne, type RecetteImportee } from '../lib/import-recette.ts';
+import { choisirFiche } from '../lib/photo-recette';
+import { libelleRayon } from '../lib/rayons.ts';
+import { colors, radius, spacing } from '../lib/theme';
 
 /**
  * Un ingrédient de l'aperçu : le brouillon, plus de quoi le vérifier.
