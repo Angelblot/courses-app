@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useMaison } from '../contexts/useMaison';
-import { construireItems } from '../lib/consolidation';
+import { construireItems, separerAilleurs } from '../lib/consolidation';
 import { envoiExiste, envoyerListe } from '../lib/cart-jobs';
 import { nouvelIdEnvoi } from '../lib/id-envoi';
 import { Action, Raison, ui, nomDialogue } from './MaisonUI';
@@ -19,7 +19,11 @@ const DRIVES = [{ cle: 'carrefour', nom: 'Carrefour', site: 'carrefour.fr' }, { 
  * remplit le panier. Le bilan a déjà vérifié que la liste est prête.
  */
 export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: () => void }) {
- const insets = useSafeAreaInsets(), { w, acheter, p } = useMaison();
+ const insets = useSafeAreaInsets(), { w, acheter: tout, p } = useMaison();
+ // Ce qui s'achète ailleurs (marché, primeur…) ne part jamais au drive.
+ const { drive: acheter, ailleurs } = separerAilleurs(tout, p.produits);
+ const [horsDrive, setHorsDrive] = useState(ailleurs.length);
+ useEffect(() => { if (visible) setHorsDrive(ailleurs.length); }, [visible]);
  // Le nombre affiché est figé à l'ouverture : l'envoi vide la liste pendant que
  // la feuille se referme, et elle afficherait « 0 produit ».
  const [total, setTotal] = useState(acheter.length);
@@ -47,6 +51,8 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
   const aboutir = (id: string) => {
    const heure = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
    onFermer(); w.reinitialiser();
+   // Les produits achetés ailleurs restent dans la liste, pour la suite des courses.
+   for (const l of ailleurs) if (l.product_id) w.ajouterProduitListe(l.product_id, /^unit|^pi/i.test(l.unit ?? '') ? l.totalQuantity : 1, false);
    // Les onglets d'abord, puis le suivi par-dessus : son retour ramène aux courses.
    router.dismissTo('/');
    router.push({ pathname: '/suivi/envoye', params: { id, n: String(n), drives, heure } });
@@ -69,6 +75,7 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
    <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="Où fait-on les courses ?" onAccessibilityEscape={fermer}>
     <View style={s.entete}><Text style={[s.titre, { flex: 1, marginBottom: 0 }]} accessibilityRole="header">Où fait-on les courses ?</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer" accessibilityState={{ disabled: envoi }} disabled={envoi} onPress={fermer} hitSlop={6} style={[s.fermer, envoi && { opacity: .4 }]}><Feather name="x" size={22} color={colors.text} /></Pressable></View>
     <Text style={[ui.detail, { marginTop: 0, marginBottom: 12, paddingHorizontal: 4 }]}>{total} produit{total > 1 ? 's' : ''} à envoyer, dans un drive ou les deux.</Text>
+    {horsDrive > 0 && <View style={s.hors}><Feather name="map-pin" size={16} color={colors.textMuted} /><Text style={[ui.detail, { flex: 1, marginTop: 0 }]}>{horsDrive} produit{horsDrive > 1 ? 's' : ''} à acheter ailleurs ne part{horsDrive > 1 ? 'ent' : ''} pas au drive : {horsDrive > 1 ? 'ils restent' : 'il reste'} dans la liste.</Text></View>}
     <View style={{ gap: 10 }}>
      {DRIVES.map(d => { const coche = w.drives.includes(d.cle); return <Pressable key={d.cle} accessibilityRole="checkbox" accessibilityState={{ checked: coche, disabled: envoi }} aria-checked={coche} accessibilityLabel={d.nom} disabled={envoi} onPress={() => w.basculerDrive(d.cle)} style={({ pressed }) => [s.drive, coche && s.driveCoche, pressed && { opacity: .85 }]}>
       <View style={s.icone}><Feather name="shopping-bag" size={18} color={colors.accent} /></View>
@@ -83,8 +90,8 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
      {aide && <Text style={[ui.detail, { marginTop: 0, paddingHorizontal: 4 }]}>Ouvre Chrome et connecte l’extension Courses au même compte que sur ton iPhone. Après l’envoi, clique sur « Remplir le panier » dans l’extension. Tu vérifies puis paies sur le site du drive.</Text>}
      {!!erreur && <View ref={refErreur} tabIndex={-1} accessible accessibilityLabel={erreur}><Text accessibilityLiveRegion="polite" style={ui.error}>{erreur}</Text></View>}
      {envoi && <ActivityIndicator color={colors.accent} accessibilityLabel="Envoi en cours" />}
-     <Action disabled={envoi || !w.drives.length} onPress={envoyer}>{envoi ? 'Envoi en cours…' : 'Envoyer'}</Action>
-     {!w.drives.length && <Raison>Coche au moins un drive.</Raison>}
+     <Action disabled={envoi || !w.drives.length || !total} onPress={envoyer}>{envoi ? 'Envoi en cours…' : 'Envoyer'}</Action>
+     {!total ? <Raison>Tout s’achète ailleurs : rien à envoyer au drive.</Raison> : !w.drives.length && <Raison>Coche au moins un drive.</Raison>}
     </View>
    </View>
  </Feuille>;
@@ -101,5 +108,6 @@ const s = StyleSheet.create({
  icone: { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
  case: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.traitControle, alignItems: 'center', justifyContent: 'center' },
  caseCochee: { backgroundColor: colors.accent, borderColor: colors.accent },
+ hors: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: -4, marginBottom: 12, paddingHorizontal: 4 },
  info: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.surface },
 });

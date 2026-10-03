@@ -14,7 +14,8 @@ export type ProduitClasse = {
  /** Drive choisi à la main ; null = déduit de la marque. */
  vendu_chez?: VenduChez | null;
 };
-export type VenduChez = 'partout' | Enseigne;
+/** Où le produit s'achète : partout, sur un seul drive, ou hors drive (marché, primeur…). */
+export type VenduChez = 'partout' | Enseigne | 'ailleurs';
 export type Enseigne = 'carrefour' | 'leclerc';
 
 /** Produits cités comme alternative d'une autre référence. */
@@ -129,6 +130,11 @@ export function enseigneDeduite(p: { name: string; brand: string | null }): Ense
 
 /** L'enseigne à laquelle un produit est réservé, ou null s'il se trouve partout. Le choix manuel l'emporte. */
 export function enseigneExclusive(p: { name: string; brand: string | null; vendu_chez?: VenduChez | null }): Enseigne | null {
- if (p.vendu_chez) return p.vendu_chez === 'partout' ? null : p.vendu_chez;
+ if (p.vendu_chez) return p.vendu_chez === 'partout' || p.vendu_chez === 'ailleurs' ? null : p.vendu_chez;
  return enseigneDeduite(p);
+}
+
+/** Le produit s'achète hors drive : il ne part jamais dans un panier. */
+export function estAilleurs(p: { vendu_chez?: VenduChez | null } | null | undefined): boolean {
+ return p?.vendu_chez === 'ailleurs';
 }

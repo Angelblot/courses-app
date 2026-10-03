@@ -12,7 +12,7 @@ import {
 } from './unites.ts';
 import { normalizeProductType } from './typology.ts';
 import { rayonDepuisLibelle, RAYONS, type CleRayon } from './rayons.ts';
-import { classement, enseigneExclusive, type Enseigne, type ProduitClasse } from './references.ts';
+import { classement, enseigneExclusive, estAilleurs, type Enseigne, type ProduitClasse } from './references.ts';
 
 export type Source = { type: 'recipe' | 'quotidien' | 'extra'; label: string; qty: number };
 
@@ -428,7 +428,19 @@ export function construireItems(lignes: LigneConsolidee[], produits: (ProduitCla
     };
     const ref = l.product_id ? parId.get(l.product_id) : undefined;
     if (!ref) return item;
-    const [, ...alternatives] = classement(ref, produits);
+    // Une alternative achetée ailleurs ne peut pas prendre le relais au drive.
+    const [, ...alternatives] = classement(ref, produits).filter((p) => !estAilleurs(p));
     return { ...item, enseigne: enseigneExclusive(ref), grammage_g: ref.grammage_g ?? null, volume_ml: ref.volume_ml ?? null, alternatives: alternatives.map(essai) };
   });
+}
+
+/**
+ * Sépare ce qui part au drive de ce qui s'achète ailleurs (marché, primeur…) :
+ * une ligne dont le produit est réglé « ailleurs » ne part jamais dans un panier.
+ */
+export function separerAilleurs<L extends { product_id?: string | null }>(lignes: L[], produits: ProduitClasse[] = []): { drive: L[]; ailleurs: L[] } {
+  const ailleurs = new Set(produits.filter((p) => estAilleurs(p)).map((p) => p.id));
+  const drive: L[] = [], hors: L[] = [];
+  for (const l of lignes) (l.product_id && ailleurs.has(l.product_id) ? hors : drive).push(l);
+  return { drive, ailleurs: hors };
 }

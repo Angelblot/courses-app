@@ -2,7 +2,9 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { enseigneDeduite, phraseSiri, retenirPhrase, type VenduChez } from '../lib/references';
+import { enseigneDeduite, phraseSiri, retenirPhrase, type Enseigne, type VenduChez } from '../lib/references';
+import { categorieLiens, courtLiens, DRIVES_LIENS, etatDrive, resumeLiens, type EtatDrive } from '../lib/liens';
+import { marquerAbsent, useLiens } from '../stores/liens';
 import { enregistrerReglages, type Product } from '../stores/products';
 import { Feuille } from './Feuille';
 import { Action, ui } from './MaisonUI';
@@ -12,8 +14,17 @@ const DRIVES: { cle: VenduChez; titre: string; detail: string }[] = [
   { cle: 'partout', titre: 'Partout', detail: 'Carrefour et E.Leclerc' },
   { cle: 'carrefour', titre: 'Carrefour seulement', detail: 'Marque Carrefour, Reflets de France, Simpl…' },
   { cle: 'leclerc', titre: 'E.Leclerc seulement', detail: 'Marque Repère, Eco+, Bio Village…' },
+  { cle: 'ailleurs', titre: 'Ailleurs', detail: 'Marché, primeur… Ne part jamais au drive.' },
 ];
-const titreDrive = (c: VenduChez) => DRIVES.find(d => d.cle === c)!.titre;
+const LIEUX = ['Marché', 'Primeur', 'Boulangerie', 'Boucherie'];
+const titreDrive = (c: VenduChez, lieu?: string | null) => c === 'ailleurs' && lieu ? `Ailleurs · ${lieu}` : DRIVES.find(d => d.cle === c)!.titre;
+const NOMS: Record<Enseigne, string> = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' };
+const TEINTES: Record<Enseigne, string> = { carrefour: colors.accent, leclerc: '#2E5683' };
+const ETATS: Record<Exclude<EtatDrive, 'hors'>, { titre: string; detail: (d: Enseigne) => string }> = {
+  relie: { titre: 'Relié', detail: () => 'Déjà acheté, mis au panier ou fiche mémorisée.' },
+  absent: { titre: 'Absent', detail: () => 'Pas vendu sur ce drive : l’extension passe à l’alternative suivante.' },
+  aucun: { titre: 'Pas encore de lien', detail: d => d === 'carrefour' ? 'L’extension l’ouvrira par son code-barres.' : 'L’extension le cherchera par son nom.' },
+};
 
 /**
  * Deux réglages de la fiche (variante FS2) : les phrases qui appellent le
@@ -22,9 +33,13 @@ const titreDrive = (c: VenduChez) => DRIVES.find(d => d.cle === c)!.titre;
  */
 export function ReglagesProduit({ produit, produits, onChange }: { produit: Product; produits: Product[]; onChange?: () => void }) {
   const [phrases, setPhrases] = useState(produit.phrases_siri ?? []);
-  const [vendu, setVendu] = useState<VenduChez | null>(produit.vendu_chez ?? null);
-  useEffect(() => { setPhrases(produit.phrases_siri ?? []); setVendu(produit.vendu_chez ?? null); }, [produit.id]);
-  const [ouvert, setOuvert] = useState<'siri' | 'drive' | null>(null);
+  const [vendu, setVendu] = useState<VenduChez | null>(produit.vendu_chez ?? null), [lieu, setLieu] = useState<string | null>(produit.lieu_achat ?? null);
+  useEffect(() => { setPhrases(produit.phrases_siri ?? []); setVendu(produit.vendu_chez ?? null); setLieu(produit.lieu_achat ?? null); }, [produit.id]);
+  const [ouvert, setOuvert] = useState<'siri' | 'drive' | 'liens' | null>(null);
+  const liens = useLiens(produit.id);
+  const reel = { ...produit, vendu_chez: vendu };
+  const faits = liens.faits.get(produit.id);
+  const aucun = !liens.chargement && categorieLiens(reel, faits) === 'aucun';
   const deduit: VenduChez = enseigneDeduite(produit) ?? 'partout';
   const auto = produit.product_type && !phrases.some(x => phraseSiri(x) === phraseSiri(produit.product_type!)) ? produit.product_type : null;
   const resume = [auto, ...phrases].filter(Boolean).join(', ');
@@ -32,23 +47,71 @@ export function ReglagesProduit({ produit, produits, onChange }: { produit: Prod
   return <>
     <View style={s.carte}>
       <Ligne icone="mic" libelle="Siri" valeur={resume || 'Aucune phrase'} onPress={() => setOuvert('siri')} />
-      <Ligne icone="shopping-cart" libelle="Vendu chez" valeur={titreDrive(vendu ?? deduit)} onPress={() => setOuvert('drive')} derniere />
+      <Ligne icone="shopping-cart" libelle="Vendu chez" valeur={titreDrive(vendu ?? deduit, lieu)} onPress={() => setOuvert('drive')} />
+      <Ligne icone="link" libelle="Liens aux drives" valeur={liens.chargement ? '…' : courtLiens(reel, faits)} detail={resumeLiens(reel, faits)} alerte={aucun ? 'Aucun' : undefined}
+        onPress={() => setOuvert('liens')} derniere />
     </View>
+    <FeuilleLiens visible={ouvert === 'liens'} onFermer={() => setOuvert(null)} produit={reel} etats={DRIVES_LIENS.map(d => ({ drive: d, etat: etatDrive(reel, d, faits) }))}
+      erreur={liens.erreur} onChange={() => { void liens.recharger(); }} onAilleurs={() => setOuvert('drive')} />
     <FeuilleSiri visible={ouvert === 'siri'} onFermer={() => setOuvert(null)} produit={produit} produits={produits} auto={auto}
       phrases={phrases} onPhrases={p => { setPhrases(p); onChange?.(); }} />
-    <FeuilleDrive visible={ouvert === 'drive'} onFermer={() => setOuvert(null)} produit={produit} deduit={deduit} vendu={vendu}
-      onVendu={v => { setVendu(v); onChange?.(); }} />
+    <FeuilleDrive visible={ouvert === 'drive'} onFermer={() => setOuvert(null)} produit={produit} deduit={deduit} vendu={vendu} lieu={lieu}
+      onVendu={(v, l) => { setVendu(v); setLieu(l); onChange?.(); }} />
   </>;
 }
 
-function Ligne({ icone, libelle, valeur, onPress, derniere = false }: { icone: 'mic' | 'shopping-cart'; libelle: string; valeur: string; onPress: () => void; derniere?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={`${libelle} : ${valeur}. Modifier`} onPress={onPress}
+function Ligne({ icone, libelle, valeur, detail, onPress, derniere = false, alerte }: { icone: 'mic' | 'shopping-cart' | 'link'; libelle: string; valeur: string; detail?: string; onPress: () => void; derniere?: boolean; alerte?: string }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={`${libelle} : ${alerte ? `${alerte}. ` : ''}${detail ?? valeur}. Modifier`} onPress={onPress}
     style={({ pressed }) => [s.ligne, !derniere && s.separee, pressed && { opacity: .85 }]}>
     <Feather name={icone} size={18} color={colors.accent} />
     <Text style={s.libelle}>{libelle}</Text>
-    <Text style={s.valeur} numberOfLines={1}>{valeur}</Text>
+    {!!valeur && <Text style={s.valeur} numberOfLines={1}>{valeur}</Text>}
+    {!!alerte && <Text style={s.alerte}>{alerte}</Text>}
     <Feather name="chevron-right" size={18} color={colors.textMuted} />
   </Pressable>;
+}
+
+/**
+ * Les liens aux drives (variante LF1) : l'état de chaque drive, et les gestes
+ * qui le règlent — le marquer absent, ou acheter le produit ailleurs.
+ */
+function FeuilleLiens({ visible, onFermer, produit, etats, erreur, onChange, onAilleurs }: {
+  visible: boolean; onFermer: () => void; produit: Product; etats: { drive: Enseigne; etat: EtatDrive }[];
+  erreur: string | null; onChange: () => void; onAilleurs: () => void;
+}) {
+  const [envoi, setEnvoi] = useState<Enseigne | null>(null), [probleme, setProbleme] = useState<string | null>(null);
+  useEffect(() => { if (visible) setProbleme(null); }, [visible]);
+  const basculer = async (drive: Enseigne, absent: boolean) => {
+    setEnvoi(drive); setProbleme(null);
+    const r = await marquerAbsent(produit.id, drive, absent, produit.name);
+    setEnvoi(null);
+    if (!r.ok) { setProbleme(r.erreur ?? null); return; }
+    onChange();
+  };
+  const ailleurs = produit.vendu_chez === 'ailleurs';
+  const visibles = etats.filter(e => e.etat !== 'hors');
+  return <Feuille visible={visible} onFermer={onFermer} nom="Liens aux drives">
+    <Panneau titre="Liens aux drives" onFermer={onFermer}>
+      {ailleurs ? <Text style={[ui.detail, s.marge]}>Ce produit s’achète hors drive : il ne part jamais dans un panier.</Text>
+        : <View style={s.liste}>
+          {visibles.map((e, i) => { const t = ETATS[e.etat as Exclude<EtatDrive, 'hors'>];
+            return <View key={e.drive} style={[s.drive, i < visibles.length - 1 && s.separee]} accessible={false}>
+              <Text style={[s.etiquette, { backgroundColor: TEINTES[e.drive] }]}>{NOMS[e.drive]}</Text>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={ui.productName}>{t.titre}</Text>
+                <Text style={[ui.detail, { marginTop: 0 }]}>{t.detail(e.drive)}</Text>
+              </View>
+              {e.etat !== 'relie' && <Pressable accessibilityRole="button" disabled={!!envoi} onPress={() => { void basculer(e.drive, e.etat === 'aucun'); }}
+                accessibilityLabel={e.etat === 'aucun' ? `Marquer absent chez ${NOMS[e.drive]}` : `Il est vendu chez ${NOMS[e.drive]}`} style={({ pressed }) => [s.geste, pressed && { opacity: .8 }]}>
+                <Text style={ui.link}>{e.etat === 'aucun' ? 'Marquer absent' : 'Il y est vendu'}</Text>
+              </Pressable>}
+            </View>; })}
+          {!visibles.length && <View style={s.drive}><Text style={ui.detail}>Aucun drive à régler.</Text></View>}
+        </View>}
+      {!!(probleme ?? erreur) && <Text accessibilityLiveRegion="polite" style={[ui.error, s.marge]}>{probleme ?? erreur}</Text>}
+      <Action secondary onPress={() => { onFermer(); setTimeout(onAilleurs, 350); }}>{ailleurs ? 'Changer où l’acheter' : 'Je l’achète ailleurs'}</Action>
+    </Panneau>
+  </Feuille>;
 }
 
 function Panneau({ titre, onFermer, children }: { titre: string; onFermer: () => void; children: ReactNode }) {
@@ -106,10 +169,12 @@ function FeuilleSiri({ visible, onFermer, produit, produits, auto, phrases, onPh
   </Feuille>;
 }
 
-function FeuilleDrive({ visible, onFermer, produit, deduit, vendu, onVendu }: {
-  visible: boolean; onFermer: () => void; produit: Product; deduit: VenduChez; vendu: VenduChez | null; onVendu: (v: VenduChez | null) => void;
+function FeuilleDrive({ visible, onFermer, produit, deduit, vendu, lieu, onVendu }: {
+  visible: boolean; onFermer: () => void; produit: Product; deduit: VenduChez; vendu: VenduChez | null; lieu: string | null;
+  onVendu: (v: VenduChez | null, lieu: string | null) => void;
 }) {
-  const [erreur, setErreur] = useState<string | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null), [autre, setAutre] = useState('');
+  useEffect(() => { if (visible) { setErreur(null); setAutre(lieu && !LIEUX.includes(lieu) ? lieu : ''); } }, [visible]);
   const actuel = vendu ?? deduit;
   const marque = produit.brand || produit.name;
   const origine = vendu && vendu !== deduit ? 'Réglé par toi.' : deduit === 'partout'
@@ -118,9 +183,17 @@ function FeuilleDrive({ visible, onFermer, produit, deduit, vendu, onVendu }: {
   const choisir = async (cle: VenduChez) => {
     // Revenir à la valeur déduite efface le réglage : la marque reprend la main.
     const valeur = cle === deduit ? null : cle;
-    const r = await enregistrerReglages([{ id: produit.id, vendu_chez: valeur }]);
+    const l = cle === 'ailleurs' ? lieu : null;
+    const r = await enregistrerReglages([{ id: produit.id, vendu_chez: valeur, lieu_achat: l }]);
     if (!r.ok) { setErreur(r.erreur ?? null); return; }
-    setErreur(null); onVendu(valeur); onFermer();
+    setErreur(null); onVendu(valeur, l);
+    // « Ailleurs » laisse la feuille ouverte : on y précise le lieu.
+    if (cle !== 'ailleurs') onFermer();
+  };
+  const choisirLieu = async (l: string | null) => {
+    const r = await enregistrerReglages([{ id: produit.id, vendu_chez: 'ailleurs', lieu_achat: l }]);
+    if (!r.ok) { setErreur(r.erreur ?? null); return; }
+    setErreur(null); onVendu('ailleurs', l);
   };
   return <Feuille visible={visible} onFermer={onFermer} nom="Vendu chez">
     <Panneau titre="Vendu chez" onFermer={onFermer}>
@@ -135,6 +208,16 @@ function FeuilleDrive({ visible, onFermer, produit, deduit, vendu, onVendu }: {
           </Pressable>;
         })}
       </View>
+      {actuel === 'ailleurs' && <View style={{ gap: 8 }}>
+        <Text style={[ui.detail, s.marge]}>Où l’acheter ? (facultatif)</Text>
+        <View style={s.lieux}>
+          {LIEUX.map(x => { const on = lieu === x;
+            return <Pressable key={x} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => { void choisirLieu(on ? null : x); }}
+              style={[s.lieu, on && s.lieuOn]}><Text style={[s.lieuTexte, on && { color: colors.accentContrast }]}>{x}</Text></Pressable>; })}
+        </View>
+        <TextInput style={ui.input} value={autre} onChangeText={setAutre} placeholder="Autre lieu, par exemple « Biocoop »" accessibilityLabel="Autre lieu d’achat"
+          returnKeyType="done" onSubmitEditing={() => { if (autre.trim()) void choisirLieu(autre.trim()); }} />
+      </View>}
       <Text style={[ui.detail, s.marge]}>Un produit réservé à un drive n’est pas cherché sur l’autre : l’extension passe à l’alternative suivante.</Text>
       {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, s.marge]}>{erreur}</Text>}
     </Panneau>
@@ -159,4 +242,12 @@ const s = StyleSheet.create({
   choix: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, paddingHorizontal: 4 },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.traitControle },
   radioCoche: { borderWidth: 7, borderColor: colors.accent },
+  alerte: { marginLeft: 'auto', fontSize: 11, fontWeight: '700', color: colors.attentionText, backgroundColor: colors.attentionSoft, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden' },
+  drive: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 64, paddingVertical: 8 },
+  etiquette: { fontSize: 11, fontWeight: '800', color: '#FFFFFF', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
+  geste: { minHeight: 44, justifyContent: 'center', paddingLeft: 6 },
+  lieux: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 4 },
+  lieu: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, justifyContent: 'center', backgroundColor: colors.off },
+  lieuOn: { backgroundColor: colors.text },
+  lieuTexte: { fontSize: 14, fontWeight: '600', color: colors.text },
 });

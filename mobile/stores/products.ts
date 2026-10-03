@@ -31,10 +31,12 @@ export type Product = {
   phrases_siri?: string[] | null;
   /** Drive choisi à la main ; null = déduit de la marque. */
   vendu_chez?: VenduChez | null;
+  /** Où l'acheter quand il s'achète hors drive (« Marché »). */
+  lieu_achat?: string | null;
 };
 
 const CHAMPS =
-  'id, ean13, name, brand, category, unit, favorite, image_url, grammage_g, volume_ml, product_type, nutriscore, alternatives, phrases_siri, vendu_chez';
+  'id, ean13, name, brand, category, unit, favorite, image_url, grammage_g, volume_ml, product_type, nutriscore, alternatives, phrases_siri, vendu_chez, lieu_achat';
 
 // Le dernier catalogue lu, partagé par tous les écrans montés. Un écran qui
 // s'ouvre (la fiche d'un appui long, Mes produits…) l'affiche aussitôt puis le
@@ -213,7 +215,7 @@ export async function enregistrerAlternatives(
 
 /** Enregistre les phrases Siri ou le drive de produits, ligne par ligne. */
 export async function enregistrerReglages(
-  ecritures: ({ id: string } & Partial<Pick<Product, 'phrases_siri' | 'vendu_chez'>>)[],
+  ecritures: ({ id: string } & Partial<Pick<Product, 'phrases_siri' | 'vendu_chez' | 'lieu_achat'>>)[],
 ): Promise<{ ok: boolean; erreur?: string }> {
   for (const { id, ...champs } of ecritures) {
     const { error } = await supabase.from('products').update(champs).eq('id', id);
