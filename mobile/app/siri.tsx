@@ -2,14 +2,14 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { nativeInbox } from '../../lib/native-inbox';
-import { Action, Head, ui } from '../../components/MaisonUI';
-import { colors } from '../../lib/theme';
-import { LiaisonRappels } from '../../components/LiaisonRappels';
+import { nativeInbox } from '../lib/native-inbox';
+import { Action, Head, ui, EspaceBas } from '../components/MaisonUI';
+import { colors } from '../lib/theme';
+import { LiaisonRappels } from '../components/LiaisonRappels';
 
 /** Mode d'emploi de Siri et du widget, ouvert depuis Réglages. */
 export default function Siri() {
-  const retour = () => { if (router.canGoBack()) router.back(); else router.replace('/compte'); };
+  const retour = () => { if (router.canGoBack()) router.back(); else router.dismissTo('/compte'); };
   return <SafeAreaView edges={['top']} style={ui.screen}>
     <ScrollView contentContainerStyle={s.corps}>
       <Head title="Siri et widget" back onBack={retour} avatar={false} />
@@ -28,7 +28,7 @@ export default function Siri() {
         <Text style={s.texte}>Ouvre une première fois l’app pour que le widget connaisse tes produits.</Text>
       </View>
       <Action secondary onPress={() => router.push('/ajout')}>Essayer l’ajout rapide</Action>
-    </ScrollView>
+    <EspaceBas /></ScrollView>
   </SafeAreaView>;
 }
 

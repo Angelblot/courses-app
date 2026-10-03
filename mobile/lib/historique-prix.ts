@@ -147,3 +147,26 @@ export function reperesPrix(valeurs: number[]): { min: number; max: number; repe
   if (reperes.length < 2) reperes.push(Math.round((min + pas) * 100) / 100);
   return { min: reperes[0], max: reperes.at(-1)!, reperes };
 }
+
+export type PrixUnitaire = { valeur: number; unite: 'kg' | 'L' };
+
+/** Le prix ramené au kilo (ou au litre) d'après la contenance du produit, arrondi au centime. */
+export function prixAuKilo(prix: number | null | undefined, grammageG: number | null | undefined, volumeMl: number | null | undefined): PrixUnitaire | null {
+  if (prix == null) return null;
+  if (grammageG) return { valeur: Math.round((prix / grammageG) * 100000) / 100, unite: 'kg' };
+  if (volumeMl) return { valeur: Math.round((prix / volumeMl) * 100000) / 100, unite: 'L' };
+  return null;
+}
+
+/**
+ * Pour un comparatif : les colonnes au prix unitaire le plus bas. Rien quand
+ * moins de deux prix sont connus, quand les unités diffèrent (kilo contre
+ * litre) ou quand tous se valent.
+ */
+export function moinsChers(prix: (PrixUnitaire | null)[]): number[] {
+  const connus = prix.flatMap((p, i) => (p ? [{ ...p, i }] : []));
+  if (connus.length < 2 || new Set(connus.map(p => p.unite)).size > 1) return [];
+  const min = Math.min(...connus.map(p => p.valeur));
+  if (connus.every(p => p.valeur === min)) return [];
+  return connus.filter(p => p.valeur === min).map(p => p.i);
+}

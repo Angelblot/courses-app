@@ -47,8 +47,9 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
   const aboutir = (id: string) => {
    const heure = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
    onFermer(); w.reinitialiser();
-   if (router.canDismiss()) router.dismissAll();
-   router.replace({ pathname: '/suivi/envoye', params: { id, n: String(n), drives, heure } });
+   // Les onglets d'abord, puis le suivi par-dessus : son retour ramène aux courses.
+   router.dismissTo('/');
+   router.push({ pathname: '/suivi/envoye', params: { id, n: String(n), drives, heure } });
   };
   // La liste est partie ou non, on le sait par son identifiant ; dans le
   // doute, on ne vide rien et le même identifiant sert au nouvel essai.

@@ -3,6 +3,7 @@ import type { ComparaisonHistorique, Evolution } from '../lib/commandes.ts';
 import { ENSEIGNES } from '../lib/commandes.ts';
 import { euros, moisCourt, pourcent, teinteEcart, BAISSE, HAUSSE } from '../lib/format-commande.ts';
 import { Photo } from './MaisonUI';
+import { appuiLongFiche } from './FicheAppuiLong';
 import { colors } from '../lib/theme';
 
 /**
@@ -38,7 +39,7 @@ export function ComparaisonCommande({ comparaison: c, drive, image, onVoir }: {
       {!!c.stables && <View style={{ width: part(c.stables), backgroundColor: '#C9CEC4' }} />}
       {!!c.hausses && <View style={{ width: part(c.hausses), backgroundColor: HAUSSE }} />}
     </View>
-    {montres.map(e => <View key={`${e.ligne.drive}${e.ligne.libelle}`} style={s.ligne} accessible
+    {montres.map(e => <Pressable key={`${e.ligne.drive}${e.ligne.libelle}`} {...appuiLongFiche({ id: e.ligne.product_id, ean13: e.ligne.ean13 })} style={({ pressed }) => [s.ligne, pressed && { backgroundColor: colors.off }]} accessible
       accessibilityLabel={`${e.ligne.libelle}, ${euros(e.avant!.prix)} puis ${euros(e.ligne.prix!)}, ${pourcent(e.ecart!)}`}>
       <Photo name={e.ligne.libelle} url={image(e)} style={s.photo} />
       <View style={{ flex: 1, gap: 1 }}>
@@ -46,7 +47,7 @@ export function ComparaisonCommande({ comparaison: c, drive, image, onVoir }: {
         <Text style={s.detail}>{euros(e.avant!.prix)} → {euros(e.ligne.prix!)} · {moisCourt(e.avant!.jour)}</Text>
       </View>
       <Text style={[s.delta, { color: e.ecart! > 0 ? HAUSSE : BAISSE }]}>{pourcent(e.ecart!)}</Text>
-    </View>)}
+    </Pressable>)}
     <Pressable accessibilityRole="button" onPress={onVoir} style={({ pressed }) => [s.lien, pressed && { backgroundColor: colors.off }]}>
       <Text style={s.lienTexte}>Voir les {c.communs + c.nouveaux} produits</Text>
     </Pressable>

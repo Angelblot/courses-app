@@ -3,15 +3,17 @@ import { Tabs, usePathname } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { BandeauSuivi } from '../../components/BandeauSuivi';
 import { colors } from '../../lib/theme';
+
+/**
+ * Les trois onglets, et eux seuls. Tout écran ouvert depuis l'un d'eux (Mes
+ * produits, une commande, l'assistant…) vit dans la pile racine, au-dessus :
+ * revenir en arrière y ramène à l'écran précédent, pas au premier onglet.
+ */
 export default function TabsLayout() {
   const path = usePathname();
-  // Les écrans ouverts depuis Réglages gardent l'onglet Réglages allumé.
-  const reglages = ['/compte', '/membres', '/siri', '/favoris'].some(p => path.startsWith(p));
-  const courses = !path.startsWith('/recettes') && !reglages;
-  return <View style={{ flex: 1 }}><Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.accent, tabBarInactiveTintColor: colors.textMuted, tabBarStyle: { display: path.endsWith('/modifier') || path.startsWith('/wizard') || path === '/suivi/envoye' ? 'none' : 'flex', backgroundColor: colors.surface, borderTopColor: colors.border } }}>
-    <Tabs.Screen name="index" options={{ title: 'Courses', tabBarAccessibilityLabel: 'Courses', tabBarLabelStyle: { color: courses ? colors.accent : colors.textMuted }, tabBarIcon: ({color,size}) => <Feather name="shopping-cart" color={courses ? colors.accent : color} size={size}/> }}/>
-    <Tabs.Screen name="recettes" options={{ title: 'Recettes', tabBarAccessibilityLabel: 'Recettes', tabBarIcon: ({color,size}) => <Feather name="book-open" color={color} size={size}/> }}/>
-    <Tabs.Screen name="compte" options={{ title: 'Réglages', tabBarAccessibilityLabel: 'Réglages', tabBarLabelStyle: { color: reglages ? colors.accent : colors.textMuted }, tabBarIcon: ({size}) => <Feather name="settings" color={reglages ? colors.accent : colors.textMuted} size={size}/> }}/>
-    <Tabs.Screen name="manques" options={{ href: null }}/><Tabs.Screen name="ajout" options={{ href: null }}/><Tabs.Screen name="habitudes" options={{ href: null }}/><Tabs.Screen name="scan" options={{ href: null }}/><Tabs.Screen name="membres" options={{ href: null }}/><Tabs.Screen name="siri" options={{ href: null }}/><Tabs.Screen name="pistes" options={{ href: null }}/><Tabs.Screen name="favoris" options={{ href: null }}/><Tabs.Screen name="liste" options={{ href: null }}/><Tabs.Screen name="wizard" options={{ href: null }}/><Tabs.Screen name="suivi" options={{ href: null }}/><Tabs.Screen name="commandes" options={{ href: null }}/>
-  </Tabs>{/* « Panier rempli » montre déjà le suivi, et le bandeau y cacherait « Terminer ». */}{path !== '/suivi/envoye' && <BandeauSuivi/>}</View>;
+  return <View style={{ flex: 1 }}><Tabs backBehavior="history" screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.accent, tabBarInactiveTintColor: colors.textMuted, tabBarStyle: { display: path.endsWith('/modifier') ? 'none' : 'flex', backgroundColor: colors.surface, borderTopColor: colors.border } }}>
+    <Tabs.Screen name="index" options={{ title: 'Courses', tabBarAccessibilityLabel: 'Courses', tabBarIcon: ({ color, size }) => <Feather name="shopping-cart" color={color} size={size} /> }} />
+    <Tabs.Screen name="recettes" options={{ title: 'Recettes', tabBarAccessibilityLabel: 'Recettes', tabBarIcon: ({ color, size }) => <Feather name="book-open" color={color} size={size} /> }} />
+    <Tabs.Screen name="compte" options={{ title: 'Réglages', tabBarAccessibilityLabel: 'Réglages', tabBarIcon: ({ color, size }) => <Feather name="settings" color={color} size={size} /> }} />
+  </Tabs><BandeauSuivi /></View>;
 }

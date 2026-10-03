@@ -1,6 +1,6 @@
 import type { ErrorBoundaryProps } from 'expo-router';
 import { Stack } from 'expo-router';
-import { EcranErreur } from '../../../components/EcranErreur';
+import { EcranErreur } from '../../components/EcranErreur';
 
 export default function CommandesLayout() {
   return <Stack screenOptions={{ headerShown: false }} />;

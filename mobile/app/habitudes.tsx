@@ -1,17 +1,18 @@
-import { instantaneHabitude, manqueActif, type InstantaneHabitude } from '../../lib/session-courses';
+import { instantaneHabitude, manqueActif, type InstantaneHabitude } from '../lib/session-courses';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { colors } from '../../lib/theme';
+import { colors } from '../lib/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { Head, Photo, Action, ui, useAnnulation } from '../../components/MaisonUI';
-import { revenirAuBilan } from '../../components/SessionProgress';
-import { useProducts } from '../../stores/products';
-import { useWizard } from '../../contexts/WizardContext';
-import { RAYONS, rayonDepuisLibelle } from '../../lib/rayons';
-import { nombreArticles } from '../../lib/ajouts-quotidiens';
-import { references } from '../../lib/references';
+import { BasDeLEcran, Head, Photo, Action, ui, useAnnulation } from '../components/MaisonUI';
+import { appuiLongFiche } from '../components/FicheAppuiLong';
+import { revenirAuBilan } from '../components/SessionProgress';
+import { useProducts } from '../stores/products';
+import { useWizard } from '../contexts/WizardContext';
+import { RAYONS, rayonDepuisLibelle } from '../lib/rayons';
+import { nombreArticles } from '../lib/ajouts-quotidiens';
+import { references } from '../lib/references';
 /**
  * Habitudes : une liste à cocher par rayon. On touche ce qu'il faut acheter ;
  * le reste du rayon est considéré comme déjà à la maison quand on passe au
@@ -55,10 +56,10 @@ export default function Habitudes({session=false}:{session?:boolean}){
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><View style={{paddingHorizontal:20,paddingTop:session?4:20,paddingBottom:4}}><Head title="Mes habitudes" back={!session} avatar={!session}/></View>
  <View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8,paddingHorizontal:20,paddingTop:session?8:0,paddingBottom:8}}>{categories.map(c=>{const actif=cat?.cle===c.cle,ok=fini(c.cle)&&!actif;return <Pressable key={c.cle} accessibilityRole="tab" accessibilityState={{selected:actif}} aria-selected={actif} accessibilityLabel={`${c.label}${ok?', passé en revue':''}`} onPress={()=>allerA(c.cle)} style={[h.rayon,actif&&{backgroundColor:colors.accent,borderColor:colors.accent}]}>{ok&&<Feather name="check" size={15} color={colors.accent}/>}<Text style={{color:actif?colors.accentContrast:colors.accent,fontWeight:'600'}}>{c.label}</Text></Pressable>;})}</ScrollView></View>
  <ScrollView contentContainerStyle={[ui.content,{paddingTop:4,gap:8}]}>
- {p.chargement&&<ActivityIndicator/>}{p.erreur&&<><Text style={ui.error}>{p.erreur}</Text><Action secondary onPress={p.recharger}>Réessayer</Action></>}
+ {p.chargement&&!p.produits.length&&<ActivityIndicator/>}{p.erreur&&<><Text style={ui.error}>{p.erreur}</Text><Action secondary onPress={p.recharger}>Réessayer</Action></>}
  {cat&&items.length>0&&<Text style={ui.detail}>Touche ce qu’il te faut. Le reste est considéré comme déjà chez toi.</Text>}
  {items.map(x=>{const pris=x.id in choix,q=choix[x.id]??1,detail=[x.brand,x.grammage_g?`${x.grammage_g} g`:x.volume_ml?`${x.volume_ml} ml`:null].filter(Boolean).join(' · ');return <View key={x.id} style={[h.ligne,pris&&h.ligneOn]}>
-  <Pressable accessibilityRole="checkbox" accessibilityState={{checked:pris}} aria-checked={pris} accessibilityLabel={x.name} onPress={()=>basculer(x.id)} style={[ui.row,{flex:1,minHeight:52}]}>
+  <Pressable accessibilityRole="checkbox" accessibilityState={{checked:pris}} aria-checked={pris} accessibilityLabel={x.name} onPress={()=>basculer(x.id)} {...appuiLongFiche(x)} style={[ui.row,{flex:1,minHeight:52}]}>
    <Photo name={x.name} url={x.image_url} style={h.photo}/>
    <View style={{flex:1}}><Text style={ui.productName}>{x.name}</Text>{!!detail&&<Text style={[ui.detail,{marginTop:1}]}>{detail}</Text>}</View>
    {!pris&&<View style={h.case}/>}
@@ -68,7 +69,7 @@ export default function Habitudes({session=false}:{session?:boolean}){
  {cat&&!items.length&&!p.chargement&&<Text style={ui.subtitle}>Rien à passer en revue dans ce rayon : ses produits sont déjà dans tes manques.</Text>}
  {!cat&&!p.chargement&&!p.erreur&&<><Text style={ui.heading}>Tes habitudes commencent ici.</Text><Text style={ui.subtitle}>Enregistre tes produits préférés avec le scanner.</Text><Action secondary onPress={()=>router.push('/scan')}>Scanner un premier favori</Action></>}
  </ScrollView>
- <View style={ui.footer}>{annulation.toast}<Action onPress={valider}>{libelle}</Action></View></SafeAreaView>
+ <View style={ui.footer}>{annulation.toast}<Action onPress={valider}>{libelle}</Action></View>{!session&&<BasDeLEcran/>}</SafeAreaView>
 }
 const h=StyleSheet.create({
  rayon:{minHeight:44,flexDirection:'row',alignItems:'center',gap:5,paddingHorizontal:14,borderRadius:22,backgroundColor:colors.accentSoft,borderWidth:1,borderColor:colors.traitControle},

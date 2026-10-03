@@ -3,14 +3,14 @@ import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Te
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Action, Photo, ui } from '../../../components/MaisonUI';
-import { Portions, rs } from '../../../components/RecipeUI';
-import { SelecteurIngredient, type ChoixIngredient } from '../../../components/SelecteurIngredient';
-import { useProducts } from '../../../stores/products';
-import { creerRecette } from '../../../stores/recipes';
-import { UNITES, valideBrouillon, type Brouillon } from '../../../lib/recette-brouillon';
-import { choisirPhoto, deposerPhoto } from '../../../lib/photo-recette';
-import { colors } from '../../../lib/theme';
+import { Action, Photo, ui } from '../components/MaisonUI';
+import { Portions, rs } from '../components/RecipeUI';
+import { SelecteurIngredient, type ChoixIngredient } from '../components/SelecteurIngredient';
+import { useProducts } from '../stores/products';
+import { creerRecette } from '../stores/recipes';
+import { UNITES, valideBrouillon, type Brouillon } from '../lib/recette-brouillon';
+import { choisirPhoto, deposerPhoto } from '../lib/photo-recette';
+import { colors } from '../lib/theme';
 
 type Ligne = ChoixIngredient & { key:number; total:string };
 export default function NouvelleRecette() {
@@ -22,7 +22,8 @@ export default function NouvelleRecette() {
   const [erreur,setErreur]=useState(''),[busy,setBusy]=useState(false),[termine,setTermine]=useState(false),[avertissement,setAvertissement]=useState('');
   const scroll=useRef<ScrollView>(null);
   const modifie=!!nom||ingredients.length>0||!!photo||parts!==4||!!prep||!!cuisson;
-  function quitter(){if(busy)return;if(modifie&&!termine)setAbandon(true);else router.replace('/recettes');}
+  const versRecettes=()=>router.canGoBack()?router.back():router.dismissTo('/recettes');
+  function quitter(){if(busy)return;if(modifie&&!termine)setAbandon(true);else versRecettes();}
   async function photoDepuis(source:'appareil'|'bibliotheque') {
     setPhotoMenu(false);
     try {const p=await choisirPhoto(source);if(p)setPhoto(p);}catch{setErreur('Impossible d’ouvrir les photos. Vérifie les permissions de l’application.');}
@@ -49,7 +50,7 @@ export default function NouvelleRecette() {
   return <SafeAreaView edges={['top']} style={rs.page}>
     <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
       <View style={rs.bar}><Pressable accessibilityRole="button" disabled={busy} onPress={quitter} style={rs.back}><Feather name="chevron-left" size={21} color={colors.accent}/><Text style={ui.link}>Recettes</Text></Pressable><Text style={ui.detail}>{termine?'Enregistrée':'Nouvelle recette'}</Text></View>
-      {termine?<View style={[rs.body,{paddingTop:48}]}><Feather name="check-circle" size={42} color={colors.accent}/><Text style={rs.title}>Une recette de plus à partager.</Text><Text style={rs.text}>« {nom.trim()} » est dans ta collection, avec ses {ingredients.length} ingrédients pour {parts} personnes.</Text>{!!avertissement&&<Text style={ui.error}>{avertissement}</Text>}<Action onPress={()=>router.replace('/recettes')}>Retrouver mes recettes</Action></View>:<>
+      {termine?<View style={[rs.body,{paddingTop:48}]}><Feather name="check-circle" size={42} color={colors.accent}/><Text style={rs.title}>Une recette de plus à partager.</Text><Text style={rs.text}>« {nom.trim()} » est dans ta collection, avec ses {ingredients.length} ingrédients pour {parts} personnes.</Text>{!!avertissement&&<Text style={ui.error}>{avertissement}</Text>}<Action onPress={()=>versRecettes()}>Retrouver mes recettes</Action></View>:<>
       <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={rs.body}>
         <View style={{gap:8}}><Text style={rs.title}>On note une bonne recette ?</Text><Text style={rs.text}>Un nom, les ingrédients et leurs quantités. Tu pourras la retrouver pour préparer tes prochains repas.</Text></View>
         <View><Text style={rs.label}>Nom de la recette</Text><TextInput accessibilityLabel="Nom de la recette" editable={!busy} maxLength={160} value={nom} onChangeText={v=>{setNom(v);setErreur('');}} placeholder="Ex. Gratin de courgettes" placeholderTextColor={colors.textMuted} style={ui.input}/></View>
@@ -80,6 +81,6 @@ export default function NouvelleRecette() {
     <Modal visible={selecteur} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setSelecteur(false)}><SelecteurIngredient onChoisir={ajouter} onFermer={()=>setSelecteur(false)}/></Modal>
     <Modal visible={unites!==null} transparent animationType="fade" onRequestClose={()=>setUnites(null)}><View style={rs.sheet}><View style={rs.dialog}><Text style={rs.section}>Choisir l’unité</Text><ScrollView style={{maxHeight:360}}>{UNITES.map(u=><Pressable accessibilityRole="button" key={u} style={rs.back} onPress={()=>{if(unites!==null)modifier(unites,{unit:u});setUnites(null);}}><Text style={ui.link}>{u}</Text></Pressable>)}</ScrollView><Action secondary onPress={()=>setUnites(null)}>Fermer</Action></View></View></Modal>
     <Modal visible={photoMenu} transparent animationType="fade" onRequestClose={()=>setPhotoMenu(false)}><View style={rs.sheet}><View style={rs.dialog}><Text style={rs.section}>Photo de la recette</Text><Action onPress={()=>photoDepuis('bibliotheque')}>Choisir une photo</Action><Action secondary onPress={()=>photoDepuis('appareil')}>Prendre une photo</Action><Action secondary onPress={()=>setPhotoMenu(false)}>Annuler</Action></View></View></Modal>
-    <Modal visible={abandon} transparent animationType="fade" onRequestClose={()=>setAbandon(false)}><View style={rs.sheet}><View style={rs.dialog}><Text style={rs.section}>Quitter sans enregistrer ?</Text><Text style={rs.text}>Les informations saisies seront perdues.</Text><Action onPress={()=>setAbandon(false)}>Continuer ma recette</Action><Action secondary onPress={()=>router.replace('/recettes')}>Quitter sans enregistrer</Action></View></View></Modal>
+    <Modal visible={abandon} transparent animationType="fade" onRequestClose={()=>setAbandon(false)}><View style={rs.sheet}><View style={rs.dialog}><Text style={rs.section}>Quitter sans enregistrer ?</Text><Text style={rs.text}>Les informations saisies seront perdues.</Text><Action onPress={()=>setAbandon(false)}>Continuer ma recette</Action><Action secondary onPress={()=>versRecettes()}>Quitter sans enregistrer</Action></View></View></Modal>
   </SafeAreaView>;
 }

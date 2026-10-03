@@ -3,16 +3,16 @@ import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, ScrollView, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Action, ui } from '../../../components/MaisonUI';
-import { useSuiviTravail } from '../../../stores/suivi';
-import { useCommandes } from '../../../stores/commandes';
-import { useImagesCommande } from '../../../stores/images-commande';
-import { comparerDrives, comparerHistorique } from '../../../lib/commandes.ts';
-import { ComparaisonCommande } from '../../../components/ComparaisonCommande';
-import { VerdictDrives } from '../../../components/VerdictDrives';
-import { etapesEnvoi, resume, type EtapeEnvoi } from '../../../lib/suivi-libelles.ts';
-import { CONSIGNES_EXTENSION } from '../../../lib/extension-consignes';
-import { colors } from '../../../lib/theme';
+import { Action, ui } from '../../components/MaisonUI';
+import { useSuiviTravail } from '../../stores/suivi';
+import { useCommandes } from '../../stores/commandes';
+import { useImagesCommande } from '../../stores/images-commande';
+import { comparerDrives, comparerHistorique } from '../../lib/commandes.ts';
+import { ComparaisonCommande } from '../../components/ComparaisonCommande';
+import { VerdictDrives } from '../../components/VerdictDrives';
+import { etapesEnvoi, resume, type EtapeEnvoi } from '../../lib/suivi-libelles.ts';
+import { CONSIGNES_EXTENSION } from '../../lib/extension-consignes';
+import { colors } from '../../lib/theme';
 
 const NOMS: Record<string, string> = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' };
 
@@ -70,7 +70,7 @@ export default function Envoye() {
     image={ev => image(ev.ligne)} onVoir={() => router.push({ pathname: '/commandes/[id]', params: { id: commande.id, drive: d } })} />)}
   </ScrollView>
   <View style={ui.footer}>
-   <Action onPress={() => router.replace('/')}>Terminer</Action>
+   <Action onPress={() => router.dismissTo('/')}>Terminer</Action>
    {!!id && <Pressable accessibilityRole="button" onPress={() => router.replace(`/suivi/${id}`)} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Text style={ui.link}>Voir le détail du remplissage</Text></Pressable>}
   </View>
  </SafeAreaView>;

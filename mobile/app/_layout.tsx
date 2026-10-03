@@ -9,6 +9,10 @@ import { supabase } from '../lib/supabase';
 import { colors } from '../lib/theme';
 import { EcranErreur } from '../components/EcranErreur';
 
+// Les onglets restent toujours au fond de la pile : un lien profond (Siri,
+// widget, notification) qui ouvre directement /ajout garde un écran où revenir.
+export const unstable_settings = { initialRouteName: '(tabs)' };
+
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
   // 'inconnue' tant que la session stockée n'est pas relue : sans cet état on
@@ -35,7 +39,7 @@ export default function RootLayout() {
     const route = segments[0] ?? '';
     const publique = route === 'login' || route === 'reinitialisation';
     if (!session && !publique) router.replace('/login');
-    if (session && route === 'login') router.replace('/');
+    if (session && route === 'login') router.dismissTo('/');
   }, [pret, session, segments, router]);
 
   // Jamais d'écran muet : tant que la session stockée n'a pas été relue,
@@ -49,7 +53,19 @@ export default function RootLayout() {
   }
 
   // Racine des gestes : sans elle, le glisser pour retirer ne répond pas.
-  return <GestureHandlerRootView style={{ flex: 1 }}><WizardProvider key={session?.user.id ?? "anonyme"} userId={session?.user.id ?? null}><Stack screenOptions={{ headerShown: false }} /></WizardProvider></GestureHandlerRootView>;
+  // Une seule pile pour tout ce qui s'ouvre depuis un onglet (Mes produits,
+  // une commande, l'assistant de courses…) : le retour, bouton ou glisser
+  // depuis le bord, ramène toujours à l'écran d'où l'on vient. Un appui
+  // long sur un produit, n'importe où, ouvre son aperçu en feuille courte ;
+  // la fiche complète monte en feuille pleine.
+  return <GestureHandlerRootView style={{ flex: 1 }}><WizardProvider key={session?.user.id ?? "anonyme"} userId={session?.user.id ?? null}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+      <Stack.Screen name="produit/[id]" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="comparer" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="apercu/[id]" options={{ presentation: 'formSheet', sheetAllowedDetents: 'fitToContents', sheetGrabberVisible: true, sheetCornerRadius: 24 }} />
+      <Stack.Screen name="login" options={{ animation: 'fade', gestureEnabled: false }} />
+    </Stack>
+  </WizardProvider></GestureHandlerRootView>;
 }
 
 /**

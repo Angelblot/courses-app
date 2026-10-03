@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Action, Photo, ui } from '../../../../components/MaisonUI';
+import { appuiLongFiche } from '../../../../components/FicheAppuiLong';
 import { Portions, rs } from '../../../../components/RecipeUI';
 import { SelecteurIngredient, type ChoixIngredient } from '../../../../components/SelecteurIngredient';
 import { useRecette, supprimerRecette, rattacherIngredient } from '../../../../stores/recipes';
@@ -34,7 +35,7 @@ export default function DetailRecette() {
     if(busy||!recette)return;setBusy(true);
     try {
       const r=await supprimerRecette(recette.id);
-      if(r.ok){if(w.selectedRecipes[recette.id])w.toggleRecette(recette.id,recette.servings_default);router.replace('/recettes');}
+      if(r.ok){if(w.selectedRecipes[recette.id])w.toggleRecette(recette.id,recette.servings_default);router.canGoBack()?router.back():router.replace('/recettes');}
       else {setErreurAction(r.erreur??'Suppression impossible. Réessaie.');setSuppression(false);}
     } catch {setErreurAction('Suppression impossible. Vérifie ta connexion.');setSuppression(false);} finally {setBusy(false);}
   }
@@ -43,7 +44,7 @@ export default function DetailRecette() {
   const aJour=choisi&&w.selectedRecipes[recette!.id]===n;
   return <SafeAreaView edges={['top']} style={rs.page}>
     <View style={rs.bar}>
-      <Pressable accessibilityRole="button" onPress={()=>router.replace('/recettes')} style={rs.back}><Feather name="chevron-left" size={21} color={colors.accent}/><Text style={ui.link}>Recettes</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={()=>router.canGoBack()?router.back():router.replace('/recettes')} style={rs.back}><Feather name="chevron-left" size={21} color={colors.accent}/><Text style={ui.link}>Recettes</Text></Pressable>
       {recette&&<Pressable accessibilityRole="button" style={rs.back} onPress={()=>router.push(`/recettes/${recette.id}/modifier`)}><Feather name="edit-2" size={16} color={colors.accent}/><Text style={ui.link}>Modifier</Text></Pressable>}
     </View>
     {!recette?<View style={rs.body}>{chargement?<ActivityIndicator color={colors.accent}/>:<><Text style={rs.title}>{erreur?'Impossible de charger la recette':'Recette introuvable'}</Text><Text style={rs.text}>{erreur??'Elle a peut-être été supprimée.'}</Text><Action secondary onPress={recharger}>Réessayer</Action></>}</View>:<>
@@ -58,7 +59,7 @@ export default function DetailRecette() {
         <View style={{gap:4}}><Text style={rs.section}>Les ingrédients</Text><Text style={rs.text}>Quantités adaptées à {n} personne{n>1?'s':''}. Touche une ligne pour choisir le produit à acheter.</Text></View>
         <View>{recette.ingredients.map(ing=>{
           const produit=produits.find(p=>p.id===ing.product_id);
-          return <Pressable key={ing.id} accessibilityRole="button" accessibilityLabel={`Choisir le produit pour ${ing.name}`} onPress={()=>setCible({id:ing.id,nom:ing.name})} style={rs.ingredient}>
+          return <Pressable key={ing.id} accessibilityRole="button" accessibilityLabel={`Choisir le produit pour ${ing.name}`} onPress={()=>setCible({id:ing.id,nom:ing.name})} {...appuiLongFiche(produit)} style={rs.ingredient}>
             <Photo name={ing.name} url={produit?.image_url} style={{width:52,height:56}}/>
             <View style={{flex:1,gap:3}}><Text style={ui.productName}>{ing.name}</Text><Text style={rs.quantity}>{formatIngredientQty(quantitePourParts(ing.quantity_per_serving,n),ing.unit)}</Text><Text style={ui.detail}>{produit?.name??'Choisir un produit'}</Text></View>
             <Feather name="chevron-right" size={18} color={colors.accent}/>

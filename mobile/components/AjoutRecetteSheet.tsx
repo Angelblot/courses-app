@@ -17,19 +17,19 @@ const OPTIONS: Option[] = [
     icone: 'camera',
     titre: 'Photographier une fiche',
     detail: 'HelloFresh, livre, carnet',
-    aller: () => router.push({ pathname: '/recettes/importer', params: { source: 'photo' } }),
+    aller: () => router.push({ pathname: '/importer-recette', params: { source: 'photo' } }),
   },
   {
     icone: 'link',
     titre: 'Coller un lien',
     detail: 'Marmiton, Jow, un blog',
-    aller: () => router.push({ pathname: '/recettes/importer', params: { source: 'lien' } }),
+    aller: () => router.push({ pathname: '/importer-recette', params: { source: 'lien' } }),
   },
   {
     icone: 'edit-3',
     titre: 'Écrire à la main',
     detail: 'Nom, ingrédients, quantités',
-    aller: () => router.push('/recettes/nouvelle'),
+    aller: () => router.push('/nouvelle-recette'),
   },
 ];
 

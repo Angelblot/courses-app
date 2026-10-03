@@ -2,10 +2,10 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { useFoyer, inviter, retirerMembre, type Membre } from '../../stores/foyer';
-import { libelleMembre, peutRetirer } from '../../lib/foyer-libelles.ts';
-import { Action, Head, ui } from '../../components/MaisonUI';
-import { colors } from '../../lib/theme';
+import { useFoyer, inviter, retirerMembre, type Membre } from '../stores/foyer';
+import { libelleMembre, peutRetirer } from '../lib/foyer-libelles.ts';
+import { Action, Head, ui, EspaceBas } from '../components/MaisonUI';
+import { colors } from '../lib/theme';
 
 /** Membres du foyer et invitations, ouvert depuis Réglages. */
 export default function Membres() {
@@ -51,13 +51,13 @@ export default function Membres() {
       {!!message && <Text accessibilityLiveRegion="polite" style={ui.link}>{message}</Text>}
       {!!erreurInvitation && <Text accessibilityLiveRegion="polite" style={ui.error}>{erreurInvitation}</Text>}
       <Action disabled={!adresse.trim() || envoi} onPress={envoyer}>{envoi ? 'Envoi…' : 'Envoyer l’invitation'}</Action>
-    </ScrollView>
+    <EspaceBas /></ScrollView>
   </SafeAreaView>;
 }
 
 /** Retour à Réglages, d'où l'écran s'ouvre. */
 function retour() {
-  if (router.canGoBack()) router.back(); else router.replace('/compte');
+  if (router.canGoBack()) router.back(); else router.dismissTo('/compte');
 }
 
 const s = StyleSheet.create({

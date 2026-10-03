@@ -2,11 +2,11 @@ import { useEffect } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { EtatVide } from '../../../components/EtatVide';
-import { useSuiviTravail, useTravailActif } from '../../../stores/suivi';
-import { libelleEtat, libelleDrive, resume } from '../../../lib/suivi-libelles.ts';
-import { estClos } from '../../../lib/suivi-bandeau.ts';
-import { colors, radius, spacing } from '../../../lib/theme';
+import { EtatVide } from '../../components/EtatVide';
+import { useSuiviTravail, useTravailActif } from '../../stores/suivi';
+import { libelleEtat, libelleDrive, resume } from '../../lib/suivi-libelles.ts';
+import { estClos } from '../../lib/suivi-bandeau.ts';
+import { colors, radius, spacing } from '../../lib/theme';
 
 export default function SuiviTravail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,7 +31,7 @@ export default function SuiviTravail() {
         <EtatVide titre="Suivi introuvable">
           Ce remplissage n&apos;existe plus, ou appartient à un autre compte.
         </EtatVide>
-        <Pressable style={s.bouton} onPress={() => router.replace('/')}>
+        <Pressable style={s.bouton} onPress={() => router.dismissTo('/')}>
           <Text style={s.boutonTexte}>Retour</Text>
         </Pressable>
       </SafeAreaView>
@@ -63,7 +63,7 @@ export default function SuiviTravail() {
           </View>
         )}
 
-        <Pressable style={s.bouton} onPress={() => router.replace('/')}>
+        <Pressable style={s.bouton} onPress={() => router.dismissTo('/')}>
           <Text style={s.boutonTexte}>Terminer</Text>
         </Pressable>
       </ScrollView>

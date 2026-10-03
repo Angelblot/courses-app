@@ -9,7 +9,8 @@ import type { Product } from '../stores/products';
 import { Feather } from '@expo/vector-icons';
 import { manquesDuBrouillon, manqueActif, manquesAPreciser, type Manque } from '../lib/session-courses';
 import { colors } from '../lib/theme';
-import { Action, Head, Photo, Raison, ui, useAnnulation, useChampVisible } from './MaisonUI';
+import { Action, BasDeLEcran, Head, Photo, Raison, ui, useAnnulation, useChampVisible } from './MaisonUI';
+import { appuiLongFiche } from './FicheAppuiLong';
 import { revenirAuBilan } from './SessionProgress';
 import { AssocierSiri } from './AssocierSiri';
 import { GlisserRetirer } from './GlisserRetirer';
@@ -53,7 +54,7 @@ function ManqueCatalogue({lineKey,manque,products,aPreciser,onRetrait}:{lineKey:
  const ouvert=aPreciser||edit,format=selected?[selected.brand,selected.volume_ml?`${selected.volume_ml} ml`:selected.grammage_g?`${selected.grammage_g} g`:selected.unit].filter(Boolean).join(' · '):'';
  const quantite=id?w.quotidienQty[id]??1:extra?.quantity??1;
  return <View style={[m.carte,aPreciser&&m.aPreciser]}>
- <Pressable accessibilityRole="button" accessibilityLabel={aPreciser?`${name}, à préciser`:`${name}, ${quantite} article${quantite>1?'s':''}. Modifier`} accessibilityState={{expanded:ouvert}} disabled={aPreciser} onPress={()=>setEdit(!edit)} style={ui.row}>
+ <Pressable accessibilityRole="button" accessibilityLabel={aPreciser?`${name}, à préciser`:`${name}, ${quantite} article${quantite>1?'s':''}. Modifier`} accessibilityState={{expanded:ouvert}} disabled={aPreciser} onPress={()=>setEdit(!edit)} {...appuiLongFiche(selected)} style={ui.row}>
   <Photo name={name} url={selected?.image_url}/>
   <View style={{flex:1}}><Text style={ui.productName}>{name}</Text><Text style={ui.detail}>{[sources[manque.source],format].filter(Boolean).join(' · ')}</Text>{aPreciser&&<Text style={m.drapeau}>À préciser</Text>}</View>
   {!aPreciser&&<View style={ui.row}><Text style={ui.num}>× {quantite}</Text><View style={m.pret}><Feather name={edit?'chevron-up':'check'} size={16} color={colors.accent}/></View></View>}
@@ -85,7 +86,7 @@ export function Manques({session=false}:{session?:boolean}) {
  {!loading&&entries.length>0&&<Text style={ui.detail}>Touche un produit pour changer son format ou sa quantité ; glisse-le vers la gauche pour le retirer.</Text>}
  {!entries.length&&!loading&&!erreur&&<View style={ui.notice}><Text style={ui.productName}>Rien ne manque pour le moment.</Text><Text style={ui.subtitle}>Ajoute un produit dès que tu remarques qu’il manque à la maison.</Text></View>}
  {!session&&<Action secondary onPress={()=>router.push('/ajout')}>Noter un manque</Action>}
- </ScrollView><View style={ui.footer}>{annulation.toast}{session?<><Action disabled={loading||!!erreur} onPress={revenirAuBilan}>{pending.length?`Revenir au bilan · ${pending.length} à préciser`:'Revenir au bilan'}</Action>{pending.length>0&&!loading&&<Raison>{pending.length>1?`${pending.length} produits restent à préciser, maintenant ou au bilan.`:`« ${pending[0][1].name} » reste à préciser, maintenant ou au bilan.`}</Raison>}</>:<Action onPress={()=>{w.demarrerSession();router.navigate(`/wizard/${w.sessionEtape??'recettes'}`);}}>{w.sessionEtape?'Reprendre mes courses':'Préparer mes courses'}</Action>}</View></SafeAreaView>;
+ </ScrollView><View style={ui.footer}>{annulation.toast}{session?<><Action disabled={loading||!!erreur} onPress={revenirAuBilan}>{pending.length?`Revenir au bilan · ${pending.length} à préciser`:'Revenir au bilan'}</Action>{pending.length>0&&!loading&&<Raison>{pending.length>1?`${pending.length} produits restent à préciser, maintenant ou au bilan.`:`« ${pending[0][1].name} » reste à préciser, maintenant ou au bilan.`}</Raison>}</>:<Action onPress={()=>{w.demarrerSession();router.navigate(`/wizard/${w.sessionEtape??'recettes'}`);}}>{w.sessionEtape?'Reprendre mes courses':'Préparer mes courses'}</Action>}</View>{!session&&<BasDeLEcran/>}</SafeAreaView>;
 }
 const m=StyleSheet.create({
  carte:{backgroundColor:colors.surface,padding:12,borderRadius:12,gap:10},

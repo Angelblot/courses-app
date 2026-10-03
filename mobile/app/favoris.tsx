@@ -5,14 +5,14 @@ import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
-import { useProducts, type Product } from '../../stores/products';
-import { classement, references } from '../../lib/references';
-import { useWizard } from '../../contexts/WizardContext';
-import { DetailProduit, type OuvertureFiche } from '../../components/DetailProduit';
-import { MenuProduit } from '../../components/MenuProduit';
-import { Action, Head, Photo, ui, useAnnulation } from '../../components/MaisonUI';
-import { RAYONS, rayonDepuisLibelle, type CleRayon } from '../../lib/rayons';
-import { colors } from '../../lib/theme';
+import { useProducts, type Product } from '../stores/products';
+import { classement, references } from '../lib/references';
+import { useWizard } from '../contexts/WizardContext';
+import { ouvrirFiche } from '../components/FicheAppuiLong';
+import { MenuProduit } from '../components/MenuProduit';
+import { Action, Head, Photo, ui, useAnnulation, EspaceBas } from '../components/MaisonUI';
+import { RAYONS, rayonDepuisLibelle, type CleRayon } from '../lib/rayons';
+import { colors } from '../lib/theme';
 
 const sansCadreWeb = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as unknown as TextStyle) : null;
 type Filtre = 'tous' | CleRayon;
@@ -28,7 +28,7 @@ const contenance = (p: Product) => p.volume_ml ? (p.volume_ml >= 1000 ? `${Strin
  */
 export default function Favoris() {
   const p = useProducts(), w = useWizard(), { width, height } = useWindowDimensions();
-  const [query, setQuery] = useState(''), [filtre, setFiltre] = useState<Filtre>('tous'), [detail, setDetail] = useState<Product | null>(null), [ouverture, setOuverture] = useState<OuvertureFiche>('consulter');
+  const [query, setQuery] = useState(''), [filtre, setFiltre] = useState<Filtre>('tous');
   const annulation = useAnnulation();
   useFocusEffect(useCallback(() => { p.recharger(); }, [p.recharger]));
   const refs = references(p.produits);
@@ -36,7 +36,7 @@ export default function Favoris() {
   const q = query.toLocaleLowerCase('fr');
   const produits = refs.filter(x => (filtre === 'tous' || rayonDepuisLibelle(x.category) === filtre) && x.name.toLocaleLowerCase('fr').includes(q));
   const colonnes = width >= 700 ? 4 : 2, largeurTuile = Math.floor((width - 32 - 10 * (colonnes - 1)) / colonnes);
-  const retour = () => { if (router.canGoBack()) router.back(); else router.replace('/compte'); };
+  const retour = () => { if (router.canGoBack()) router.back(); else router.dismissTo('/compte'); };
 
   const puces: { cle: Filtre; label: string; n: number }[] = [
     { cle: 'tous', label: 'Tous', n: refs.length },
@@ -61,14 +61,8 @@ export default function Favoris() {
   const voisinRef = useRef(voisin); voisinRef.current = voisin;
   const balayage = useMemo(() => Gesture.Pan().runOnJS(true).activeOffsetX([-24, 24]).failOffsetY([-14, 14])
     .onEnd(e => { if (Math.abs(e.translationX) > 60 || Math.abs(e.velocityX) > 600) voisinRef.current(e.translationX < 0 ? 1 : -1); }), []);
-  const ouvrir = (x: Product, o: OuvertureFiche = 'consulter') => { setOuverture(o); setDetail(x); };
+  const ouvrir = ouvrirFiche;
   const ajouterListe = (x: Product) => { const avant = w.quotidien[x.id] ?? null; w.ajouterProduitListe(x.id); annulation.proposer(`${x.name} ajouté à ta liste`, () => w.marquerProduit(x.id, avant)); };
-  const supprime = (x: Product) => {
-    setDetail(null);
-    w.marquerProduit(x.id, null);
-    AccessibilityInfo.announceForAccessibility(`${x.name} supprimé`);
-    p.recharger();
-  };
   const tuile = (x: Product) => <View style={[s.tuile, { width: largeurTuile }]}>
     <Pressable accessibilityRole="button" accessibilityLabel={`Consulter ${x.name}${contenance(x) ? `, ${contenance(x)}` : ''}`} accessibilityHint="Appui long pour plus d’actions" onPress={() => ouvrir(x)} onLongPress={Platform.OS === 'ios' ? undefined : () => ouvrir(x)} style={({ pressed }) => pressed && { opacity: .85 }}>
       <View style={s.image}><Photo name={x.name} url={x.image_url} style={s.photo} /></View>
@@ -99,10 +93,8 @@ export default function Favoris() {
         </MenuProduit>)}</View>
       {!p.chargement && !p.erreur && !produits.length && <View style={ui.notice}><Text style={ui.productName}>{query ? 'Aucun produit ne correspond.' : filtre === 'tous' ? 'Pas encore de produit.' : 'Aucun produit dans ce rayon.'}</Text><Text style={ui.subtitle}>Scanne un produit pour l’ajouter : il rejoindra tes habitudes.</Text></View>}
       </Animated.View></GestureDetector>
-    </ScrollView>
+    <EspaceBas /></ScrollView>
     {annulation.toast}
-    <DetailProduit produit={detail ? p.produits.find(x => x.id === detail.id) ?? detail : null} produits={p.produits} ouverture={ouverture} onFermer={() => setDetail(null)} onChange={p.recharger} onSupprime={supprime}
-      onAjouter={detail ? () => { ajouterListe(detail); setDetail(null); } : undefined} />
   </SafeAreaView>;
 }
 

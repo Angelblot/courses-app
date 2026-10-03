@@ -3,11 +3,11 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Action, Head, ui } from '../../../components/MaisonUI';
-import { useCommandes } from '../../../stores/commandes';
-import { comparerDrives, comparerHistorique, ENSEIGNES, type Commande } from '../../../lib/commandes.ts';
-import { euros, jourLong, pourcent, teinteEcart } from '../../../lib/format-commande.ts';
-import { colors } from '../../../lib/theme';
+import { Action, Head, ui, EspaceBas } from '../../components/MaisonUI';
+import { useCommandes } from '../../stores/commandes';
+import { comparerDrives, comparerHistorique, ENSEIGNES, type Commande } from '../../lib/commandes.ts';
+import { euros, jourLong, pourcent, teinteEcart } from '../../lib/format-commande.ts';
+import { colors } from '../../lib/theme';
 
 /**
  * Mes commandes (variante EP2c) : factures importées et paniers remplis, du
@@ -17,7 +17,7 @@ import { colors } from '../../../lib/theme';
 export default function Commandes() {
   const { commandes, chargement, erreur, recharger } = useCommandes();
   useFocusEffect(useCallback(() => { void recharger(); }, [recharger]));
-  const retour = () => { if (router.canGoBack()) router.back(); else router.replace('/compte'); };
+  const retour = () => { if (router.canGoBack()) router.back(); else router.dismissTo('/compte'); };
   return <SafeAreaView edges={['top']} style={ui.screen}>
     <ScrollView contentContainerStyle={[ui.content, { paddingBottom: 40 }]}>
       <Head title="Mes commandes" back onBack={retour} avatar={false} />
@@ -27,7 +27,7 @@ export default function Commandes() {
         ? <Text style={ui.subtitle}>Tes factures et les paniers remplis par l’extension.</Text>
         : <View style={ui.notice}><Text style={ui.productName}>Pas encore de commande.</Text><Text style={ui.subtitle}>Elles apparaissent quand l’extension a rempli un panier, ou quand tes factures sont importées.</Text></View>)}
       {commandes.map(c => <Carte key={c.id} commande={c} toutes={commandes} />)}
-    </ScrollView>
+    <EspaceBas /></ScrollView>
   </SafeAreaView>;
 }
 

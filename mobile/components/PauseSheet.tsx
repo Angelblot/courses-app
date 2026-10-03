@@ -16,7 +16,7 @@ import { colors } from '../lib/theme';
 export function PauseSheet({ visible, onFermer }: { visible: boolean; onFermer: () => void }) {
  const insets = useSafeAreaInsets(), w = useWizard();
  const etape = SESSION_STEPS.find(e => e.cle === w.sessionEtape)?.label;
- const quitter = () => { onFermer(); if (router.canDismiss()) router.dismissAll(); router.replace('/'); };
+ const quitter = () => { onFermer(); router.dismissTo('/'); };
  return <Feuille visible={visible} onFermer={onFermer} nom={'Faire une pause ?'}>
    <View style={[s.panneau, { paddingBottom: 12 + insets.bottom }]} accessibilityViewIsModal accessibilityLabel="Faire une pause ?" onAccessibilityEscape={onFermer}>
     <View style={s.entete}><Text style={s.titre} accessibilityRole="header">Faire une pause ?</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} hitSlop={6} style={s.fermer}><Feather name="x" size={22} color={colors.text} /></Pressable></View>
