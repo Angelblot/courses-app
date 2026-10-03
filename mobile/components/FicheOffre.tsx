@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -48,19 +48,6 @@ function Contenu({ fiche, proches, onChoisir, onFermer }: { fiche: FicheProduit 
   if (!fiche) return null;
   const d = fiche.details;
   const colonnes = [fiche, ...proches.filter(p => p.ean13 !== fiche.ean13 && p.details).slice(0, 2)];
-  const m = meilleurs(colonnes.map(c => ({ nutriscore: c.nutriscore, details: c.details ?? null })));
-  const vert = (cle: string, i: number) => m[cle]?.includes(i);
-  const lignes: [string, string, (c: FicheProduit) => React.ReactNode][] = [
-    ['nutriscore', 'Nutri-Score', c => <PastilleNutri note={c.nutriscore} />],
-    ['ecoscore', 'Eco-Score', c => c.details?.ecoscore ? <Text style={[s.mini, { backgroundColor: NOTES[c.details.ecoscore] }]}>{c.details.ecoscore.toUpperCase()}</Text> : <Text style={s.cellule}>—</Text>],
-    ['nova', 'NOVA', c => <Text style={s.cellule}>{c.details?.nova ?? '—'}</Text>],
-    ['kcal', 'Énergie', c => <Text style={s.cellule}>{c.details?.kcal != null ? `${c.details.kcal} kcal` : '—'}</Text>],
-    ['gras', 'Gras', c => <Text style={s.cellule}>{g(c.details?.gras ?? null)}</Text>],
-    ['satures', 'Saturés', c => <Text style={s.cellule}>{g(c.details?.satures ?? null)}</Text>],
-    ['sucres', 'Sucres', c => <Text style={s.cellule}>{g(c.details?.sucres ?? null)}</Text>],
-    ['sel', 'Sel', c => <Text style={s.cellule}>{g(c.details?.sel ?? null)}</Text>],
-    ['allergenes', 'Allergènes', c => <Text style={[s.cellule, { fontSize: 11 }]}>{c.details ? c.details.allergenes.join(', ') || 'aucun' : '—'}</Text>],
-  ];
   const ingredients = d?.ingredients ?? null;
 
   return <SafeAreaView edges={['top']} style={s.ecran}>
@@ -96,16 +83,7 @@ function Contenu({ fiche, proches, onChoisir, onFermer }: { fiche: FicheProduit 
 
         {colonnes.length > 1 && <>
           <Text style={s.section}>Comparé à des produits proches</Text>
-          <View style={s.comparatif}>
-            <View style={s.ligneComp}><View style={s.libelleComp} />{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, i === 0 && s.colonneMoi]}><Photo name={c.name} url={c.imageUrl} style={s.mini52} /><Text style={s.nomComp} numberOfLines={3}>{c.name}</Text></View>)}</View>
-            {lignes.map(([cle, libelle, rendu]) => <View key={cle} style={s.ligneComp}>
-              <Text style={s.libelleComp}>{libelle}</Text>
-              {colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, i === 0 && s.colonneMoi, vert(cle, i) && s.mieux]}>{rendu(c)}</View>)}
-            </View>)}
-            <View style={[s.ligneComp, { borderBottomWidth: 0 }]}><View style={s.libelleComp} />{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, i === 0 && s.colonneMoi]}>
-              {i > 0 && <Pressable accessibilityRole="button" accessibilityLabel={`Choisir ${c.name}`} onPress={() => onChoisir(c)} style={s.choisirPetit}><Text style={s.choisirPetitTexte}>Choisir</Text></Pressable>}
-            </View>)}</View>
-          </View>
+          <TableauComparatif colonnes={colonnes} pied={(c, i) => i > 0 && <Pressable accessibilityRole="button" accessibilityLabel={`Choisir ${c.name}`} onPress={() => onChoisir(c)} style={s.choisirPetit}><Text style={s.choisirPetitTexte}>Choisir</Text></Pressable>} />
           <Text style={[ui.detail, { textAlign: 'center' }]}>Pour 100 g · le meilleur de chaque ligne en vert</Text>
         </>}
       </ScrollView>
@@ -113,6 +91,44 @@ function Contenu({ fiche, proches, onChoisir, onFermer }: { fiche: FicheProduit 
         <Pressable accessibilityRole="button" onPress={() => onChoisir(fiche)} style={({ pressed }) => [s.choisir, pressed && { opacity: .85 }]}><Text style={s.choisirTexte}>Choisir ce produit</Text></Pressable>
       </View>
     </SafeAreaView>;
+}
+
+/** Une ligne de comparatif : clé (pour le meilleur en vert), libellé, et le rendu d'une cellule. */
+export type LigneComparatif = [string, string, (c: FicheProduit, i: number) => ReactNode];
+
+/**
+ * Le comparatif côte à côte (FD3) : une colonne par produit, la première
+ * teintée, le meilleur de chaque ligne en vert. Au-delà de trois produits,
+ * le tableau défile de côté. `avant` ajoute des lignes en tête (le prix,
+ * par exemple), avec leurs propres gagnants ; `pied` une action par colonne.
+ */
+export function TableauComparatif({ colonnes, avant = [], meilleursAvant = {}, pied }: {
+  colonnes: FicheProduit[]; avant?: LigneComparatif[]; meilleursAvant?: Record<string, number[]>;
+  pied?: (c: FicheProduit, i: number) => ReactNode;
+}) {
+  const m = { ...meilleurs(colonnes.map(c => ({ nutriscore: c.nutriscore, details: c.details ?? null }))), ...meilleursAvant };
+  const vert = (cle: string, i: number) => m[cle]?.includes(i);
+  const lignes: LigneComparatif[] = [...avant,
+    ['nutriscore', 'Nutri-Score', c => c.nutriscore ? <PastilleNutri note={c.nutriscore} /> : <Text style={s.cellule}>—</Text>],
+    ['ecoscore', 'Eco-Score', c => c.details?.ecoscore ? <Text style={[s.mini, { backgroundColor: NOTES[c.details.ecoscore] }]}>{c.details.ecoscore.toUpperCase()}</Text> : <Text style={s.cellule}>—</Text>],
+    ['nova', 'NOVA', c => <Text style={s.cellule}>{c.details?.nova ?? '—'}</Text>],
+    ['kcal', 'Énergie', c => <Text style={s.cellule}>{c.details?.kcal != null ? `${c.details.kcal} kcal` : '—'}</Text>],
+    ['gras', 'Gras', c => <Text style={s.cellule}>{g(c.details?.gras ?? null)}</Text>],
+    ['satures', 'Saturés', c => <Text style={s.cellule}>{g(c.details?.satures ?? null)}</Text>],
+    ['sucres', 'Sucres', c => <Text style={s.cellule}>{g(c.details?.sucres ?? null)}</Text>],
+    ['sel', 'Sel', c => <Text style={s.cellule}>{g(c.details?.sel ?? null)}</Text>],
+    ['allergenes', 'Allergènes', c => <Text style={[s.cellule, { fontSize: 11 }]}>{c.details ? c.details.allergenes.join(', ') || 'aucun' : '—'}</Text>],
+  ];
+  const large = colonnes.length > 3, col = large ? s.colonneFixe : null;
+  const tableau = <View style={[s.comparatif, large && { marginHorizontal: 0 }]}>
+    <View style={s.ligneComp}><View style={s.libelleComp} />{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, i === 0 && s.colonneMoi]}><Photo name={c.name} url={c.imageUrl} style={s.mini52} /><Text style={s.nomComp} numberOfLines={3}>{c.name}</Text></View>)}</View>
+    {lignes.map(([cle, libelle, rendu]) => <View key={cle} style={s.ligneComp}>
+      <Text style={s.libelleComp}>{libelle}</Text>
+      {colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, i === 0 && s.colonneMoi, vert(cle, i) && s.mieux]}>{rendu(c, i)}</View>)}
+    </View>)}
+    {pied && <View style={[s.ligneComp, { borderBottomWidth: 0 }]}><View style={s.libelleComp} />{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, i === 0 && s.colonneMoi]}>{pied(c, i)}</View>)}</View>}
+  </View>;
+  return large ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12 }}>{tableau}</ScrollView> : tableau;
 }
 
 function Rang({ libelle, valeur, niveau, derniere = false }: { libelle: string; valeur: string; niveau?: Niveau; derniere?: boolean }) {
@@ -160,6 +176,7 @@ const s = StyleSheet.create({
   cellule: { fontSize: 12, color: colors.text, textAlign: 'center', fontVariant: ['tabular-nums'] },
   mini: { fontSize: 11, fontWeight: '800', color: '#FFFFFF', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
   mini52: { width: 52, height: 52, borderRadius: 8 },
+  colonneFixe: { flex: 0, width: 104 },
   nomComp: { fontSize: 11, fontWeight: '600', color: colors.text, textAlign: 'center' },
   choisirPetit: { minHeight: 36, paddingHorizontal: 10, borderRadius: 10, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
   choisirPetitTexte: { fontSize: 13, fontWeight: '700', color: colors.accent },

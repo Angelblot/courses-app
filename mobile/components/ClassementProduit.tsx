@@ -3,6 +3,7 @@ import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { classement, enseigneExclusive, referenceDe, reordonner } from '../lib/references';
 import { enregistrerAlternatives, type Product } from '../stores/products';
 import { SelecteurIngredient } from './SelecteurIngredient';
@@ -75,7 +76,13 @@ export function ClassementProduit({ produit, produits, onChange, onGlisse }: { p
   const suggestions = produits.filter(p => p.product_type && p.product_type === reference.product_type);
 
   return <View style={s.zone}>
-    <Text style={s.titre} accessibilityRole="header">Ordre d’essai</Text>
+    <View style={s.entete}>
+      <Text style={s.titre} accessibilityRole="header">Ordre d’essai</Text>
+      {lignes.length > 1 && <Pressable accessibilityRole="button" accessibilityLabel={`Comparer les ${lignes.length} produits`} onPress={() => router.push({ pathname: '/comparer', params: { ids: ordre.join(','), reference: reference.id } })}
+        style={({ pressed }) => [s.comparer, pressed && { opacity: .8 }]}>
+        <Feather name="columns" size={15} color={colors.accent} /><Text style={s.comparerTexte}>Comparer</Text>
+      </Pressable>}
+    </View>
     <Text style={[ui.detail, { marginTop: 0 }]}>Siri et le panier prennent le premier, puis les suivants s’il manque au drive.</Text>
     <View style={s.liste}>
       {lignes.map((p, i) => {
@@ -112,6 +119,9 @@ export function ClassementProduit({ produit, produits, onChange, onGlisse }: { p
 const s = StyleSheet.create({
   zone: { alignSelf: 'stretch', gap: 8, marginTop: 20 },
   titre: { fontSize: 18, fontWeight: '700', color: colors.text },
+  entete: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  comparer: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 12, borderRadius: 18, backgroundColor: colors.accentSoft },
+  comparerTexte: { fontSize: 14, fontWeight: '600', color: colors.accent },
   liste: { backgroundColor: colors.surface, borderRadius: 14 },
   ligne: { height: HAUTEUR, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 10, paddingRight: 4, backgroundColor: colors.surface, borderRadius: 14 },
   ligneReference: { backgroundColor: colors.accentSoft },

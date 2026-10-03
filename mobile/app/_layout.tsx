@@ -61,6 +61,7 @@ export default function RootLayout() {
   return <GestureHandlerRootView style={{ flex: 1 }}><WizardProvider key={session?.user.id ?? "anonyme"} userId={session?.user.id ?? null}>
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Screen name="produit/[id]" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="comparer" options={{ presentation: 'modal' }} />
       <Stack.Screen name="apercu/[id]" options={{ presentation: 'formSheet', sheetAllowedDetents: 'fitToContents', sheetGrabberVisible: true, sheetCornerRadius: 24 }} />
       <Stack.Screen name="login" options={{ animation: 'fade', gestureEnabled: false }} />
     </Stack>

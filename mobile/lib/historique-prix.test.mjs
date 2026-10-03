@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { historiquePrix, echelleTemps, reperesPrix, lieuDe } from './historique-prix.ts';
+import { historiquePrix, echelleTemps, reperesPrix, lieuDe, prixAuKilo, moinsChers } from './historique-prix.ts';
 
 const l = (x) => ({ drive: 'carrefour', magasin: 'Carrefour Lattes', commande: '1', quantity_delivered: 1, unit_price_ttc: 5.55, remise_ttc: 0, total_ttc: 5.55, ...x });
 // Le papier toilette Essential, tel que sur les factures.
@@ -70,4 +70,16 @@ test('repères ronds autour des prix', () => {
   assert.ok(r.min <= 4.68 && r.max >= 5.55);
   assert.ok(r.reperes.length >= 2 && r.reperes.length <= 5);
   assert.deepEqual(r.reperes, [4.5, 5, 5.5, 6].slice(0, r.reperes.length));
+});
+
+test('prix au kilo ou au litre, et les moins chers', () => {
+  assert.deepEqual(prixAuKilo(1.05, 150, null), { valeur: 7, unite: 'kg' });
+  assert.deepEqual(prixAuKilo(2.19, null, 600), { valeur: 3.65, unite: 'L' });
+  assert.equal(prixAuKilo(2, null, null), null);
+  assert.equal(prixAuKilo(null, 200, null), null);
+  // On ne compare que des unités semblables ; un seul prix connu n'a pas de gagnant.
+  assert.deepEqual(moinsChers([{ valeur: 7, unite: 'kg' }, { valeur: 5.2, unite: 'kg' }, null]), [1]);
+  assert.deepEqual(moinsChers([{ valeur: 7, unite: 'kg' }, null]), []);
+  assert.deepEqual(moinsChers([{ valeur: 7, unite: 'kg' }, { valeur: 3, unite: 'L' }]), []);
+  assert.deepEqual(moinsChers([{ valeur: 4, unite: 'kg' }, { valeur: 4, unite: 'kg' }]), []);
 });
