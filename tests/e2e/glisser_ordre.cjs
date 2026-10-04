@@ -39,6 +39,22 @@ const dossier=process.env.CAPTURES||'/tmp';
  await glisser('Allumettes Carrefour',-2);attendu.push('Allumettes Carrefour > Allumettes Tradilège > Lardons Herta');
  if(await rangs()!==attendu.at(-1))throw Error('3e glisser : '+await rangs());
  if(ecritures.length<3)throw Error('Écritures : '+JSON.stringify(ecritures));
+ // Glisser vers la gauche : un glissement court découvre « Retirer », un long retire, « Annuler » remet.
+ const balayer=async(nom,dx)=>{const l=page.getByLabel(nom,{exact:true});const bx=await l.boundingBox(),x=bx.x+bx.width*0.6,y=bx.y+bx.height/2;
+  await page.mouse.move(x,y);await page.mouse.down();for(let k=1;k<=12;k++){await page.mouse.move(x+dx*k/12,y);await page.waitForTimeout(16);}await page.mouse.up();await page.waitForTimeout(700);};
+ await balayer('Lardons Herta',-70);
+ const bouton=page.getByText('Retirer',{exact:true}).nth(1);await bouton.waitFor();await page.screenshot({path:dossier+'/balayer-ouvert.png'});
+ await bouton.click();await page.getByText('Lardons Herta retiré',{exact:true}).waitFor();
+ if(await page.getByLabel(/^Lardons Herta, rang/).count())throw Error('Lardons toujours là');
+ await page.screenshot({path:dossier+'/balayer-annuler.png'});
+ await page.getByRole('button',{name:'Annuler : Lardons Herta retiré'}).click();await page.waitForTimeout(600);
+ await page.getByLabel(/^Lardons Herta, rang 3 sur 3/).waitFor();
+ await page.waitForTimeout(6500);await balayer('Lardons Herta',-300);await page.getByText('Lardons Herta retiré',{exact:true}).waitFor();
+ if(await page.getByLabel(/^Lardons Herta, rang/).count())throw Error('Glissement complet sans effet');
+ // Appui long : la fiche du produit appuyé s'ouvre par-dessus.
+ const lard=page.getByLabel('Allumettes Carrefour',{exact:true});const lb=await lard.boundingBox();
+ await page.mouse.move(lb.x+lb.width/2,lb.y+lb.height/2);await page.mouse.down();await page.waitForTimeout(600);await page.mouse.up();
+ await page.waitForURL(/produit\/c/,{timeout:10000});
  await page.screenshot({path:dossier+'/glisser-ordre.png'});
  if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true,n:ecritures.length}));
  }catch(e){console.error(e);process.exitCode=1}finally{await b.close()}})();

@@ -7,21 +7,26 @@ import { router } from 'expo-router';
 import { classement, enseigneExclusive, referenceDe, reordonner } from '../lib/references';
 import { enregistrerAlternatives, type Product } from '../stores/products';
 import { SelecteurIngredient } from './SelecteurIngredient';
-import { Photo, ui } from './MaisonUI';
-import { appuiLongFiche } from './FicheAppuiLong';
+import { Photo, ui, useAnnulation } from './MaisonUI';
+import { ouvrirFiche } from './FicheAppuiLong';
 import { colors } from '../lib/theme';
 
 /** Hauteur fixe d'une ligne : le glisser se mesure en lignes. */
 const HAUTEUR = 68;
 const NOMS = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' } as const;
+/** Largeur du bouton « Retirer » découvert par un glissement vers la gauche. */
+const BOUTON = 96;
+const DANGER = '#B3261E';
 
 /**
  * Référence et alternatives d'un produit (variante AL3) : une seule liste
  * classée. La première est la référence (fond vert) : Siri l'ajoute, le
  * panier l'essaie d'abord, puis les suivantes si elle manque au drive. On
  * réordonne en faisant glisser les poignées, les autres lignes s'écartant
- * en direct ; VoiceOver propose « monter » et « descendre ». Un appui long
- * sur une ligne ouvre l'aperçu du produit, avec son dernier prix.
+ * en direct ; VoiceOver propose « monter » et « descendre ». Glisser une
+ * alternative vers la gauche découvre « Retirer » ; un glissement complet la
+ * retire aussitôt, et « Annuler » la remet. Un appui long ouvre la fiche du
+ * produit par-dessus celle-ci.
  */
 export function ClassementProduit({ produit, produits, onChange, onGlisse }: { produit: Product; produits: Product[]; onChange?: () => void;
   /** Un glisser commence ou finit : la fiche fige son défilement et sa fermeture. */
@@ -51,7 +56,25 @@ export function ClassementProduit({ produit, produits, onChange, onGlisse }: { p
     nouvel.splice(cible, 0, id);
     void enregistrer(nouvel);
   };
-  const retirer = (i: number) => { if (i > 0) void enregistrer(ordre.filter((_, k) => k !== i)); };
+  const annulation = useAnnulation();
+  const retirer = (id: string) => {
+    const avant = ordre, i = avant.indexOf(id);
+    if (i <= 0) return;
+    const nom = parId.get(id)?.name ?? 'Produit';
+    void enregistrer(avant.filter(x => x !== id));
+    annulation.proposer(`${nom} retiré`, () => { void enregistrer(avant); });
+  };
+
+  // Glisser vers la gauche : un geste par ligne, qui ne prend la main que
+  // sur un mouvement franchement horizontal (le défilement reste vertical).
+  const largeur = useRef(360), glissements = useRef(new Map<string, Animated.Value>()).current;
+  const [ouverte, setOuverte] = useState<string | null>(null);
+  const tx = (id: string) => { let v = glissements.get(id); if (!v) { v = new Animated.Value(0); glissements.set(id, v); } return v; };
+  const amener = (id: string, vers: number, fin?: () => void) => Animated.spring(tx(id), { toValue: vers, useNativeDriver: true, bounciness: 0, speed: 20 }).start(() => fin?.());
+  // Le relâché d'un glissement ne compte pas comme un toucher (il refermerait la ligne).
+  const finBalayage = useRef(0);
+  const retirerRef = useRef(retirer), ouverteRef = useRef(ouverte);
+  retirerRef.current = retirer; ouverteRef.current = ouverte;
 
   // Le geste d'une poignée démarre au toucher : ni le défilement de la fiche
   // ni le glisser qui ferme la feuille ne peuvent le lui prendre. Un geste
@@ -77,6 +100,19 @@ export function ClassementProduit({ produit, produits, onChange, onGlisse }: { p
       .onEnd((e) => { deplacerRef.current(departRef.current, vers(e.translationY)); })
       .onFinalize(() => { cibleRef.current = null; setActif(null); setCible(null); decalage.setValue(0); onGlisseRef.current?.(false); })] as const;
   })), [cleIds, decalage]);
+  const balayages = useMemo(() => new Map(cleIds.split(',').filter(Boolean).map(id => [id, Gesture.Pan().runOnJS(true)
+    .activeOffsetX([-14, 14]).failOffsetY([-12, 12])
+    .onStart(() => { const o = ouverteRef.current; if (o && o !== id) { amener(o, 0); setOuverte(null); } })
+    .onUpdate((e) => { tx(id).setValue(Math.min(0, e.translationX + (ouverteRef.current === id ? -BOUTON : 0))); })
+    .onEnd((e) => {
+      finBalayage.current = Date.now();
+      const x = e.translationX + (ouverteRef.current === id ? -BOUTON : 0);
+      if (x < -largeur.current * 0.55 || (x < -BOUTON && e.velocityX < -900)) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        amener(id, -largeur.current, () => { tx(id).setValue(0); setOuverte(null); retirerRef.current(id); });
+      } else if (x < -BOUTON / 2) { amener(id, -BOUTON); setOuverte(id); }
+      else { amener(id, 0); setOuverte(o => (o === id ? null : o)); }
+    })] as const)), [cleIds]);
   // Pendant un glisser, les lignes entre la place d'origine et la cible s'écartent d'un rang.
   const ecart = (k: number) => actif == null || cible == null || k === actif ? 0
     : actif < cible && k > actif && k <= cible ? -HAUTEUR : actif > cible && k >= cible && k < actif ? HAUTEUR : 0;
@@ -91,24 +127,32 @@ export function ClassementProduit({ produit, produits, onChange, onGlisse }: { p
       </Pressable>}
     </View>
     <Text style={[ui.detail, { marginTop: 0 }]}>Siri et le panier prennent le premier, puis les suivants s’il manque au drive.</Text>
-    <View style={s.liste}>
+    <View style={{ marginTop: -8 }}>{annulation.toast}</View>
+    <View style={s.liste} onLayout={e => { largeur.current = e.nativeEvent.layout.width; }}>
       {lignes.map((p, i) => {
         const enseigne = enseigneExclusive(p);
-        return <Animated.View key={p.id} style={[s.ligne, i === 0 && s.ligneReference, i < lignes.length - 1 && s.separee, actif === i ? s.souleve : { transform: [{ translateY: ecart(i) }] }, actif === i && { transform: [{ translateY: decalage }, { scale: 1.02 }] }]}>
+        const ligne = <Animated.View style={[s.contenu, i === 0 && s.ligneReference, i > 0 && { transform: [{ translateX: tx(p.id) }] }]}>
           <View style={[s.rang, i === 0 && s.rangReference]}><Text style={[s.rangTexte, i === 0 && { color: colors.accentContrast }]}>{i + 1}</Text></View>
-          <Pressable {...(p.id === produit.id ? {} : appuiLongFiche(p))} accessibilityLabel={p.name} style={s.produit}>
+          <Pressable accessibilityLabel={p.name} accessibilityHint={p.id === produit.id ? undefined : 'Appui long pour ouvrir sa fiche'} delayLongPress={350}
+            onPress={() => { if (ouverte && Date.now() - finBalayage.current > 400) { amener(ouverte, 0); setOuverte(null); } }}
+            onLongPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); if (p.id !== produit.id) ouvrirFiche(p); }} style={s.produit}>
             <Photo name={p.name} url={p.image_url} style={s.photo} />
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={ui.productName} numberOfLines={2}>{p.name}</Text>
               <View style={s.puces}>{(enseigne ? [enseigne] : (['carrefour', 'leclerc'] as const)).map(e => <Text key={e} style={s.puce}>{NOMS[e]}</Text>)}</View>
             </View>
           </Pressable>
-          {i > 0 && <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${p.name} du classement`} onPress={() => retirer(i)} hitSlop={4} style={s.action}><Feather name="x" size={16} color={colors.textMuted} /></Pressable>}
           <GestureDetector gesture={poignees.get(p.id)!}><View accessible accessibilityRole="adjustable" accessibilityLabel={`${p.name}, rang ${i + 1} sur ${lignes.length}${i === 0 ? ', référence' : ''}. Fais glisser pour changer l’ordre`}
-            accessibilityActions={[{ name: 'increment', label: 'Descendre' }, { name: 'decrement', label: 'Monter' }]}
-            onAccessibilityAction={e => deplacer(i, e.nativeEvent.actionName === 'increment' ? i + 1 : i - 1)} style={s.action}>
+            accessibilityActions={[{ name: 'increment', label: 'Descendre' }, { name: 'decrement', label: 'Monter' }, ...(i > 0 ? [{ name: 'delete', label: 'Retirer' }] : [])]}
+            onAccessibilityAction={e => { const a = e.nativeEvent.actionName; if (a === 'delete') retirer(p.id); else deplacer(i, a === 'increment' ? i + 1 : i - 1); }} style={s.action}>
             <Feather name="menu" size={18} color={actif === i ? colors.accent : colors.traitControle} />
           </View></GestureDetector>
+        </Animated.View>;
+        return <Animated.View key={p.id} style={[s.ligne, i === 0 && s.premiere, i === lignes.length - 1 && s.derniere, i < lignes.length - 1 && s.separee, actif === i ? s.souleve : { transform: [{ translateY: ecart(i) }] }, actif === i && { transform: [{ translateY: decalage }, { scale: 1.02 }] }]}>
+          {i > 0 && <Pressable accessibilityElementsHidden importantForAccessibility="no-hide-descendants" onPress={() => { tx(p.id).setValue(0); setOuverte(null); retirer(p.id); }} style={s.retirer}>
+            <Text style={s.retirerTexte}>Retirer</Text>
+          </Pressable>}
+          {i > 0 ? <GestureDetector gesture={balayages.get(p.id)!}>{ligne}</GestureDetector> : ligne}
         </Animated.View>;
       })}
     </View>
@@ -130,7 +174,12 @@ const s = StyleSheet.create({
   comparer: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 12, borderRadius: 18, backgroundColor: colors.accentSoft },
   comparerTexte: { fontSize: 14, fontWeight: '600', color: colors.accent },
   liste: { backgroundColor: colors.surface, borderRadius: 14 },
-  ligne: { height: HAUTEUR, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 10, paddingRight: 4, backgroundColor: colors.surface, borderRadius: 14 },
+  ligne: { height: HAUTEUR, backgroundColor: colors.surface, overflow: 'hidden' },
+  premiere: { borderTopLeftRadius: 14, borderTopRightRadius: 14 },
+  derniere: { borderBottomLeftRadius: 14, borderBottomRightRadius: 14 },
+  contenu: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 10, paddingRight: 4, backgroundColor: colors.surface },
+  retirer: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: DANGER, alignItems: 'flex-end', justifyContent: 'center' },
+  retirerTexte: { width: BOUTON, textAlign: 'center', fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
   ligneReference: { backgroundColor: colors.accentSoft },
   separee: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   rang: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },

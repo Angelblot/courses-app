@@ -19,7 +19,7 @@ const products=[
   await route.fulfill({json:data});});
  await page.addInitScript(({session})=>{localStorage.setItem('sb-qmymwicsgilhoihtfdjm-auth-token',JSON.stringify(session));},{session});
  const btn=(name)=>page.getByRole('button',{name,exact:true});
- await page.goto('http://localhost:8082/favoris');
+ await page.goto(`http://localhost:${process.env.PORT||'8082'}/favoris`);
  const emmental=page.getByRole('button',{name:/^Consulter Emmental râpé fondant/});await emmental.waitFor({timeout:60000});
  // MP1 : seules les références ; le gruyère vit sous l'emmental, une pastille le dit.
  if(await page.getByRole('button',{name:/^Consulter Gruyère/}).count())throw Error('An alternative is shown as a product');
@@ -35,7 +35,7 @@ const products=[
  await page.waitForTimeout(800);
  const derniere=ecritures.at(-1);if(derniere?.id!=='emmental'||JSON.stringify(derniere.alternatives)!==JSON.stringify(['gruyere','comte']))throw Error('Bad add '+JSON.stringify(ecritures));
  // Retirer une alternative.
- await btn('Retirer Gruyère Râpé du classement').click();await page.waitForTimeout(600);
+ {const l=page.getByLabel('Gruyère Râpé',{exact:true});const bx=await l.boundingBox(),x=bx.x+bx.width*0.6,y=bx.y+bx.height/2;await page.mouse.move(x,y);await page.mouse.down();for(let k=1;k<=12;k++){await page.mouse.move(x-300*k/12,y);await page.waitForTimeout(16);}await page.mouse.up();await page.waitForTimeout(900);}
  if(JSON.stringify(ecritures.at(-1).alternatives)!==JSON.stringify(['comte']))throw Error('Bad remove '+JSON.stringify(ecritures));
  if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true,ecritures}));
  }catch(e){console.error(e);process.exitCode=1}finally{await b.close()}})();
