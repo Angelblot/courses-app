@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { historiquePrix, type Historique } from '../lib/historique-prix.ts';
+import { derniersPrix, historiquePrix, type DernierPrix, type Historique } from '../lib/historique-prix.ts';
 
 const VIDE: Historique = { achats: [], dernier: null, ecart: null, depuis: null };
 
@@ -33,4 +33,19 @@ export function useHistoriquePrix(produitId: string, ean13?: string | null) {
   }, [produitId, ean13]);
   useEffect(() => { void recharger(); }, [recharger]);
   return { historique, chargement, erreur, recharger };
+}
+
+/** Le dernier prix payé de chaque produit du foyer, pour la liste « Mes produits ». */
+export function useDerniersPrix() {
+  const [prix, setPrix] = useState<Map<string, DernierPrix>>(new Map());
+  const recharger = useCallback(async () => {
+    const { data, error } = await supabase.from('purchase_lines')
+      .select('product_id, purchase_date, drive, magasin, commande, quantity_delivered, unit_price_ttc, remise_ttc, total_ttc')
+      .not('product_id', 'is', null).gt('quantity_delivered', 0).order('purchase_date', { ascending: false }).limit(10000);
+    // Sans prix, la liste reste utilisable : on n'affiche simplement rien.
+    if (error) { console.error('[derniersPrix]', error); return; }
+    setPrix(derniersPrix(data ?? []));
+  }, []);
+  useEffect(() => { void recharger(); }, [recharger]);
+  return { prix, recharger };
 }

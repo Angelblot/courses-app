@@ -170,3 +170,30 @@ export function moinsChers(prix: (PrixUnitaire | null)[]): number[] {
   if (connus.every(p => p.valeur === min)) return [];
   return connus.filter(p => p.valeur === min).map(p => p.i);
 }
+
+export type DernierPrix = { prix: number; drive: string; jour: string };
+
+/**
+ * Le dernier prix payé de chaque produit, à l'unité et remise déduite, d'après
+ * les lignes de factures. Les produits manquants (rien de livré) ne comptent pas.
+ */
+export function derniersPrix(lignes: (LigneAchat & { product_id: string | null })[]): Map<string, DernierPrix> {
+  const m = new Map<string, DernierPrix>();
+  for (const l of lignes) {
+    if (!l.product_id) continue;
+    const q = Number(l.quantity_delivered ?? 0), pu = Number(l.unit_price_ttc ?? 0);
+    if (q <= 0 || pu <= 0) continue;
+    const jour = l.purchase_date.slice(0, 10), d = m.get(l.product_id);
+    if (d && d.jour >= jour) continue;
+    const total = l.total_ttc != null ? Number(l.total_ttc) : pu * q + Number(l.remise_ttc ?? 0);
+    m.set(l.product_id, { prix: arrondi(total / q), drive: l.drive ?? 'carrefour', jour });
+  }
+  return m;
+}
+
+/** « 8 déc. », ou « juil. 2023 » quand l'achat date de plus de dix mois. */
+export function quandAchete(jour: string, aujourdhui = new Date()): string {
+  const d = new Date(`${jour}T12:00:00`);
+  if (aujourdhui.getTime() - d.getTime() > 300 * 86400000) return d.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}

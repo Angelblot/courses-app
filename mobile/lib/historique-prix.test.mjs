@@ -83,3 +83,16 @@ test('prix au kilo ou au litre, et les moins chers', () => {
   assert.deepEqual(moinsChers([{ valeur: 7, unite: 'kg' }, { valeur: 3, unite: 'L' }]), []);
   assert.deepEqual(moinsChers([{ valeur: 4, unite: 'kg' }, { valeur: 4, unite: 'kg' }]), []);
 });
+
+test('le dernier prix payé de chaque produit', async () => {
+  const { derniersPrix, quandAchete } = await import('./historique-prix.ts');
+  const l = (x) => ({ purchase_date: '2025-12-08', drive: 'carrefour', magasin: null, commande: '1', quantity_delivered: 1, unit_price_ttc: 2.99, remise_ttc: 0, total_ttc: 2.99, product_id: 'a', ...x });
+  const m = derniersPrix([
+    l({ purchase_date: '2026-02-16', drive: 'leclerc', quantity_delivered: 2, unit_price_ttc: 1.5, remise_ttc: -0.6, total_ttc: 2.4 }),
+    l({}), l({ product_id: 'b', quantity_delivered: 0 }), l({ product_id: null }),
+  ]);
+  assert.deepEqual(m.get('a'), { prix: 1.2, drive: 'leclerc', jour: '2026-02-16' });
+  assert.equal(m.has('b'), false);
+  assert.equal(quandAchete('2026-09-08', new Date('2026-10-04T12:00:00')), '8 sept.');
+  assert.equal(quandAchete('2023-07-23', new Date('2026-10-04T12:00:00')), 'juil. 2023');
+});

@@ -23,7 +23,7 @@ const products=[
  const emmental=page.getByRole('button',{name:/^Consulter Emmental râpé fondant/});await emmental.waitFor({timeout:60000});
  // MP1 : seules les références ; le gruyère vit sous l'emmental, une pastille le dit.
  if(await page.getByRole('button',{name:/^Consulter Gruyère/}).count())throw Error('An alternative is shown as a product');
- await page.getByLabel('1 alternatives').waitFor();
+ await page.getByRole('button',{name:/^Consulter Emmental râpé fondant CARREFOUR, 200 g, 2 choix/}).waitFor();
  await page.screenshot({path:process.env.CAPTURES?process.env.CAPTURES+'/mp1.png':'/tmp/mp1.png'});
  await emmental.click();await page.getByText('Ordre d’essai',{exact:true}).waitFor();
  await page.getByRole('adjustable',{name:/^Emmental râpé fondant CARREFOUR, rang 1 sur 2, référence/}).waitFor().catch(async()=>{await page.getByLabel(/rang 1 sur 2, référence/).waitFor();});
