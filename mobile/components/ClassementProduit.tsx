@@ -54,22 +54,29 @@ export function ClassementProduit({ produit, produits, onChange, onGlisse }: { p
   const retirer = (i: number) => { if (i > 0) void enregistrer(ordre.filter((_, k) => k !== i)); };
 
   // Le geste d'une poignée démarre au toucher : ni le défilement de la fiche
-  // ni le glisser qui ferme la feuille ne peuvent le lui prendre.
-  const deplacerRef = useRef(deplacer), cibleRef = useRef<number | null>(null), onGlisseRef = useRef(onGlisse);
-  deplacerRef.current = deplacer; onGlisseRef.current = onGlisse;
-  const n = ordre.length;
-  const poignees = useMemo(() => ordre.map((_, i) => {
-    const vers = (dy: number) => Math.max(0, Math.min(n - 1, i + Math.round(dy / HAUTEUR)));
-    return Gesture.Pan().minDistance(0).runOnJS(true)
-      .onStart(() => { cibleRef.current = i; setActif(i); setCible(i); decalage.setValue(0); onGlisseRef.current?.(true); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); })
+  // ni le glisser qui ferme la feuille ne peuvent le lui prendre. Un geste
+  // par produit, et non par rang : après un déplacement, les lignes changent
+  // de place, et une poignée qui recevrait le geste d'une autre resterait
+  // inerte jusqu'au rendu suivant. Le rang se lit au moment du toucher.
+  const deplacerRef = useRef(deplacer), cibleRef = useRef<number | null>(null), departRef = useRef(0), onGlisseRef = useRef(onGlisse), ordreRef = useRef(ordre);
+  deplacerRef.current = deplacer; onGlisseRef.current = onGlisse; ordreRef.current = ordre;
+  const cleIds = [...ordre].sort().join(',');
+  const poignees = useMemo(() => new Map(cleIds.split(',').filter(Boolean).map(id => {
+    const vers = (dy: number) => Math.max(0, Math.min(ordreRef.current.length - 1, departRef.current + Math.round(dy / HAUTEUR)));
+    return [id, Gesture.Pan().minDistance(0).runOnJS(true)
+      .onStart(() => {
+        const i = Math.max(0, ordreRef.current.indexOf(id));
+        departRef.current = i; cibleRef.current = i; setActif(i); setCible(i); decalage.setValue(0); onGlisseRef.current?.(true);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      })
       .onUpdate((e) => {
         decalage.setValue(e.translationY);
         const v = vers(e.translationY);
         if (v !== cibleRef.current) { cibleRef.current = v; setCible(v); void Haptics.selectionAsync().catch(() => {}); }
       })
-      .onEnd((e) => { deplacerRef.current(i, vers(e.translationY)); })
-      .onFinalize(() => { cibleRef.current = null; setActif(null); setCible(null); decalage.setValue(0); onGlisseRef.current?.(false); });
-  }), [n, decalage]);
+      .onEnd((e) => { deplacerRef.current(departRef.current, vers(e.translationY)); })
+      .onFinalize(() => { cibleRef.current = null; setActif(null); setCible(null); decalage.setValue(0); onGlisseRef.current?.(false); })] as const;
+  })), [cleIds, decalage]);
   // Pendant un glisser, les lignes entre la place d'origine et la cible s'écartent d'un rang.
   const ecart = (k: number) => actif == null || cible == null || k === actif ? 0
     : actif < cible && k > actif && k <= cible ? -HAUTEUR : actif > cible && k >= cible && k < actif ? HAUTEUR : 0;
@@ -97,7 +104,7 @@ export function ClassementProduit({ produit, produits, onChange, onGlisse }: { p
             </View>
           </Pressable>
           {i > 0 && <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${p.name} du classement`} onPress={() => retirer(i)} hitSlop={4} style={s.action}><Feather name="x" size={16} color={colors.textMuted} /></Pressable>}
-          <GestureDetector gesture={poignees[i]}><View accessible accessibilityRole="adjustable" accessibilityLabel={`${p.name}, rang ${i + 1} sur ${lignes.length}${i === 0 ? ', référence' : ''}. Fais glisser pour changer l’ordre`}
+          <GestureDetector gesture={poignees.get(p.id)!}><View accessible accessibilityRole="adjustable" accessibilityLabel={`${p.name}, rang ${i + 1} sur ${lignes.length}${i === 0 ? ', référence' : ''}. Fais glisser pour changer l’ordre`}
             accessibilityActions={[{ name: 'increment', label: 'Descendre' }, { name: 'decrement', label: 'Monter' }]}
             onAccessibilityAction={e => deplacer(i, e.nativeEvent.actionName === 'increment' ? i + 1 : i - 1)} style={s.action}>
             <Feather name="menu" size={18} color={actif === i ? colors.accent : colors.traitControle} />
