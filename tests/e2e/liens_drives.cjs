@@ -39,6 +39,8 @@ const dossier=process.env.CAPTURES||'/tmp';
  await page.getByRole('tab',{name:/^Aucun drive/}).click();
  await page.getByRole('button',{name:/^Mortadelle Negroni/}).click();
  const ligne=page.getByRole('button',{name:/^Liens aux drives : Aucun\. Carrefour : pas de lien · E\.Leclerc : pas de lien/});
+ // L'ordre d'essai parle des mêmes liens que le récapitulatif.
+ await page.getByLabel(/^Mortadelle Negroni\. Carrefour : pas de lien, E\.Leclerc : pas de lien$/).waitFor();
  await ligne.scrollIntoViewIfNeeded({timeout:30000});await page.waitForTimeout(300);
  await page.screenshot({path:dossier+'/lf1-ligne.png'});
  await ligne.click();

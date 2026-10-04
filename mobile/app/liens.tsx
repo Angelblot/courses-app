@@ -4,9 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useProducts, type Product } from '../stores/products';
 import { useLiens } from '../stores/liens';
-import { categorieLiens, DRIVES_LIENS, etatDrive, type CategorieLiens, type EtatDrive } from '../lib/liens';
+import { categorieLiens, type CategorieLiens, type FaitsLiens } from '../lib/liens';
+import { PastillesDrives, phraseLiens } from '../components/PastillesDrives';
 import { RAYONS, rayonDepuisLibelle } from '../lib/rayons';
-import type { Enseigne } from '../lib/references';
 import { Action, Head, Photo, ui, EspaceBas } from '../components/MaisonUI';
 import { appuiLongFiche, ouvrirFiche } from '../components/FicheAppuiLong';
 import { colors } from '../lib/theme';
@@ -17,8 +17,6 @@ const FILTRES: { cle: Exclude<CategorieLiens, 'ailleurs'>; titre: string }[] = [
   { cle: 'leclerc', titre: 'E.Leclerc seul' },
   { cle: 'deux', titre: 'Les deux' },
 ];
-const NOMS: Record<Enseigne, string> = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' };
-const MOTS: Record<EtatDrive, string> = { relie: 'relié', absent: 'absent', aucun: 'pas de lien', hors: '' };
 
 /**
  * Liens aux drives (variante RL1) : combien de produits chaque drive
@@ -68,7 +66,7 @@ export default function Liens() {
         {groupes.map(g => <View key={g.cle} style={{ gap: 6 }}>
           <Text style={s.rayon}>{g.label.toUpperCase()} · {g.produits.length}</Text>
           <View style={s.carte}>
-            {g.produits.map((x, i) => <Ligne key={x.id} produit={x} etats={DRIVES_LIENS.map(d => ({ d, e: etatDrive(x, d, liens.faits.get(x.id)) }))} derniere={i === g.produits.length - 1} />)}
+            {g.produits.map((x, i) => <Ligne key={x.id} produit={x} faits={liens.faits.get(x.id)} derniere={i === g.produits.length - 1} />)}
           </View>
         </View>)}
       </>}
@@ -76,18 +74,13 @@ export default function Liens() {
   </SafeAreaView>;
 }
 
-function Ligne({ produit, etats, derniere }: { produit: Product; etats: { d: Enseigne; e: EtatDrive }[]; derniere: boolean }) {
-  const visibles = etats.filter(x => x.e !== 'hors');
-  const detail = produit.vendu_chez === 'ailleurs' ? `Hors drive${produit.lieu_achat ? ` · ${produit.lieu_achat}` : ''}` : null;
-  return <Pressable accessibilityRole="button" accessibilityLabel={`${produit.name}. ${detail ?? visibles.map(x => `${NOMS[x.d]} : ${MOTS[x.e]}`).join(', ')}. Ouvrir la fiche`}
+function Ligne({ produit, faits, derniere }: { produit: Product; faits: FaitsLiens | undefined; derniere: boolean }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={`${produit.name}. ${phraseLiens(produit, faits)}. Ouvrir la fiche`}
     onPress={() => ouvrirFiche(produit)} {...appuiLongFiche(produit)} style={({ pressed }) => [s.ligne, !derniere && s.separee, pressed && { opacity: .85 }]}>
     <Photo name={produit.name} url={produit.image_url} style={s.photo} />
     <View style={{ flex: 1, gap: 4 }}>
       <Text style={s.nom} numberOfLines={2}>{produit.name}</Text>
-      <View style={s.puces}>
-        {detail ? <Text style={[s.puce, s.puceAucun]}>{detail}</Text>
-          : visibles.map(x => <Text key={x.d} style={[s.puce, x.e === 'relie' ? s.puceRelie : x.e === 'absent' ? s.puceAbsent : s.puceAucun]}>{x.e === 'relie' ? NOMS[x.d] : `${NOMS[x.d]} · ${MOTS[x.e]}`}</Text>)}
-      </View>
+      <PastillesDrives produit={produit} faits={faits} />
     </View>
   </Pressable>;
 }
@@ -105,9 +98,4 @@ const s = StyleSheet.create({
   separee: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   photo: { width: 44, height: 44, borderRadius: 8 },
   nom: { fontSize: 15, fontWeight: '600', color: colors.text, lineHeight: 19 },
-  puces: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  puce: { fontSize: 11, fontWeight: '700', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
-  puceRelie: { color: '#2F6B2F', backgroundColor: '#E7F0E1' },
-  puceAbsent: { color: colors.textMuted, backgroundColor: colors.bg },
-  puceAucun: { color: colors.attentionText, backgroundColor: colors.attentionSoft },
 });

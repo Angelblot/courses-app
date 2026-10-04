@@ -4,7 +4,9 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { classement, enseigneExclusive, referenceDe, reordonner } from '../lib/references';
+import { classement, referenceDe, reordonner } from '../lib/references';
+import { useLiens } from '../stores/liens';
+import { PastillesDrives, phraseLiens } from './PastillesDrives';
 import { enregistrerAlternatives, type Product } from '../stores/products';
 import { SelecteurIngredient } from './SelecteurIngredient';
 import { Photo, ui, useAnnulation } from './MaisonUI';
@@ -13,7 +15,6 @@ import { colors } from '../lib/theme';
 
 /** Hauteur fixe d'une ligne : le glisser se mesure en lignes. */
 const HAUTEUR = 68;
-const NOMS = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' } as const;
 /** Largeur du bouton « Retirer » découvert par un glissement vers la gauche. */
 const BOUTON = 96;
 const DANGER = '#B3261E';
@@ -56,7 +57,7 @@ export function ClassementProduit({ produit, produits, onChange, onGlisse }: { p
     nouvel.splice(cible, 0, id);
     void enregistrer(nouvel);
   };
-  const annulation = useAnnulation();
+  const annulation = useAnnulation(), liens = useLiens();
   const retirer = (id: string) => {
     const avant = ordre, i = avant.indexOf(id);
     if (i <= 0) return;
@@ -130,16 +131,16 @@ export function ClassementProduit({ produit, produits, onChange, onGlisse }: { p
     <View style={{ marginTop: -8 }}>{annulation.toast}</View>
     <View style={s.liste} onLayout={e => { largeur.current = e.nativeEvent.layout.width; }}>
       {lignes.map((p, i) => {
-        const enseigne = enseigneExclusive(p);
+        const faits = liens.faits.get(p.id);
         const ligne = <Animated.View style={[s.contenu, i === 0 && s.ligneReference, i > 0 && { transform: [{ translateX: tx(p.id) }] }]}>
           <View style={[s.rang, i === 0 && s.rangReference]}><Text style={[s.rangTexte, i === 0 && { color: colors.accentContrast }]}>{i + 1}</Text></View>
-          <Pressable accessibilityLabel={p.name} accessibilityHint={p.id === produit.id ? undefined : 'Appui long pour ouvrir sa fiche'} delayLongPress={350}
+          <Pressable accessibilityLabel={`${p.name}. ${phraseLiens(p, faits)}`} accessibilityHint={p.id === produit.id ? undefined : 'Appui long pour ouvrir sa fiche'} delayLongPress={350}
             onPress={() => { if (ouverte && Date.now() - finBalayage.current > 400) { amener(ouverte, 0); setOuverte(null); } }}
             onLongPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); if (p.id !== produit.id) ouvrirFiche(p); }} style={s.produit}>
             <Photo name={p.name} url={p.image_url} style={s.photo} />
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={ui.productName} numberOfLines={2}>{p.name}</Text>
-              <View style={s.puces}>{(enseigne ? [enseigne] : (['carrefour', 'leclerc'] as const)).map(e => <Text key={e} style={s.puce}>{NOMS[e]}</Text>)}</View>
+              <PastillesDrives produit={p} faits={faits} />
             </View>
           </Pressable>
           <GestureDetector gesture={poignees.get(p.id)!}><View accessible accessibilityRole="adjustable" accessibilityLabel={`${p.name}, rang ${i + 1} sur ${lignes.length}${i === 0 ? ', référence' : ''}. Fais glisser pour changer l’ordre`}
@@ -188,8 +189,6 @@ const s = StyleSheet.create({
   photo: { width: 44, height: 44, borderRadius: 8 },
   produit: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch' },
   souleve: { zIndex: 2, elevation: 4, borderRadius: 14, shadowColor: '#141C10', shadowOpacity: .18, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-  puces: { flexDirection: 'row', gap: 4 },
-  puce: { fontSize: 11, fontWeight: '600', color: '#3A5030', backgroundColor: colors.surface, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
   action: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   ajouter: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent },
 });
