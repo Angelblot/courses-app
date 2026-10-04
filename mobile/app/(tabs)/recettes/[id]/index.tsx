@@ -17,7 +17,9 @@ import { formatIngredientQty } from '../../../../lib/unites';
 import { colors } from '../../../../lib/theme';
 
 export default function DetailRecette() {
-  const {id}=useLocalSearchParams<{id:string}>(), router=useRouter();
+  const {id,depuis}=useLocalSearchParams<{id:string;depuis?:string}>(), router=useRouter();
+  // Ouverte depuis l'accueil : on y revient, et l'onglet Recettes retrouve sa liste.
+  const retour=()=>{if(depuis==='accueil'){router.dismissTo('/recettes');router.navigate('/');}else if(router.canGoBack())router.back();else router.replace('/recettes');};
   const {recette,chargement,erreur,recharger}=useRecette(id), {produits}=useProducts(), w=useWizard();
   const personnesFoyer=usePersonnesFoyer();
   const [parts,setParts]=useState<number|null>(null),[avis,setAvis]=useState('');
@@ -35,7 +37,7 @@ export default function DetailRecette() {
     if(busy||!recette)return;setBusy(true);
     try {
       const r=await supprimerRecette(recette.id);
-      if(r.ok){if(w.selectedRecipes[recette.id])w.toggleRecette(recette.id,recette.servings_default);router.canGoBack()?router.back():router.replace('/recettes');}
+      if(r.ok){if(w.selectedRecipes[recette.id])w.toggleRecette(recette.id,recette.servings_default);retour();}
       else {setErreurAction(r.erreur??'Suppression impossible. Réessaie.');setSuppression(false);}
     } catch {setErreurAction('Suppression impossible. Vérifie ta connexion.');setSuppression(false);} finally {setBusy(false);}
   }
@@ -44,7 +46,7 @@ export default function DetailRecette() {
   const aJour=choisi&&w.selectedRecipes[recette!.id]===n;
   return <SafeAreaView edges={['top']} style={rs.page}>
     <View style={rs.bar}>
-      <Pressable accessibilityRole="button" onPress={()=>router.canGoBack()?router.back():router.replace('/recettes')} style={rs.back}><Feather name="chevron-left" size={21} color={colors.accent}/><Text style={ui.link}>Recettes</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={depuis==='accueil'?'Revenir à l’accueil':'Revenir aux recettes'} onPress={retour} style={rs.back}><Feather name="chevron-left" size={21} color={colors.accent}/><Text style={ui.link}>{depuis==='accueil'?'Accueil':'Recettes'}</Text></Pressable>
       {recette&&<Pressable accessibilityRole="button" style={rs.back} onPress={()=>router.push(`/recettes/${recette.id}/modifier`)}><Feather name="edit-2" size={16} color={colors.accent}/><Text style={ui.link}>Modifier</Text></Pressable>}
     </View>
     {!recette?<View style={rs.body}>{chargement?<ActivityIndicator color={colors.accent}/>:<><Text style={rs.title}>{erreur?'Impossible de charger la recette':'Recette introuvable'}</Text><Text style={rs.text}>{erreur??'Elle a peut-être été supprimée.'}</Text><Action secondary onPress={recharger}>Réessayer</Action></>}</View>:<>

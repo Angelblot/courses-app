@@ -83,7 +83,7 @@ export default function Maison() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={a.carrousel}>
           {recettes.map(x => { const temps = (x.prep_minutes ?? 0) + (x.cook_minutes ?? 0);
             const detail = [temps ? `${temps} min` : '', x.servings_default ? `${x.servings_default} pers.` : ''].filter(Boolean).join(' · ');
-            return <Pressable key={x.id} accessibilityRole="button" accessibilityLabel={`Voir la recette ${x.name}${detail ? `, ${detail}` : ''}`} onPress={() => router.push(`/recettes/${x.id}`)}
+            return <Pressable key={x.id} accessibilityRole="button" accessibilityLabel={`Voir la recette ${x.name}${detail ? `, ${detail}` : ''}`} onPress={() => router.push({ pathname: '/recettes/[id]', params: { id: x.id, depuis: 'accueil' } }, { withAnchor: true })}
               style={({ pressed }) => [a.recette, pressed && { opacity: .85 }]}>
               <Photo name={x.name} url={x.image_url} recipe style={a.photo} />
               <Text style={a.nom} numberOfLines={2}>{x.name}</Text>
