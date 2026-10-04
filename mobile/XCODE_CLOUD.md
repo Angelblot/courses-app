@@ -126,3 +126,10 @@ node scripts/asc.mjs "/v1/ciProducts/4ece9928-69b5-4a0a-a0cc-bdd408d09a57/workfl
 Avant d'en arriver là, vérifier que le commit touche bien `mobile/` : un commit
 qui ne modifie que la racine — `CLAUDE.md`, par exemple — ne déclenche rien, et
 c'est voulu.
+
+## Relancer un build
+
+Le workflow ne démarre que si un commit modifie un fichier de `mobile/` : un
+commit vide (`git commit --allow-empty`) ne déclenche rien. Pour relancer sans
+changement de code, utiliser « Démarrer le build » dans App Store Connect →
+Xcode Cloud, ou pousser une modification réelle sous `mobile/`.
