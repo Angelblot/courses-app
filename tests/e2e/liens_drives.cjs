@@ -32,7 +32,7 @@ const dossier=process.env.CAPTURES||'/tmp';
  await page.waitForTimeout(300);await page.screenshot({path:dossier+'/rl1.png'});
  await page.getByRole('tab',{name:/^Carrefour seul/}).click();
  await page.getByText('Lait demi-écrémé',{exact:true}).waitFor();
- await page.getByText('E.Leclerc · pas de lien',{exact:true}).waitFor();
+ if(await page.getByText(/pas de lien/).count())throw Error('« pas de lien » ne doit plus apparaître dans les pastilles');
  await page.getByRole('button',{name:'Voir les produits achetés hors drive : 1'}).click();
  await page.getByText('Hors drive · Marché',{exact:true}).waitFor();
  // La fiche : la ligne « Liens aux drives » signale l'absence de lien.
@@ -40,7 +40,7 @@ const dossier=process.env.CAPTURES||'/tmp';
  await page.getByRole('button',{name:/^Mortadelle Negroni/}).click();
  const ligne=page.getByRole('button',{name:/^Liens aux drives : Aucun\. Carrefour : pas de lien · E\.Leclerc : pas de lien/});
  // L'ordre d'essai parle des mêmes liens que le récapitulatif.
- await page.getByLabel(/^Mortadelle Negroni\. Carrefour : pas de lien, E\.Leclerc : pas de lien$/).waitFor();
+ await page.getByLabel(/^Mortadelle Negroni\. Aucun drive relié$/).waitFor();
  await ligne.scrollIntoViewIfNeeded({timeout:30000});await page.waitForTimeout(300);
  await page.screenshot({path:dossier+'/lf1-ligne.png'});
  await ligne.click();
