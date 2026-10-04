@@ -11,10 +11,9 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  const dir=process.env.CAPTURES||'.impeccable/review/session-courses';fs.mkdirSync(dir,{recursive:true});const shot=n=>page.screenshot({path:`${dir}/${n}.png`});
  const btn=(name)=>page.getByRole('button',{name,exact:true});
  const texte=t=>page.getByText(t,{exact:true}).last();
- await page.goto('http://localhost:8082');await page.getByText('Les courses, à ton rythme.',{exact:true}).waitFor({timeout:60000});
- // Accueil : lignes touchables, « Tout voir » en titre.
- if(await btn('Voir mes manques').count())throw Error('Duplicate home button remains');
- await btn('Tout voir, 3 produits').waitFor();await btn('Noter un manque…').waitFor();
+ await page.goto(`http://localhost:${process.env.PORT||'8082'}`);await page.getByText('Tes prochaines courses',{exact:true}).waitFor({timeout:60000});
+ // Accueil (AC1) : les manques n'y figurent plus.
+ if(await page.getByText('Mes manques',{exact:true}).count()||await btn('Noter un manque…').count())throw Error('Les manques sont encore sur l’accueil');
  await shot('0-accueil');
  // Étape 1 sur 2 : les repas ; la photo ouvre un aperçu sans quitter la session.
  await btn('Préparer mes courses').click();await texte('Étape 1 sur 2 · Repas').waitFor();
