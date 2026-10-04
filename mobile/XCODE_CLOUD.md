@@ -133,3 +133,7 @@ Le workflow ne démarre que si un commit modifie un fichier de `mobile/` : un
 commit vide (`git commit --allow-empty`) ne déclenche rien. Pour relancer sans
 changement de code, utiliser « Démarrer le build » dans App Store Connect →
 Xcode Cloud, ou pousser une modification réelle sous `mobile/`.
+
+Si l'archive réussit mais que TestFlight ne reçoit rien, regarder l'étape
+« TestFlight Internal Testing » du build dans App Store Connect : GitHub ne
+reçoit que le résultat de l'archivage (cas du 4 octobre 2026, relancé).
