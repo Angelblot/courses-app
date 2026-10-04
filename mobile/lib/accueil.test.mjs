@@ -15,6 +15,8 @@ test('date et salutation', () => {
   assert.equal(dateLongue(new Date('2026-10-04T10:00:00')), 'Dimanche 4 octobre');
   assert.equal(salutation(new Date('2026-10-04T10:00:00')), 'Bonjour.');
   assert.equal(salutation(new Date('2026-10-04T19:30:00')), 'Bonsoir.');
+  assert.equal(salutation(new Date('2026-10-04T10:00:00'), ' Angelo '), 'Bonjour Angelo.');
+  assert.equal(salutation(new Date('2026-10-04T10:00:00'), ''), 'Bonjour.');
 });
 
 test('le budget : moyenne des 6 dernières, écart avec les 6 d’avant', () => {

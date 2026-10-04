@@ -7,6 +7,7 @@ import { useFoyer, renommerFoyer, reglerPersonnes } from '../../stores/foyer';
 import { useProducts } from '../../stores/products';
 import { useWizard } from '../../contexts/WizardContext';
 import { usePistes } from '../../stores/pistes';
+import { usePrenom } from '../../stores/profil';
 import { Groupe, Ligne } from '../../components/GroupeReglages';
 import { ui } from '../../components/MaisonUI';
 import { references } from '../../lib/references';
@@ -26,6 +27,7 @@ export default function Compte() {
   const [nom, setNom] = useState<string | null>(null);
   const [erreurReglage, setErreurReglage] = useState<string | null>(null);
   const [adresse, setAdresse] = useState<string | null>(null);
+  const profil = usePrenom(), [prenom, setPrenom] = useState<string | null>(null);
   useFocusEffect(useCallback(() => { recharger(); }, [recharger]));
   useEffect(() => { void supabase.auth.getUser().then(({ data }) => setAdresse(data.user?.email ?? null)); }, []);
 
@@ -34,6 +36,12 @@ export default function Compte() {
     const r = await renommerFoyer(foyer.id, nom);
     setErreurReglage(r.ok ? null : r.erreur ?? null);
     if (r.ok) { setNom(null); recharger(); }
+  };
+  const enregistrerPrenom = async () => {
+    if (prenom === null || prenom.trim() === (profil.prenom ?? '')) { setPrenom(null); return; }
+    const r = await profil.enregistrer(prenom);
+    setErreurReglage(r.ok ? null : r.erreur ?? null);
+    if (r.ok) setPrenom(null);
   };
   // Enregistré à chaque pas : les repas choisis ensuite partent pour ce nombre.
   const changerPersonnes = async (n: number) => {
@@ -80,6 +88,11 @@ export default function Compte() {
       </Groupe>
 
       <Groupe titre="Compte">
+        <Ligne icone="smile" teinte="#9A5A1E" libelle="Prénom">
+          <TextInput value={prenom ?? profil.prenom ?? ''} onChangeText={setPrenom} onBlur={enregistrerPrenom} onSubmitEditing={enregistrerPrenom} returnKeyType="done"
+            autoCapitalize="words" autoComplete="given-name" textContentType="givenName" maxLength={40}
+            accessibilityLabel="Ton prénom, affiché sur l’accueil" style={s.champ} placeholder="Pour l’accueil" placeholderTextColor={colors.textMuted} />
+        </Ligne>
         {!!adresse && <Ligne icone="user" teinte="#6B7266" libelle={adresse} />}
         <Ligne icone="log-out" teinte={colors.danger} libelle="Se déconnecter" danger onPress={() => { void supabase.auth.signOut(); }} derniere />
       </Groupe>

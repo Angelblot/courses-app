@@ -9,6 +9,7 @@ import { Action, Photo, ui, useAnnulation } from '../../components/MaisonUI';
 import { SESSION_STEPS } from '../../lib/session-courses';
 import { usePistes } from '../../stores/pistes';
 import { useCommandes } from '../../stores/commandes';
+import { usePrenom } from '../../stores/profil';
 import { ENSEIGNES } from '../../lib/commandes';
 import { dateLongue, phraseSaison, resumeBudget, saison, salutation, type Saison } from '../../lib/accueil';
 
@@ -29,7 +30,7 @@ const jour = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('fr
  * manques n'y figurent pas : widget, Siri et bilan des courses s'en chargent.
  */
 export default function Maison() {
-  const { w, r, erreur } = useMaison(), { commandes } = useCommandes();
+  const { w, r, erreur } = useMaison(), { commandes } = useCommandes(), { prenom } = usePrenom();
   const insets = useSafeAreaInsets(), { width } = useWindowDimensions();
   const annulation = useAnnulation();
   const maintenant = new Date();
@@ -57,7 +58,7 @@ export default function Maison() {
         <Image source={IMAGES[saison(maintenant)]} accessibilityIgnoresInvertColors style={[a.image, { width: largeur, height: largeur * 1.5, top: insets.top - Math.round(largeur * 1.5 * 0.21) }]} />
         <View style={[a.accroche, { paddingTop: insets.top + 18 }]}>
           <Text style={a.date}>{dateLongue(maintenant).toUpperCase()}</Text>
-          <Text style={a.bonjour} accessibilityRole="header">{salutation(maintenant)}</Text>
+          <Text style={a.bonjour} accessibilityRole="header">{salutation(maintenant, prenom)}</Text>
           <Text style={a.saison}>{phraseSaison(maintenant)}</Text>
         </View>
       </View>

@@ -34,8 +34,11 @@ export function dateLongue(d: Date): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-/** Bonsoir à partir de 18 h. */
-export const salutation = (d: Date) => (d.getHours() >= 18 ? 'Bonsoir.' : 'Bonjour.');
+/** « Bonjour Angelo. », « Bonsoir. » à partir de 18 h ; sans prénom, le mot seul. */
+export function salutation(d: Date, prenom?: string | null): string {
+  const mot = d.getHours() >= 18 ? 'Bonsoir' : 'Bonjour', p = prenom?.trim();
+  return p ? `${mot} ${p}.` : `${mot}.`;
+}
 
 export type Budget = {
   /** Montant moyen des dernières commandes (jusqu'à 6), arrondi à l'euro. */
