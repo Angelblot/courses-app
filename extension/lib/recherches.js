@@ -17,9 +17,10 @@ export function fileDeRecherches(recherches) {
   return ORDRE_DRIVES
     .map((drive) => ({
       drive,
+      // Les fiches d'abord : quelqu'un attend devant le comparatif.
       recherches: aFaire
         .filter((r) => r.drive === drive)
-        .sort((a, b) => String(a.demandee_le).localeCompare(String(b.demandee_le))),
+        .sort((a, b) => Number(b.type === 'fiche') - Number(a.type === 'fiche') || String(a.demandee_le).localeCompare(String(b.demandee_le))),
     }))
     .filter((g) => g.recherches.length);
 }

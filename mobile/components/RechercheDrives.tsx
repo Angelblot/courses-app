@@ -9,7 +9,7 @@ import {
 import { contenanceLisible, libellePrixUnitaire, lireMesures, ORDRE_UNITES, prixParUnite, prixUnitaireLisible, uniteCommune, type Mesures } from '../lib/caracteristiques.ts';
 import { analyser, plusPetits } from '../lib/analyse-comparatif.ts';
 import { lookupEan, type FicheProduit } from '../lib/openfoodfacts.ts';
-import { annulerRecherche, demanderRecherches, garderOffres, useRecherchesDrive } from '../stores/recherches-drive';
+import { annulerRecherche, demanderFiches, demanderRecherches, garderOffres, useRecherchesDrive } from '../stores/recherches-drive';
 import { useProducts } from '../stores/products';
 import { TableauComparatif, type LigneComparatif } from './FicheOffre';
 import { Photo, ui } from './MaisonUI';
@@ -41,7 +41,7 @@ export function RechercheDrives({ requete, ean13, autres, onGarde, onPhase }: {
   autres: string[];
   onGarde: (productId: string) => void;
 }) {
-  const { recherches, offres, chargement, recharger } = useRecherchesDrive(requete);
+  const { recherches, offres, chargement, recharger, fichesEnCours } = useRecherchesDrive(requete);
   const { recharger: rechargerProduits } = useProducts();
   const [envoi, setEnvoi] = useState(false), [erreur, setErreur] = useState<string | null>(null);
   const [coches, setCoches] = useState<string[]>([]), [ouverts, setOuverts] = useState<Partial<Record<DriveRecherche, boolean>>>({});
@@ -172,7 +172,8 @@ export function RechercheDrives({ requete, ean13, autres, onGarde, onPhase }: {
     </Pressable>}
     <Text style={[s.texte, s.marge]}>Touche des produits pour les comparer. « Garder » l’ajoute à « Mes produits », déjà relié à son drive.</Text>
     {pied}
-    <ComparerOffres visible={comparer} offres={cochees} occupe={!!garde} erreur={comparer ? erreur : null} onFermer={() => setComparer(false)} onGarder={o => { void garder(o); }} />
+    <ComparerOffres visible={comparer} offres={cochees} occupe={!!garde} erreur={comparer ? erreur : null} fichesEnCours={fichesEnCours}
+      onOuvert={() => { void demanderFiches(cochees, fichesEnCours).then(() => recharger()); }} onFermer={() => setComparer(false)} onGarder={o => { void garder(o); }} />
   </View>;
 }
 
@@ -184,9 +185,15 @@ export function RechercheDrives({ requete, ean13, autres, onGarde, onPhase }: {
  * connus ajoutent Nutri-Score, NOVA et repères. Quelques phrases en tirent
  * l'essentiel. À deux, chaque panier prendra celui de son drive.
  */
-function ComparerOffres({ visible, offres, occupe, erreur, onFermer, onGarder }: {
-  visible: boolean; offres: OffreRelevee[]; occupe: boolean; erreur: string | null; onFermer: () => void; onGarder: (o: OffreRelevee[]) => void;
+function ComparerOffres({ visible, offres, occupe, erreur, fichesEnCours, onOuvert, onFermer, onGarder }: {
+  visible: boolean; offres: OffreRelevee[]; occupe: boolean; erreur: string | null;
+  /** Les fiches que l'extension lit en ce moment, pour compléter les contenances. */
+  fichesEnCours: string[]; onOuvert: () => void;
+  onFermer: () => void; onGarder: (o: OffreRelevee[]) => void;
 }) {
+  // À l'ouverture, les fiches qui manquent sont demandées à l'extension ; le tableau se complète à leur arrivée.
+  useEffect(() => { if (visible) onOuvert(); }, [visible]);
+  const lecture = offres.filter(o => fichesEnCours.includes(o.id)).length;
   const [choix, setChoix] = useState<ChoixParDrive>({});
   // Les fiches des bases ouvertes, par offre : undefined tant qu'on cherche, null si rien.
   const [fiches, setFiches] = useState<Record<string, FicheProduit | null>>({});
@@ -207,29 +214,32 @@ function ComparerOffres({ visible, offres, occupe, erreur, onFermer, onGarder }:
   const choisies = offres.filter(o => choix[o.drive] === o.id);
   // Les mesures : le libellé d'abord, puis le relevé du drive et la fiche ouverte pour le poids ou le volume.
   const mesures: Mesures[] = offres.map(o => {
-    const m = lireMesures(o.libelle), f = fiches[o.id];
+    const m = lireMesures(o.libelle, o.fiche_texte), f = fiches[o.id];
     const g = m.g ?? o.grammage_g ?? f?.grammageG ?? null, ml = m.ml ?? o.volume_ml ?? f?.volumeMl ?? null;
-    return { ...m, ...(g ? { g: Number(g) } : {}), ...(ml ? { ml: Number(ml) } : {}) };
+    return { ...m, ...(g ? { g: Number(g) } : {}), ...(ml ? { ml: Number(ml) } : {}) } as Mesures;
   });
   const unite = uniteCommune(mesures);
   const parUnite = offres.map((o, i) => (unite ? prixParUnite(o.prix, mesures[i], unite) : null));
   const colonnes = offres.map(o => { const f = fiches[o.id];
     return { ean13: o.id, name: o.libelle, brand: o.marque, imageUrl: o.image_url ?? f?.imageUrl ?? null, grammageG: o.grammage_g, volumeMl: o.volume_ml,
       productType: null, categoryKey: null, nutriscore: o.nutriscore ?? f?.nutriscore ?? null, ...(f?.details ? { details: f.details } : {}) }; });
-  const phrases = analyser(offres.map((o, i) => ({ nom: o.libelle, prix: o.prix, prixUnite: parUnite[i], nutriscore: colonnes[i].nutriscore,
+  const estime = (i: number) => !!(unite && mesures[i].estime?.[unite]);
+  const phrases = analyser(offres.map((o, i) => ({ nom: o.libelle, prix: o.prix, prixUnite: parUnite[i], estime: estime(i), nutriscore: colonnes[i].nutriscore,
     nova: fiches[o.id]?.details?.nova ?? null, promotion: o.promotion, disponible: o.disponible })), unite);
   const contenance = (m: Mesures) => {
     const u = unite && m[unite] != null ? unite : ORDRE_UNITES.find(x => m[x] != null);
-    return u ? contenanceLisible(u, m[u]!) : NC;
+    return u ? `${m.estime?.[u] ? '≈ ' : ''}${contenanceLisible(u, m[u]!)}` : NC;
   };
-  const sources = [...new Set(offres.map(o => fiches[o.id]?.origine ?? (fiches[o.id] ? 'Open Food Facts' : null)).filter(Boolean))];
+  // Une base n'est citée que si elle a apporté quelque chose : repères, Nutri-Score ou contenance.
+  const sources = [...new Set(offres.map(o => { const f = fiches[o.id];
+    return f && (f.details || f.nutriscore || f.grammageG || f.volumeMl) ? f.origine ?? 'Open Food Facts' : null; }).filter(Boolean))];
   const releve = offres.reduce((p, o) => (!p || o.vu_le < p ? o.vu_le : p), '' as string);
   const avant: LigneComparatif[] = [
     ['drive', 'Drive', (_, i) => <Text style={s.pastille}>{NOMS_DRIVE[offres[i].drive]}</Text>],
     ['prix', 'Prix au drive', (_, i) => offres[i].prix != null ? <Text style={s.prix}>{prixLisible(offres[i].prix)}</Text> : <Text style={s.nc}>{NC}</Text>],
     // Une ligne vide pour tous n'apprend rien : contenance, prix à la mesure, promo, dispo et fiche n'apparaissent que si l'un en a.
     ...(mesures.some(m => Object.keys(m).length) ? [['contenance', 'Contenance', (_, i) => <Text style={s.cellule}>{contenance(mesures[i])}</Text>] as LigneComparatif] : []),
-    ...(unite ? [['unite', libellePrixUnitaire(unite), (_, i) => <Text style={parUnite[i] != null ? s.cellule : s.nc}>{parUnite[i] != null ? prixUnitaireLisible(parUnite[i]!, unite) : NC}</Text>] as LigneComparatif] : []),
+    ...(unite ? [['unite', libellePrixUnitaire(unite), (_, i) => <Text style={parUnite[i] != null ? s.cellule : s.nc}>{parUnite[i] != null ? `${estime(i) ? '≈ ' : ''}${prixUnitaireLisible(parUnite[i]!, unite)}` : NC}</Text>] as LigneComparatif] : []),
     ...(offres.some(o => o.promotion) ? [['promo', 'Promo', (_, i) => <Text style={offres[i].promotion ? [s.cellule, { color: colors.attentionText, fontWeight: '700' }] : s.nc}>{offres[i].promotion ? insecable(offres[i].promotion!) : NC}</Text>] as LigneComparatif] : []),
     ...(offres.some(o => !o.disponible) ? [['dispo', 'Dispo', (_, i) => <Text style={s.cellule}>{offres[i].disponible ? 'en stock' : 'indisponible'}</Text>] as LigneComparatif] : []),
   ];
@@ -249,6 +259,10 @@ function ComparerOffres({ visible, offres, occupe, erreur, onFermer, onGarder }:
         {phrases.length > 0 && <View style={s.analyse} accessibilityLiveRegion="polite">
           <Text style={s.analyseTitre}>Ce qu’on peut en dire</Text>
           {phrases.map(p => <View key={p} style={s.puce}><View style={s.point} /><Text style={s.analyseTexte}>{p}</Text></View>)}
+        </View>}
+        {lecture > 0 && <View style={s.lecture} accessibilityLiveRegion="polite">
+          <ActivityIndicator size="small" color={colors.accent} />
+          <Text style={[s.texte, { flex: 1 }]}>Lecture {lecture > 1 ? `des ${lecture} fiches` : 'de la fiche'} sur Carrefour : les contenances se complètent d’elles-mêmes.</Text>
         </View>}
         <Text style={[s.texte, { paddingHorizontal: 16 }]}>Garde un produit par drive, ou un seul pour les deux. Un 2ᵉ sur le même drive remplace le 1er.</Text>
         <TableauComparatif colonnes={colonnes} avant={avant} meilleursAvant={{ unite: plusPetits(parUnite), prix: plusPetits(offres.map(o => o.prix)) }} enAvant={offres.flatMap((o, i) => choix[o.drive] === o.id ? [i] : [])}
@@ -333,6 +347,7 @@ const s = StyleSheet.create({
   validation: { backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 8 },
   resume: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   resumeTexte: { flex: 1, textAlign: 'right', fontSize: 14, fontWeight: '600', color: colors.text },
+  lecture: { marginHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
   analyse: { marginHorizontal: 16, backgroundColor: colors.accentSoft, borderRadius: 14, padding: 14, gap: 8 },
   analyseTitre: { fontSize: 14, fontWeight: '700', color: colors.text },
   puce: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },

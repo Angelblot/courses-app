@@ -169,7 +169,7 @@ export async function enregistrerOffres(lignes) {
 
 /** Recherches demandées depuis l'app et pas encore faites (ou interrompues). */
 export async function recherchesAFaire() {
-  return appel('recherches_drive?statut=in.(en_attente,en_cours,verification)&select=id,drive,requete,ean13,statut,demandee_le&order=demandee_le.asc');
+  return appel('recherches_drive?statut=in.(en_attente,en_cours,verification)&select=id,drive,requete,ean13,statut,demandee_le,type,url,offre_id&order=demandee_le.asc');
 }
 
 /** Avance une recherche : en cours, faite, vide, vérification ou échec. */
@@ -190,5 +190,14 @@ export async function signalerPresence(activite, detail, version) {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ activite, detail, version, vue_le: new Date().toISOString() }),
+  });
+}
+
+/** Range le texte utile de la fiche d'une offre, lu pour la comparer. */
+export async function enregistrerFiche(offreId, texte) {
+  return appel(`offres_drive?id=eq.${offreId}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ fiche_texte: texte, fiche_lue_le: new Date().toISOString() }),
   });
 }

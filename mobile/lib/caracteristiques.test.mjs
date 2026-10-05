@@ -5,7 +5,7 @@ import { lireMesures, uniteCommune, prixParUnite, prixUnitaireLisible, contenanc
 test('mesures : longueurs, feuilles et lots lus dans le libellé', () => {
   assert.deepEqual(lireMesures('CARREFOUR Papier cuisson 15 m CARREFOUR'), { m: 15 });
   assert.deepEqual(lireMesures('CARREFOUR Papier cuisson 20 feuilles CARREFOUR'), { feuille: 20 });
-  assert.deepEqual(lireMesures('Papier cuisson 8 m x 38 cm'), { m: 8 });
+  assert.deepEqual(lireMesures('Papier cuisson 8 m x 38 cm'), { m: 8, m2: 3.04 });
   assert.deepEqual(lireMesures('Papier cuisson 2,5 mètres'), { m: 2.5 });
   assert.deepEqual(lireMesures('Allumettes 2x75g'), { g: 150 });
   assert.deepEqual(lireMesures('Lait demi-écrémé 6 x 1 L'), { ml: 6000 });
@@ -39,4 +39,33 @@ test('mesures : prix comparables et lisibles', () => {
   assert.equal(contenanceLisible('g', 1500), '1,5 kg');
   assert.equal(contenanceLisible('feuille', 1), '1 feuille');
   assert.equal(libellePrixUnitaire('lavage'), 'Prix au lavage');
+});
+
+test('mesures : la fiche complète le libellé, sans le contredire', () => {
+  // Le texte réel de la fiche Carrefour « 20 feuilles » (sans le bloc colis).
+  const fiche = 'Papier Cuisson | Papier cuisson 20 feuilles CARREFOUR | le papier cuisson | (19) | Description | Papier cuisson. Comprend 20 feuilles de papier cuisson 38 x 42cm. Compatible micro-onde et four | Caractéristiques techniques | Fabrication française | Non | Nombre de pièces | 15';
+  const m = lireMesures('CARREFOUR Papier cuisson 20 feuilles CARREFOUR', fiche);
+  assert.equal(m.feuille, 20);
+  assert.equal(m.m2, 3.192);
+  // Sans rouleau de largeur connue à opposer, des mètres équivalents, estimés : 20 × 42 cm.
+  assert.equal(m.m, 8.4);
+  assert.deepEqual(m.estime, { m: true });
+  // « la boite de 16 feuilles » : le nombre vient du sous-titre de la fiche.
+  assert.equal(lireMesures('ALBAL Papier cuisson en feuilles ALBAL', 'Papier cuisson en feuilles ALBAL | la boite de 16 feuilles | Description | …').feuille, 16);
+  // Le libellé l'emporte sur la fiche.
+  assert.equal(lireMesures('Papier cuisson 15 m', 'Rouleau papier cuisson brun 12M').m, 15);
+});
+
+test('mesures : rouleaux avec largeur, surface et pièces de taille connue', () => {
+  assert.deepEqual(lireMesures('VOGUE Papier Sulfurisé 290 Mm X 50 M - Vogue VOGUE'), { m: 50, m2: 14.5 });
+  assert.deepEqual(lireMesures('VOGUE Papier Sulfurisé 50 M X 440 Mm - Vogue VOGUE'), { m: 50, m2: 22 });
+  assert.deepEqual(lireMesures('HENDI Papier Sulfurisé Blanc 500 Pièces 306x305mm - Hendi HENDI'), { m2: 46.665, piece: 500 });
+  assert.deepEqual(lireMesures('Papier cuisson 8 m x 38 cm'), { m: 8, m2: 3.04 });
+});
+
+test('mesures : la mesure commune préfère l’exacte à l’estimée, à couverture égale', () => {
+  const rouleau = lireMesures('Papier cuisson 15 m'), feuilles = lireMesures('Papier 20 feuilles 38 x 42cm'), albal = lireMesures('Albal en feuilles', 'la boite de 16 feuilles');
+  assert.equal(uniteCommune([rouleau, feuilles, albal, lireMesures('Albal 5m')]), 'm');
+  assert.equal(uniteCommune([feuilles, albal]), 'feuille');
+  assert.equal(uniteCommune([lireMesures('Papier 290 mm x 50 m'), feuilles]), 'm2');
 });

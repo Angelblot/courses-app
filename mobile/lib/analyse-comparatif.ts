@@ -8,6 +8,8 @@ import { libellePrixUnitaire, prixUnitaireLisible, type Unite } from './caracter
 
 export type ColonneAnalyse = {
   nom: string; prix: number | null; prixUnite: number | null;
+  /** Le prix à la mesure est estimé (des feuilles converties en mètres). */
+  estime?: boolean;
   nutriscore: string | null; nova: number | null; promotion: string | null; disponible: boolean;
 };
 
@@ -36,7 +38,8 @@ export function analyser(colonnes: ColonneAnalyse[], unite: Unite | null): strin
     const i = unitaires[0], c = colonnes[i];
     const max = Math.max(...colonnes.flatMap(x => (x.prixUnite != null ? [x.prixUnite] : [])));
     const ecart = Math.round((1 - c.prixUnite! / max) * 100);
-    phrases.push(`${libellePrixUnitaire(unite).replace('Prix', 'Le moins cher')} : ${nomCourt(c.nom)}, ${prixUnitaireLisible(c.prixUnite!, unite)}${ecart >= 5 ? `, ${ecart}\u00a0% de moins que le plus cher` : ''}.`);
+    phrases.push(`${libellePrixUnitaire(unite).replace('Prix', 'Le moins cher')} : ${nomCourt(c.nom)}, ${c.estime ? 'environ ' : ''}${prixUnitaireLisible(c.prixUnite!, unite)}${ecart >= 5 ? `, ${ecart}\u00a0% de moins que le plus cher` : ''}.`);
+    if (colonnes.some(x => x.estime && x.prixUnite != null)) phrases.push('Pour les feuilles, les mètres sont estimés : leur grand côté mis bout à bout.');
     const moinsChere = plusPetits(colonnes.map(x => x.prix));
     if (moinsChere.length === 1 && moinsChere[0] !== i && colonnes[moinsChere[0]].prixUnite != null) {
       phrases.push(`${nomCourt(colonnes[moinsChere[0]].nom)} coûte moins à l’achat, mais revient plus cher ${libellePrixUnitaire(unite).replace('Prix ', '')}.`);

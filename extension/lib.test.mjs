@@ -147,3 +147,11 @@ test('recherches : démarrage automatique, sauf après une pause qui attend une 
   assert.equal(demarrageAuto({ auto: true, aFaire: 3, occupe: false, etat: { statut: 'pause', cause: 'erreur' } }), true);
   assert.equal(demarrageAuto({ auto: true, aFaire: 3, occupe: false, etat: { statut: 'fini' } }), true);
 });
+
+test('recherches : les fiches à lire passent avant les recherches du même drive', () => {
+  const file = fileDeRecherches([
+    { id: 'r1', drive: 'carrefour', statut: 'en_attente', demandee_le: '2026-10-05T10:00:00Z', type: 'recherche' },
+    { id: 'f1', drive: 'carrefour', statut: 'en_attente', demandee_le: '2026-10-05T11:00:00Z', type: 'fiche' },
+  ]);
+  assert.deepEqual(file[0].recherches.map((r) => r.id), ['f1', 'r1']);
+});

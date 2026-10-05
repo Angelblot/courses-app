@@ -25,6 +25,8 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
   else if(url.includes('/rest/v1/recherches_drive')){
    if(m==='POST'){const lignes=req.postDataJSON();ecrit.recherches.push(...lignes);recherches.push(...lignes.map((l,i)=>({id:`r${recherches.length+i}`,statut:'en_attente',resultats:null,demandee_le:new Date().toISOString(),faite_le:null,...l})));}
    else if(m==='DELETE')recherches=[];
+   else if(url.includes('type=eq.fiche')&&url.includes('statut=in.'))data=recherches.filter(r=>r.type==='fiche'&&['en_attente','en_cours','verification'].includes(r.statut)).map(r=>({offre_id:r.offre_id}));
+   else if(url.includes('type=eq.fiche'))data=recherches.filter(r=>r.type==='fiche').map(r=>({offre_id:r.offre_id}));
    else data=url.includes('statut=in.')?recherches.filter(r=>['en_attente','en_cours','verification'].includes(r.statut)):recherches.filter(r=>url.includes(`requete=eq.${r.requete}`));}
   else if(url.includes('/rest/v1/offres_drive'))data=offres;
   else if(url.includes('/rest/v1/extension_presence'))data={vue_le:new Date().toISOString(),activite:'prete',detail:{auto:true}};
@@ -60,22 +62,33 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
  // 3. L'extension a cherché : les résultats reviennent, par drive.
  recherches=recherches.map(r=>r.requete!=='Papier sulfurisé'?r:{...r,id:r.drive==='carrefour'?'rc':'rl',statut:'faite',resultats:r.drive==='carrefour'?4:1,faite_le:new Date().toISOString()});
  offres=[offre('c1','carrefour',0,'Papier cuisson sulfurisé Carrefour 8 m',1.59,'3560070000001'),offre('c2','carrefour',1,'Papier cuisson Albal 10 m',2.99,'3560070000002'),
-  offre('c3','carrefour',2,'Papier sulfurisé Bio 5 m',2.49),offre('c4','carrefour',3,'Feuilles de cuisson x20',3.19),offre('l1','leclerc',0,'Papier cuisson Repère 8 m',1.39,null,{promotion:'-30 % le 2e'})];
+  offre('c3','carrefour',2,'Papier sulfurisé Bio 5 m',2.49),offre('c4','carrefour',3,'Papier cuisson 20 feuilles',3.19,'3560070000004'),offre('l1','leclerc',0,'Papier cuisson Repère 8 m',1.39,null,{promotion:'-30 % le 2e'})];
  await page.keyboard.press('Escape');await page.waitForTimeout(600);await ouvrir();
  await page.getByText('Sur tes drives',{exact:true}).waitFor({timeout:20000});
  // Quatre résultats Carrefour : tous montrés plutôt qu'un « Voir 1 autre ».
- await page.getByText('Feuilles de cuisson x20',{exact:true}).waitFor();if(await page.getByText(/^Voir les/).count())throw Error('Voir les autres inutile');
+ await page.getByText('Papier cuisson 20 feuilles',{exact:true}).waitFor();if(await page.getByText(/^Voir les/).count())throw Error('Voir les autres inutile');
  await page.getByRole('checkbox',{name:'Comparer Papier cuisson sulfurisé Carrefour 8 m'}).click();
  await page.getByRole('checkbox',{name:'Comparer Papier cuisson Albal 10 m'}).click();
  await page.getByRole('checkbox',{name:'Comparer Papier cuisson Repère 8 m'}).click();
- const comparer=page.getByRole('button',{name:'Comparer les 3 produits cochés'});await comparer.scrollIntoViewIfNeeded();
+ await page.getByRole('checkbox',{name:'Comparer Papier cuisson 20 feuilles'}).click();
+ const comparer=page.getByRole('button',{name:'Comparer les 4 produits cochés'});await comparer.scrollIntoViewIfNeeded();
  await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd3-resultats.png'});
  await comparer.click();
+ // 3 bis. À l'ouverture, les fiches Carrefour sont demandées à l'extension (pas Leclerc : ses fiches n'ont pas d'adresse).
+ await page.getByText(/^Lecture des 3 fiches sur Carrefour/).waitFor({timeout:15000});
+ const fiches=ecrit.recherches.filter(r=>r.type==='fiche').map(r=>r.offre_id).sort().join(',');
+ if(fiches!=='c1,c2,c4')throw Error('Fiches demandées '+fiches);
+ // L'extension lit la fiche des 20 feuilles : leur taille donne des mètres équivalents, estimés.
+ recherches=recherches.map(r=>r.type==='fiche'?{...r,statut:'faite'}:r);
+ offres=offres.map(o=>o.id==='c4'?{...o,fiche_texte:'Description | Comprend 20 feuilles de papier cuisson 38 x 42cm.'}:o);
+ await page.getByText('≈ 8,4 m',{exact:true}).waitFor({timeout:25000});
+ await page.getByText('≈ 0,38 €/m',{exact:true}).waitFor();
  // 4. Comparatif : il s'adapte au produit (contenance en mètres, prix au mètre), cite la fiche ouverte et en tire l'essentiel.
  await page.getByText('Garde un produit par drive, ou un seul pour les deux. Un 2ᵉ sur le même drive remplace le 1er.',{exact:true}).waitFor();
  await page.getByText('Prix au mètre',{exact:true}).waitFor();await page.getByText('0,17 €/m',{exact:true}).waitFor();
- await page.getByText(/Repères : Open Products Facts\./).waitFor({timeout:15000});
- await page.getByText('Le moins cher au mètre : Papier cuisson Repère 8 m, 0,17 €/m, 42\u00a0% de moins que le plus cher.',{exact:true}).waitFor();
+ // La fiche Open Products Facts n'apporte que le nom : elle n'est pas citée comme source.
+ await page.waitForTimeout(1500);if(await page.getByText(/Repères :/).count())throw Error('Source citée sans rien apporter');
+ await page.getByText('Le moins cher au mètre : Papier cuisson Repère 8 m, 0,17 €/m, 54\u00a0% de moins que le plus cher.',{exact:true}).waitFor();
  // Un choix par drive ; un 2e choix Carrefour remplace le 1er.
  await page.getByRole('button',{name:'Garder Papier cuisson sulfurisé Carrefour 8 m pour Carrefour'}).click();
  await page.getByRole('button',{name:'Garder Papier cuisson Albal 10 m pour Carrefour'}).click();

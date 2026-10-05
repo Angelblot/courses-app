@@ -21,6 +21,12 @@ test('analyse : Nutri-Score, NOVA, promotion et indisponibilité quand ils dépa
   assert.deepEqual(p, ['Meilleur Nutri-Score : Yaourt A (A).', 'Le moins transformé : Yaourt A (NOVA 1).', 'En promotion : Yaourt B, -30\u00a0% le 2e.', 'Indisponible au drive : Yaourt B.']);
 });
 
+test('analyse : un prix estimé est dit, et la conversion expliquée', () => {
+  const p = analyser([col('Papier cuisson 15 m', 1.79, 0.119), col('Papier 20 feuilles', 0.99, 0.118, { estime: true })], 'm');
+  assert.equal(p[0], 'Le moins cher au mètre : Papier 20 feuilles, environ 0,12 €/m.');
+  assert.equal(p[1], 'Pour les feuilles, les mètres sont estimés : leur grand côté mis bout à bout.');
+});
+
 test('analyse : utilitaires', () => {
   assert.deepEqual(plusPetits([3, null, 1, 1]), [2, 3]);
   assert.deepEqual(plusPetits([2, 2]), []);

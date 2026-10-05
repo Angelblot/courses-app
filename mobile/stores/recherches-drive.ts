@@ -4,7 +4,7 @@ import { DRIVES_RECHERCHE, planGarde, type OffreRelevee, type RechercheDrive } f
 import { normalizeProductType } from '../lib/typology.ts';
 
 const CHAMPS_RECHERCHE = 'id, drive, requete, ean13, statut, resultats, demandee_le, faite_le';
-const CHAMPS_OFFRE = 'id, recherche_id, drive, libelle, marque, ean13, url, image_url, prix, prix_unitaire, unite_prix, grammage_g, volume_ml, nutriscore, promotion, disponible, rang, vu_le';
+const CHAMPS_OFFRE = 'id, recherche_id, drive, libelle, marque, ean13, url, image_url, prix, prix_unitaire, unite_prix, grammage_g, volume_ml, nutriscore, promotion, disponible, rang, vu_le, fiche_texte';
 
 /**
  * Demande à l'extension de chercher ces produits sur Carrefour et E.Leclerc.
@@ -40,6 +40,8 @@ export function useRecherchesDrive(requete: string) {
   const [recherches, setRecherches] = useState<RechercheDrive[]>([]);
   const [offres, setOffres] = useState<OffreRelevee[]>([]);
   const [chargement, setChargement] = useState(true);
+  // Les offres dont la fiche est en cours de lecture par l'extension.
+  const [fichesEnCours, setFichesEnCours] = useState<string[]>([]);
 
   const recharger = useCallback(async () => {
     const { data, error } = await supabase.from('recherches_drive').select(CHAMPS_RECHERCHE)
@@ -54,6 +56,11 @@ export function useRecherchesDrive(requete: string) {
       ? await supabase.from('offres_drive').select(CHAMPS_OFFRE).in('recherche_id', ids).order('rang', { ascending: true })
       : { data: [], error: null };
     if (lues.error) console.error('[useRecherchesDrive]', lues.error);
+    const idsOffres = (lues.data ?? []).map(o => (o as OffreRelevee).id);
+    const fiches = idsOffres.length
+      ? await supabase.from('recherches_drive').select('offre_id').eq('type', 'fiche').in('statut', ['en_attente', 'en_cours', 'verification']).in('offre_id', idsOffres)
+      : { data: [] };
+    setFichesEnCours(((fiches.data ?? []) as { offre_id: string }[]).map(f => f.offre_id));
     setRecherches(liste);
     setOffres(((lues.data ?? []) as OffreRelevee[]).map(o => ({ ...o, prix: o.prix == null ? null : Number(o.prix), prix_unitaire: o.prix_unitaire == null ? null : Number(o.prix_unitaire) })));
     setChargement(false);
@@ -62,16 +69,22 @@ export function useRecherchesDrive(requete: string) {
   useEffect(() => {
     let vivant = true;
     void recharger();
+    // Toute avancée compte : une fiche lue porte le libellé de l'offre, pas le nom cherché.
     const canal = supabase.channel(`recherches-${requete}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'recherches_drive' }, (m) => {
-        const r = (m.new ?? m.old) as Partial<RechercheDrive> | undefined;
-        if (vivant && (!r?.requete || r.requete === requete)) void recharger();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recherches_drive' }, () => { if (vivant) void recharger(); })
       .subscribe();
     return () => { vivant = false; supabase.removeChannel(canal); };
   }, [requete, recharger]);
 
-  return { recherches, offres, chargement, recharger };
+  // Le temps réel peut manquer un événement : tant que quelque chose est en cours, on relit toutes les 15 secondes.
+  const enCours = fichesEnCours.length > 0 || recherches.some(r => ['en_attente', 'en_cours'].includes(r.statut));
+  useEffect(() => {
+    if (!enCours) return;
+    const t = setInterval(() => { void recharger(); }, 15_000);
+    return () => clearInterval(t);
+  }, [enCours, recharger]);
+
+  return { recherches, offres, chargement, recharger, fichesEnCours };
 }
 
 /**
@@ -117,4 +130,23 @@ export async function garderOffres(choisies: OffreRelevee[], requete: string): P
     if (error) console.error('[garderOffres] alternatives', error);
   }
   return { ok: true, productId: ids[0] };
+}
+
+/**
+ * Demande à l'extension de lire la fiche des offres comparées dont la
+ * contenance manque (taille des feuilles, largeur d'un rouleau…). Seules les
+ * fiches Carrefour ont une adresse ; une lecture déjà demandée ne se répète pas.
+ */
+export async function demanderFiches(offres: OffreRelevee[], dejaEnCours: string[]): Promise<{ ok: boolean }> {
+  const candidates = offres.filter(o => o.drive === 'carrefour' && o.url && !o.fiche_texte && !dejaEnCours.includes(o.id));
+  if (!candidates.length) return { ok: true };
+  // Une fiche déjà lue sans rien d'utile, ou en cours, ne se redemande pas.
+  const { data: deja } = await supabase.from('recherches_drive').select('offre_id').eq('type', 'fiche').in('offre_id', candidates.map(o => o.id));
+  const vues = new Set(((deja ?? []) as { offre_id: string }[]).map(d => d.offre_id));
+  const lignes = candidates.filter(o => !vues.has(o.id))
+    .map(o => ({ drive: o.drive, type: 'fiche', requete: o.libelle.slice(0, 200), url: o.url, offre_id: o.id }));
+  if (!lignes.length) return { ok: true };
+  const { error } = await supabase.from('recherches_drive').insert(lignes);
+  if (error) { console.error('[demanderFiches]', error); return { ok: false }; }
+  return { ok: true };
 }

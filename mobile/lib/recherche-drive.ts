@@ -24,6 +24,8 @@ export type OffreRelevee = {
   prix: number | null; prix_unitaire: number | null; unite_prix: 'kg' | 'l' | 'unite' | null;
   grammage_g: number | null; volume_ml: number | null; nutriscore: NoteNutri | null;
   promotion: string | null; disponible: boolean; rang: number | null; vu_le: string;
+  /** Le texte utile de la fiche sur le drive, lu par l'extension pour comparer. */
+  fiche_texte?: string | null;
 };
 
 const EN_ATTENTE: StatutRecherche[] = ['en_attente', 'en_cours', 'verification'];

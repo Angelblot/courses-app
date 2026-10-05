@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import type { FicheProduit } from '../lib/openfoodfacts.ts';
@@ -129,7 +129,33 @@ export function TableauComparatif({ colonnes, avant = [], meilleursAvant = {}, p
   };
   const visibles = lignes.filter(([cle]) => !connu[cle] || colonnes.some(connu[cle]));
   const large = colonnes.length > 3, col = large ? s.colonneFixe : null;
-  const tableau = <View style={[s.comparatif, large && { marginHorizontal: 0 }]}>
+  // Au-delà de trois produits, le tableau défile de côté et les libellés restent en place à gauche :
+  // chaque ligne défilante mesure sa hauteur, que reprend son libellé figé.
+  const [hauteurs, setHauteurs] = useState<Record<string, number>>({});
+  const mesurer = (cle: string) => (e: LayoutChangeEvent) => {
+    const h = Math.round(e.nativeEvent.layout.height);
+    setHauteurs(x => (x[cle] === h ? x : { ...x, [cle]: h }));
+  };
+  if (large) {
+    const rangees: [string, string | null][] = [['entete', null], ...visibles.map(([cle, libelle]) => [cle, libelle] as [string, string]), ...(pied ? [['pied', null] as [string, null]] : [])];
+    return <View style={[s.comparatif, { flexDirection: 'row' }]}>
+      <View style={s.libellesFiges}>
+        {rangees.map(([cle, libelle]) => <View key={cle} style={[s.ligneComp, { height: hauteurs[cle] }, cle === 'pied' && { borderBottomWidth: 0 }]}>
+          {libelle ? <Text style={s.libelleComp}>{libelle}</Text> : null}
+        </View>)}
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+        <View>
+          <View onLayout={mesurer('entete')} style={s.ligneComp}>{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, enAvant.includes(i) && s.colonneMoi]}><Photo name={c.name} url={c.imageUrl} style={s.mini52} /><Text style={s.nomComp} numberOfLines={3}>{c.name}</Text></View>)}</View>
+          {visibles.map(([cle, , rendu]) => <View key={cle} onLayout={mesurer(cle)} style={s.ligneComp}>
+            {colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, enAvant.includes(i) && s.colonneMoi, vert(cle, i) && s.mieux]}>{rendu(c, i)}</View>)}
+          </View>)}
+          {pied && <View onLayout={mesurer('pied')} style={[s.ligneComp, { borderBottomWidth: 0 }]}>{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, enAvant.includes(i) && s.colonneMoi]}>{pied(c, i)}</View>)}</View>}
+        </View>
+      </ScrollView>
+    </View>;
+  }
+  const tableau = <View style={s.comparatif}>
     <View style={s.ligneComp}><View style={s.libelleComp} />{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, enAvant.includes(i) && s.colonneMoi]}><Photo name={c.name} url={c.imageUrl} style={s.mini52} /><Text style={s.nomComp} numberOfLines={3}>{c.name}</Text></View>)}</View>
     {visibles.map(([cle, libelle, rendu]) => <View key={cle} style={s.ligneComp}>
       <Text style={s.libelleComp}>{libelle}</Text>
@@ -137,7 +163,7 @@ export function TableauComparatif({ colonnes, avant = [], meilleursAvant = {}, p
     </View>)}
     {pied && <View style={[s.ligneComp, { borderBottomWidth: 0 }]}><View style={s.libelleComp} />{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, enAvant.includes(i) && s.colonneMoi]}>{pied(c, i)}</View>)}</View>}
   </View>;
-  return large ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12 }}>{tableau}</ScrollView> : tableau;
+  return tableau;
 }
 
 function Rang({ libelle, valeur, niveau, derniere = false }: { libelle: string; valeur: string; niveau?: Niveau; derniere?: boolean }) {
@@ -181,11 +207,13 @@ const s = StyleSheet.create({
   libelleComp: { width: 92, fontSize: 12, fontWeight: '600', color: colors.textMuted, paddingHorizontal: 8, alignSelf: 'center' },
   colonne: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 4, gap: 4 },
   colonneMoi: { backgroundColor: '#F6F8F3' },
+  libellesFiges: { width: 92, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border, backgroundColor: colors.surface, zIndex: 1 },
   mieux: { backgroundColor: '#E6F0DD' },
   cellule: { fontSize: 12, color: colors.text, textAlign: 'center', fontVariant: ['tabular-nums'] },
   mini: { fontSize: 11, fontWeight: '800', color: '#FFFFFF', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, overflow: 'hidden' },
   mini52: { width: 52, height: 52, borderRadius: 8 },
-  colonneFixe: { flex: 0, width: 104 },
+  // Largeur explicite : sur le web, flex: 0 donne une base nulle qui écrase les colonnes.
+  colonneFixe: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', width: 104 },
   nomComp: { fontSize: 11, fontWeight: '600', color: colors.text, textAlign: 'center' },
   choisirPetit: { minHeight: 36, paddingHorizontal: 10, borderRadius: 10, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
   choisirPetitTexte: { fontSize: 13, fontWeight: '700', color: colors.accent },

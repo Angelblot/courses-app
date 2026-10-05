@@ -278,6 +278,22 @@ export function pageAgent(cfg, item, mode) {
     };
   }
 
+  /**
+   * Le texte utile d'une fiche, pour la comparer : titre, sous-titre (« la
+   * boite de 16 feuilles »), description et caractéristiques techniques. On
+   * coupe avant les suggestions et on retire le bloc « Caractéristiques du
+   * colis », qui décrit l'emballage et fausserait la contenance.
+   */
+  function texteDeFiche() {
+    const racine = document.querySelector('main') || document.body;
+    let texte = (racine.innerText || '').replace(/\s*\n+\s*/g, ' | ');
+    const fins = ['Voir tous les produits du rayon', 'Paiement 100% sécurisé', 'Vous pourriez aussi aimer', 'Ils peuvent aussi vous intéresser'];
+    const fin = Math.min(...fins.map((f) => texte.indexOf(f)).filter((i) => i > 0), texte.length);
+    texte = texte.slice(0, fin).replace(/Caract[ée]ristiques du colis.*?(?=\| [A-ZÉ][a-zé]+ [a-zé]|$)/, '');
+    if (!texte.trim()) return { ok: false, reason: 'product_unavailable', message: 'Fiche vide' };
+    return { ok: true, reason: 'fiche', texte: texte.slice(0, 2000) };
+  }
+
   /** Ajoute au panier depuis une fiche produit (pas une liste de résultats). */
   async function addFromProductPage() {
     const pp = cfg.productPage || {};
@@ -574,6 +590,7 @@ export function pageAgent(cfg, item, mode) {
     if (mode === 'diagnose') return { ok: true, reason: 'diagnose', report: diagnose() };
 
     // Accès direct à une fiche : aucune recherche, donc aucune ambiguïté.
+    if (mode === 'fiche') return texteDeFiche();
     if (productPageRe && productPageRe.test(location.href)) {
       return mode === 'releve' ? lireFiche() : addFromProductPage();
     }

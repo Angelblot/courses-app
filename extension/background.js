@@ -17,7 +17,7 @@ import { pageAgent } from './content/page-agent.js';
 import {
   travauxEnAttente, travauxAbandonnes, revendiquer,
   progresser, terminer, equivalencesDe, enregistrerEquivalence, enregistrerOffres,
-  recherchesAFaire, majRecherche, signalerPresence,
+  recherchesAFaire, majRecherche, signalerPresence, enregistrerFiche,
 } from './supabase.js';
 import { fileDeRecherches, pauseEntreRecherches, adresseRecherche, issueRecherche, demarrageAuto } from './lib/recherches.js';
 import { strategie, indexer } from './lib/equivalences.js';
@@ -765,6 +765,23 @@ async function faireRecherches(file, { auto = false } = {}) {
       if (etat?.statut !== 'en_cours') return;
       await majRecherche(rech.id, { statut: 'en_cours' });
       await majEtatRecherches({ requete: rech.requete });
+      // Une fiche à lire pour le comparatif : on l'ouvre, on en garde le texte utile, sans rien cliquer.
+      if (rech.type === 'fiche') {
+        let compteFiche = { ok: false, reason: 'no_results' };
+        if (rech.url) { await naviguer(tabId, rech.url); compteFiche = await runAgent(tabId, cfg, { name: rech.requete, quantity: 1 }, 'fiche'); }
+        const lue = compteFiche.ok && rech.offre_id ? (await enregistrerFiche(rech.offre_id, compteFiche.texte)).ok : false;
+        const statutFiche = compteFiche.reason === 'challenge' ? 'verification' : lue ? 'faite' : 'vide';
+        await majRecherche(rech.id, { statut: statutFiche, resultats: lue ? 1 : 0, faite_le: statutFiche === 'verification' ? null : new Date().toISOString() });
+        if (statutFiche === 'verification') {
+          if (auto) await chrome.tabs.update(tabId, { active: true }).catch(() => {});
+          await majEtatRecherches({ statut: 'pause', cause: 'verification', message: `Vérification demandée sur ${cfg.label}. Résous-la dans l'onglet, puis relance.` });
+          return;
+        }
+        fait += 1;
+        await majEtatRecherches({ fait, journal: [...(etat.journal ?? []), { requete: `fiche · ${rech.requete}`, drive: groupe.drive, statut: statutFiche, n: lue ? 1 : 0 }].slice(-30) });
+        await sleep(pauseEntreRecherches());
+        continue;
+      }
       const item = { name: rech.requete, quantity: 1, ean: rech.ean13 ?? null };
       let compte = { ok: false, reason: 'no_results' };
       // Un code-barres ouvre la fiche Carrefour sans recherche ni ambiguïté.
