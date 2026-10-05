@@ -1,7 +1,7 @@
 import { ProductSuggestions, productSuggestion } from '../components/ProductSuggestions';
 import { doublonsPossibles, manqueActif, manquesAPreciser, manquesDuBrouillon, resumeBilan } from '../lib/session-courses';
 import { rayonDepuisLibelle } from '../lib/rayons';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -32,7 +32,7 @@ export default function Liste({session=false}:{session?:boolean}){
  const visibles=lignes.filter(l=>l.owned===owned);
  const points=manques.length+doublons.length;
  const annulation=useAnnulation();
- useEffect(()=>{if(!points)setRegler(false);},[points]);
+ // La feuille Préciser se ferme d'elle-même quand elle n'a plus rien à montrer (récapitulatif compris).
  const vide=!acheter.length;
  // Tout retrait depuis la liste s'annule, comme ailleurs dans la session.
  const diminuer=(l:LigneMaison)=>{if(l.totalQuantity>1){w.modifierLigne(l.key,l.totalQuantity-1);return;}const avant=w.ligneQuantites[l.key];w.modifierLigne(l.key,0);annulation.proposer(`${l.name} retiré de ta liste`,()=>w.restaurerLigne(l.key,avant));};

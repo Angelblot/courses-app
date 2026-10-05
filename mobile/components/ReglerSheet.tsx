@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useWizard } from '../contexts/WizardContext';
@@ -49,6 +49,10 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
  const focusRegle = focus && !focusOuvert ? regles[focus] : undefined;
  const courant = focusOuvert ?? (focusRegle ? undefined : tete);
  const affiche = focusRegle ? focus : courant ? cle(courant) : null;
+ // Plus rien d'ouvert mais des points réglés ici : le récapitulatif, d'où l'on revoit chacun.
+ const fin = !courant && !focusRegle && Object.keys(regles).length > 0;
+ const vide = !courant && !focusRegle && !fin;
+ useEffect(() => { if (visible && vide) onFermer(); }, [visible, vide]);
 
  useEffect(() => { if (visible && !focus && cleTete) setParcours(p => visiter(p, cleTete)); }, [visible, focus, cleTete]);
  // Une nouvelle ouverture repart de zéro : les réglages d'avant sont dans la liste.
@@ -57,7 +61,7 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
  // La file entière, dans l'ordre de visite : « 3 sur 19 » ne bouge pas quand un point est réglé.
  const ordre = [...parcours, ...points.map(cle).filter(k => !parcours.includes(k))];
  const n = Math.max(ordre.length, 1), position = affiche ? Math.min(n, rangDans(parcours, affiche)) : 1;
- const titre = `Préciser · ${position} sur ${n}`;
+ const titre = fin ? 'Préciser' : `Préciser · ${position} sur ${n}`;
  const ouverts = new Set(points.map(cle));
  const progression = n > 1 ? <View style={s.pas} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
   {ordre.map(k => <View key={k} style={[s.segment, k === affiche && s.segmentCourant, !ouverts.has(k) && !!regles[k] && s.segmentFait]} />)}
@@ -65,21 +69,27 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
 
  const nomDe = (k: string) => { const p = points.find(x => cle(x) === k);
   return p ? (p.type === 'manque' ? p.manque.name : `${p.doublon.a.name} ou ${p.doublon.b.name}`) : regles[k]?.nom ?? ''; };
- const avant = affiche ? precedentDe(parcours, affiche) : null;
+ const reglesDansLOrdre = ordre.filter(k => regles[k] && !ouverts.has(k)).map(k => ({ cle: k, regle: regles[k] }));
+ const avant = affiche ? precedentDe(parcours, affiche) : fin ? reglesDansLOrdre[reglesDansLOrdre.length - 1]?.cle ?? null : null;
  const onPrecedent = avant ? () => setFocus(avant) : null;
  const libellePrecedent = avant ? `Revenir à « ${nomDe(avant)} »` : 'Point précédent';
  // VoiceOver suit le changement de point : le contenu de la feuille est remplacé d'un bloc.
- useEffect(() => { if (visible && affiche) AccessibilityInfo.announceForAccessibility(`${titre}. ${nomDe(affiche)}${focusRegle ? ', déjà réglé' : ''}`); }, [visible, affiche, !!focusRegle]);
+ useEffect(() => {
+  if (visible && affiche) AccessibilityInfo.announceForAccessibility(`${titre}. ${nomDe(affiche)}${focusRegle ? ', déjà réglé' : ''}`);
+  else if (visible && fin) AccessibilityInfo.announceForAccessibility('Tout est réglé');
+ }, [visible, affiche, !!focusRegle, fin]);
  const regle = (k: string, nom: string, type: Point['type']): OnRegle => (resume, annuler) => {
   setRegles(r => ({ ...r, [k]: { nom, type, resume, annuler } }));
   setFocus(null);
  };
 
- return <Modal visible={visible && (!!courant || !!focusRegle)} animationType="slide" presentationStyle="pageSheet" onRequestClose={onFermer}>
-  {focusRegle && focus
+ return <Modal visible={visible && !vide} animationType="slide" presentationStyle="pageSheet" onRequestClose={onFermer}>
+  {fin
+   ? <ToutRegle progression={progression} points={reglesDansLOrdre} toast={toast} onFermer={onFermer} onPrecedent={onPrecedent} libellePrecedent={libellePrecedent} onRevoir={setFocus} />
+   : focusRegle && focus
    ? <PointRegle titre={titre} progression={progression} regle={focusRegle} onFermer={onFermer} onPrecedent={onPrecedent}
      suite={cleTete ? { rang: rangDans(parcours, cleTete), nom: nomDe(cleTete) } : null} libellePrecedent={libellePrecedent}
-     onContinuer={() => cleTete ? setFocus(null) : onFermer()}
+     onContinuer={() => setFocus(null)}
      onChanger={() => { focusRegle.annuler(); setRegles(r => { const { [focus]: _, ...reste } = r; return reste; }); }} />
    : courant?.type === 'manque'
    ? <PreciserManque key={courant.key} titre={titre} progression={progression} lineKey={courant.key} manque={courant.manque} products={products} onFermer={onFermer} onRetrait={onRetrait} toast={toast}
@@ -102,6 +112,46 @@ function Entete({ titre, onFermer, onPrecedent, libellePrecedent }: { titre: str
  </View>;
 }
 
+/** Une décision en une ligne lisible : « Carrefour : … », « Retiré de ta liste », « Gardé sans produit… ». */
+function decision(resume: Resume): string {
+ const pleines = resume.filter(l => !l.vide);
+ return (pleines.length ? pleines.map(l => `${l.qui} : ${l.quoi}`) : resume.slice(0, 1).map(l => `${l.qui} ${l.quoi}`)).join('\n');
+}
+
+/**
+ * Tout est réglé : la feuille reste ouverte sur le récapitulatif. Chaque point
+ * se revoit d'un tap (puis « Changer »), le chevron remonte au dernier.
+ */
+function ToutRegle({ progression, points, onFermer, onPrecedent, libellePrecedent, onRevoir, toast }: { toast?: ReactNode; progression: ReactNode; points: { cle: string; regle: Regle }[]; onFermer: () => void; onPrecedent: (() => void) | null; libellePrecedent: string; onRevoir: (cle: string) => void }) {
+ const insets = useSafeAreaInsets();
+ return <SafeAreaView edges={['top']} style={s.ecran}>
+  <Entete titre="Préciser" onFermer={onFermer} onPrecedent={onPrecedent} libellePrecedent={libellePrecedent} />
+  <ScrollView contentContainerStyle={{ gap: 10, paddingBottom: 16 }}>
+   {progression}
+   <View style={s.heros}>
+    <View style={s.statutRegle} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Feather name="check" size={24} color={colors.accentContrast} /></View>
+    <View style={{ flex: 1, gap: 2 }}><Text style={s.nom} accessibilityRole="header">Tout est réglé</Text><Text style={[ui.detail, { marginTop: 0 }]}>{points.length} point{points.length > 1 ? 's' : ''}. Touche-en un pour le revoir.</Text></View>
+   </View>
+   <View style={s.recap}>
+    {points.map(({ cle, regle }, i) => <Pressable key={cle} accessibilityRole="button" accessibilityLabel={`Revoir « ${regle.nom} ». ${decision(regle.resume).split('\n').join('. ')}`} onPress={() => onRevoir(cle)}
+     style={({ pressed }) => [s.recapLigne, i > 0 && s.ligneRegleTrait, pressed && { backgroundColor: colors.off }]}>
+     <View style={{ flex: 1, gap: 2 }}>
+      <Text style={ui.productName} numberOfLines={1}>« {regle.nom} »</Text>
+      <Text style={[ui.detail, { marginTop: 0 }, regle.resume[0]?.qui === 'Retiré' && { color: colors.danger }]} numberOfLines={2}>{decision(regle.resume)}</Text>
+     </View>
+     <Feather name="chevron-right" size={18} color={colors.textMuted} />
+    </Pressable>)}
+   </View>
+  </ScrollView>
+  <View style={[s.basDoublon, s.piedFin, { paddingBottom: 12 + insets.bottom }]}>
+   {toast}
+   <Pressable accessibilityRole="button" onPress={onFermer} style={({ pressed }) => [s.valider, pressed && { opacity: .85 }]}>
+    <Text style={s.validerTexte}>Terminer</Text>
+   </Pressable>
+  </View>
+ </SafeAreaView>;
+}
+
 /**
  * Un point déjà réglé, revu par « Précédent » : ce qui a été décidé, puis
  * « Continuer » vers le premier point ouvert ou « Changer » pour le rouvrir.
@@ -113,7 +163,7 @@ function PointRegle({ titre, progression, regle, onFermer, onPrecedent, libelleP
   <View style={{ gap: 10, paddingBottom: 10 }}>
    {progression}
    <View style={s.heros}>
-    <View style={[s.inconnu, { backgroundColor: colors.accentSoft }]}><Feather name="check" size={22} color={colors.accent} /></View>
+    <View style={s.statutRegle} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Feather name="check" size={24} color={colors.accentContrast} /></View>
     <View style={{ flex: 1, gap: 2 }}><Text style={s.nom} numberOfLines={2}>« {regle.nom} »</Text><Text style={s.dejaRegle}>Déjà réglé</Text></View>
    </View>
   </View>
@@ -129,8 +179,8 @@ function PointRegle({ titre, progression, regle, onFermer, onPrecedent, libelleP
     : '« Changer » remet les deux lignes, pour trancher autrement.'}</Text>
   </View>
   <View style={[s.basDoublon, { paddingBottom: 12 + insets.bottom }]}>
-   <Pressable accessibilityRole="button" accessibilityLabel={suite ? `Continuer au point ${suite.rang}, « ${suite.nom} »` : 'Terminer'} onPress={onContinuer} style={({ pressed }) => [s.valider, pressed && { opacity: .85 }]}>
-    <Text style={s.validerTexte}>{suite ? `Continuer au point ${suite.rang}` : 'Terminer'}</Text>
+   <Pressable accessibilityRole="button" accessibilityLabel={suite ? `Continuer au point ${suite.rang}, « ${suite.nom} »` : 'Voir le récapitulatif'} onPress={onContinuer} style={({ pressed }) => [s.valider, pressed && { opacity: .85 }]}>
+    <Text style={s.validerTexte}>{suite ? `Continuer au point ${suite.rang}` : 'Voir le récapitulatif'}</Text>
    </Pressable>
    <Pressable accessibilityRole="button" accessibilityLabel={`Changer « ${regle.nom} »`} onPress={onChanger} style={({ pressed }) => [s.lienPied, pressed && { opacity: .6 }]}>
     <Text style={s.lienPiedTexte}>Changer</Text>
@@ -158,9 +208,10 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
   const avant = w;
   setOccupe(true); setErreur(null);
   const r = await garderOffres(offres, nom);
-  setOccupe(false);
-  if (!r.ok || !r.productId) { setErreur(r.erreur ?? 'Impossible d’ajouter ce produit. Réessaie.'); return; }
+  if (!r.ok || !r.productId) { setOccupe(false); setErreur(r.erreur ?? 'Impossible d’ajouter ce produit. Réessaie.'); return; }
+  // Occupé jusqu'au règlement : le chevron reste inactif pendant le rechargement.
   await recharger();
+  setOccupe(false);
   setComparaison(null);
   const productId = r.productId;
   onRegle(DRIVES_RECHERCHE.map(d => { const o = offres.find(x => x.drive === d);
@@ -288,6 +339,10 @@ const s = StyleSheet.create({
  carteRegle: { backgroundColor: colors.surface, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 4 },
  ligneRegle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 44, paddingVertical: 8 },
  ligneRegleTrait: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+ recap: { marginHorizontal: 16, backgroundColor: colors.surface, borderRadius: 16, overflow: 'hidden' },
+ recapLigne: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, paddingHorizontal: 14, paddingVertical: 10 },
+ piedFin: { backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+ statutRegle: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
  dejaRegle: { fontSize: 13, fontWeight: '600', color: colors.accent },
  qui: { fontSize: 15, fontWeight: '600', color: colors.text },
  quoi: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, textAlign: 'right' },

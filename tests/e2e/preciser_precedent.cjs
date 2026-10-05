@@ -49,5 +49,16 @@ const etat={quotidien:{},quotidienQty:{},ligneQuantites:{},lignePossedees:{},sel
  await page.waitForTimeout(500);await page.screenshot({path:dossier+'/pp3-rouvert.png'});
  // Régler à nouveau : on repart vers le premier point ouvert (Sel est retiré, Javel reste).
  await garder('Antikal').click();await texte('« Javel »').waitFor();await texte('Préciser · 3 sur 3').waitFor();
+ // Le dernier point réglé : la feuille reste ouverte sur le récapitulatif.
+ await garder('Javel').click();
+ await texte('Tout est réglé').waitFor();await texte('3 points. Touche-en un pour le revoir.').waitFor();
+ await texte('Retiré de ta liste').waitFor();
+ await page.waitForTimeout(500);await page.screenshot({path:dossier+'/pp4-fin.png'});
+ await page.getByRole('button',{name:/^Revoir « Javel »/}).click();
+ await texte('Déjà réglé').waitFor();await texte('« Javel »').waitFor();
+ await btn('Voir le récapitulatif').click();await texte('Tout est réglé').waitFor();
+ await page.getByRole('button',{name:/^Revenir à « Javel »/}).click();await texte('Déjà réglé').waitFor();
+ await btn('Voir le récapitulatif').click();await btn('Terminer').click();
+ await texte('Tout est réglé').waitFor({state:'detached'});
  if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true}));
  }catch(e){console.error(e);await page?.screenshot({path:dossier+'/pp-erreur.png'}).catch(()=>{});process.exitCode=1}finally{await b.close()}})();
