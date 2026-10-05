@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type TextStyle } from 'react-native';
+import { ActivityIndicator, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type TextStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -42,6 +42,9 @@ export default function Favoris() {
     .filter(x => rayonDepuisLibelle(x.category) === r.cle && (!q || `${x.name} ${x.brand ?? ''}`.toLocaleLowerCase('fr').includes(q)))
     .sort((a, b) => a.name.localeCompare(b.name, 'fr')) })).filter(r => r.produits.length);
   const largeurLigne = Math.min(width, 720) - 32;
+  // Toutes les tuiles ont la même hauteur : nom sur deux lignes, détail, marges,
+  // à la taille de texte choisie dans iOS. Le menu natif l'exige (MenuProduit).
+  const hauteurLigne = Math.max(72, Math.ceil(56 * PixelRatio.getFontScale()) + 20);
   const retour = () => { if (router.canGoBack()) router.back(); else router.dismissTo('/compte'); };
 
   // Les puces sautent au rayon ; au défilement, celle du rayon visible s'allume.
@@ -80,7 +83,7 @@ export default function Favoris() {
     const detail = [poids, choix > 1 ? `${choix} choix` : ''].filter(Boolean).join(', ');
     return <Pressable accessibilityRole="button" accessibilityLabel={`Consulter ${x.name}${detail ? `, ${detail}` : ''}${prix ? `, dernier prix ${euros(prix.prix)} chez ${ENSEIGNES[prix.drive] ?? prix.drive}, ${quandAchete(prix.jour)}` : ', jamais acheté'}${liste ? ', dans ta liste' : ''}`}
       accessibilityHint="Appui long pour plus d’actions" onPress={() => { if (Date.now() - finBalayage.current > 400) ouvrir(x); }} onLongPress={Platform.OS === 'ios' ? undefined : () => ouvrir(x)}
-      style={({ pressed }) => [s.ligne, { width: largeurLigne }, !derniere && s.separee, pressed && { backgroundColor: colors.bg }]}>
+      style={({ pressed }) => [s.ligne, { width: largeurLigne, height: hauteurLigne }, !derniere && s.separee, pressed && { backgroundColor: colors.bg }]}>
       <View style={s.photo}>
         <Photo name={x.name} url={x.image_url} style={s.image} />
         {liste && <View style={s.coche}><Feather name="check" size={12} color="#FFFFFF" /></View>}
@@ -115,7 +118,7 @@ export default function Favoris() {
         {sections.map(r => <View key={r.cle} onLayout={e => { posSections.current[r.cle] = e.nativeEvent.layout.y; }}>
           <Text style={s.rayon} accessibilityRole="header">{r.label.toUpperCase()} · {r.produits.length}</Text>
           <View style={s.carte}>{r.produits.map((x, i) =>
-            <MenuProduit key={x.id} largeur={largeurLigne} onAjouter={() => ajouterListe(x)} onModifier={() => ouvrir(x, 'modifier')}
+            <MenuProduit key={x.id} largeur={largeurLigne} hauteur={hauteurLigne} onAjouter={() => ajouterListe(x)} onModifier={() => ouvrir(x, 'modifier')}
               onActualiser={x.ean13 ? () => ouvrir(x, 'actualiser') : undefined} onSupprimer={() => ouvrir(x, 'supprimer')}>
               {ligne(x, i === r.produits.length - 1)}
             </MenuProduit>)}</View>
@@ -142,7 +145,7 @@ const s = StyleSheet.create({
   puceCompte: { fontSize: 13, fontWeight: '500', color: colors.textMuted },
   rayon: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, color: colors.textMuted, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 },
   carte: { backgroundColor: colors.surface, borderRadius: 16, marginHorizontal: 16, overflow: 'hidden' },
-  ligne: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 72, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.surface },
+  ligne: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 8, overflow: 'hidden', backgroundColor: colors.surface },
   separee: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   photo: { width: 52, height: 52 },
   image: { width: 52, height: 52, borderRadius: 10, backgroundColor: 'white' },

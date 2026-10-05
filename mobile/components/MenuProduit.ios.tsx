@@ -3,6 +3,8 @@ import { Button, ContextMenu, Divider, Host, RNHostView } from '@expo/ui/swift-u
 
 export type MenuProduitProps = {
   largeur: number;
+  /** Hauteur fixe de la tuile : le conteneur SwiftUI ne la mesure pas lui-même. */
+  hauteur: number;
   onAjouter: () => void;
   onModifier: () => void;
   /** Absent quand le produit n'a pas de code-barres à relire. */
@@ -15,10 +17,15 @@ export type MenuProduitProps = {
  * Le menu contextuel natif d'iOS d'une tuile de « Mes produits », ouvert par
  * un appui long : liste, modifier, actualiser, supprimer. Le repli web et
  * Android, sans menu, est dans `MenuProduit.tsx`.
+ *
+ * La taille est imposée, pas mesurée : avec `matchContents`, le conteneur
+ * gardait parfois une hauteur périmée au défilement et rognait la tuile.
+ * `ignoreSafeArea` : sans lui, la tuile passée sous la barre d'accueil était
+ * coupée par la marge de sécurité.
  */
-export function MenuProduit({ largeur, onAjouter, onModifier, onActualiser, onSupprimer, children }: MenuProduitProps) {
+export function MenuProduit({ largeur, hauteur, onAjouter, onModifier, onActualiser, onSupprimer, children }: MenuProduitProps) {
   return (
-    <Host matchContents={{ vertical: true }} style={{ width: largeur }}>
+    <Host ignoreSafeArea="all" style={{ width: largeur, height: hauteur }}>
       <ContextMenu>
         <ContextMenu.Items>
           <Button label="Ajouter à ma liste" systemImage="cart.badge.plus" onPress={onAjouter} />
@@ -29,7 +36,7 @@ export function MenuProduit({ largeur, onAjouter, onModifier, onActualiser, onSu
           <Button label="Supprimer" systemImage="trash" role="destructive" onPress={onSupprimer} />
         </ContextMenu.Items>
         <ContextMenu.Trigger>
-          <RNHostView matchContents>{children}</RNHostView>
+          <RNHostView>{children}</RNHostView>
         </ContextMenu.Trigger>
       </ContextMenu>
     </Host>
