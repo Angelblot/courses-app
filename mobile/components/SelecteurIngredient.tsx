@@ -147,7 +147,8 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
           ? duCatalogue.map(p => ligne(p.id, p.name, [p.brand, contenance(p.grammage_g, p.volume_ml)].filter(Boolean).join(' · ') || null, p.image_url, p.nutriscore, true, () => onChoisir(depuisProduit(p))))
           : !prochesVus.length && !entete && <Text style={s.vide}>Aucun de tes produits ne correspond.</Text>}
 
-        {texte.length >= 3 && <>
+        {/* Dans Préciser (en-tête), une section vide n'apprend rien : elle ne s'affiche qu'avec quelque chose dedans. */}
+        {texte.length >= 3 && (!entete || off.enRecherche || !!off.erreur || !!off.resultats?.length) && <>
           <Text style={s.section}>Sur les bases ouvertes</Text>
           {off.enRecherche && <View style={s.attente} accessibilityLiveRegion="polite"><ActivityIndicator color={colors.accent} /><Text style={[ui.detail, { marginTop: 0 }]}>{off.progression}</Text></View>}
           {!!off.erreur && <Text accessibilityLiveRegion="polite" style={s.vide}>{off.erreur}</Text>}

@@ -85,14 +85,14 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
  </View> : <View style={{ gap: 6 }}>
   {toast}
   <View style={s.issues}>
+   {/* Le nom est déjà en tête de l'écran ; ce que fait l'extension sans produit passe dans l'aide VoiceOver. */}
    <Pressable accessibilityRole="button" accessibilityLabel={`Garder « ${nom} » sans produit. L’extension le cherchera par son nom.`} onPress={() => w.validerManque(lineKey, qty)} style={({ pressed }) => [s.garderNom, pressed && { opacity: .85 }]}>
-    <Text style={s.garderNomTexte} numberOfLines={2}>Garder « {nom} » sans produit</Text>
+    <Text style={s.garderNomTexte} numberOfLines={1}>Garder sans produit</Text>
    </Pressable>
    <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${nom} de ta liste`} onPress={retirer} style={({ pressed }) => [s.retirer, pressed && { opacity: .85 }]}>
     <Feather name="trash-2" size={17} color={colors.danger} /><Text style={s.retirerTexte}>Retirer</Text>
    </Pressable>
   </View>
-  <Text style={s.explication}>Sans produit, l’extension cherche « {nom} » sur le drive.</Text>
  </View>;
  return <SelecteurIngredient titre={titre} verbe="Choisir" sansProduit={false} requeteInitiale={nom} proches={produitsProches(nom, products)} entete={entete} pied={pied}
   onFermer={onFermer} onChoisir={c => { if (c.product_id) w.validerManque(lineKey, qty, c.product_id); }}

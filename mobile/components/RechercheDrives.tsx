@@ -80,19 +80,13 @@ export function RechercheDrives({ requete, ean13, autres, onGarde, onPhase }: {
   if (chargement) return null;
   const pied = !!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, s.marge]}>{erreur}</Text>;
 
+  // Un seul geste, une seule ligne d'explication : le bouton dit déjà où l'on cherche.
   if (etape === 'aucune') return <View style={s.bloc}>
-    <View style={s.encart}>
-      <View style={s.ligneIcone}>
-        <Feather name="monitor" size={20} color={colors.accent} />
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={s.titre}>Le chercher sur tes drives</Text>
-          <Text style={s.texte}>L’extension Chrome le cherchera sur Carrefour et E.Leclerc, depuis ton ordinateur. Les résultats reviendront ici.</Text>
-        </View>
-      </View>
-      <Pressable accessibilityRole="button" disabled={envoi} onPress={() => { void demander(); }} style={({ pressed }) => [s.principal, (pressed || envoi) && { opacity: .85 }]}>
-        {envoi ? <ActivityIndicator color={colors.accentContrast} /> : <Text style={s.principalTexte}>Chercher sur Carrefour et E.Leclerc</Text>}
-      </Pressable>
-    </View>
+    <Pressable accessibilityRole="button" accessibilityLabel="Chercher sur Carrefour et E.Leclerc" accessibilityHint="L’extension Chrome le cherche depuis ton ordinateur ; les résultats reviennent ici." disabled={envoi}
+      onPress={() => { void demander(); }} style={({ pressed }) => [s.principal, s.principalIcone, (pressed || envoi) && { opacity: .85 }]}>
+      {envoi ? <ActivityIndicator color={colors.accentContrast} /> : <><Feather name="search" size={17} color={colors.accentContrast} /><Text style={s.principalTexte}>Chercher sur Carrefour et E.Leclerc</Text></>}
+    </Pressable>
+    <Text style={[s.texte, { textAlign: 'center' }]}>Par l’extension Chrome, sur ton ordinateur.</Text>
     {pied}
   </View>;
 
@@ -295,6 +289,7 @@ const s = StyleSheet.create({
   principal: { minHeight: 48, borderRadius: 12, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
   principalTexte: { fontSize: 15, fontWeight: '600', color: colors.accentContrast },
   inactif: { backgroundColor: colors.off },
+  principalIcone: { flexDirection: 'row', gap: 8 },
   secondaire: { minHeight: 44, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   secondaireTexte: { fontSize: 14, fontWeight: '600', color: colors.accent },
   etat: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 40, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.bg, gap: 8 },
