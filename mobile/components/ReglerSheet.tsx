@@ -9,7 +9,7 @@ import type { LigneMaison } from '../lib/liste-maison';
 import { produitsProches, type Manque } from '../lib/session-courses';
 import { sources } from './Manques';
 import { SelecteurIngredient } from './SelecteurIngredient';
-import { RechercheDrives, Recapitulatif } from './RechercheDrives';
+import { RechercheDrives, Recapitulatif, type Comparaison } from './RechercheDrives';
 import { EtatExtension } from './EtatExtension';
 import { useExtension } from '../stores/extension';
 import type { ChoixOffres, OffreRelevee, phase as Phase } from '../lib/recherche-drive.ts';
@@ -62,6 +62,7 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
  const [etape, setEtape] = useState<ReturnType<typeof Phase>>('aucune');
  const { recharger } = useProducts();
  const [choix, setChoix] = useState<ChoixOffres>({}), [occupe, setOccupe] = useState(false), [erreur, setErreur] = useState<string | null>(null);
+ const [comparaison, setComparaison] = useState<Comparaison>(null);
  // Valider : chaque produit choisi rejoint « Mes produits », relié à son drive ; le point est réglé.
  const valider = async (offres: OffreRelevee[]) => {
   if (!offres.length || occupe) return;
@@ -70,6 +71,7 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
   setOccupe(false);
   if (!r.ok || !r.productId) { setErreur(r.erreur ?? 'Impossible d’ajouter ce produit. Réessaie.'); return; }
   await recharger();
+  setComparaison(null);
   w.validerManque(lineKey, qty, r.productId);
  };
  const choisies = [choix.carrefour, choix.leclerc].filter((o): o is OffreRelevee => !!o);
@@ -86,8 +88,20 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
    <Text style={s.qte}>× {qty}</Text>
   </View>
  </View>;
+ const nCoches = comparaison?.coches.length ?? 0;
+ // En comparaison, le pied fixe garde « Comparer » à portée du pouce, quelle que soit la longueur de la liste.
+ const pied = etape === 'resultats' && comparaison ? <View style={{ gap: 8 }}>
+  {toast}
+  <Text style={s.coches} accessibilityLiveRegion="polite">{nCoches === 0 ? 'Coche au moins deux produits' : `${nCoches} produit${nCoches > 1 ? 's' : ''} coché${nCoches > 1 ? 's' : ''}`}</Text>
+  <Pressable accessibilityRole="button" accessibilityLabel={`Comparer les ${nCoches} produits cochés`} disabled={nCoches < 2} onPress={() => setComparaison({ ...comparaison, ouvert: true })} style={[s.valider, nCoches < 2 && s.validerInactif]}>
+   <Text style={[s.validerTexte, nCoches < 2 && { color: colors.offText }]}>Comparer</Text>
+  </Pressable>
+  <View style={s.liensPied}>
+   <Pressable accessibilityRole="button" onPress={() => setComparaison(null)} hitSlop={6} style={s.lienPied}><Text style={s.lienPiedTexte}>Annuler</Text></Pressable>
+  </View>
+ </View>
  // Des résultats : le pied récapitule le choix par enseigne et valide ; garder sans produit et retirer restent à portée.
- const pied = etape === 'resultats' ? <View style={{ gap: 8 }}>
+ : etape === 'resultats' ? <View style={{ gap: 8 }}>
   {toast}
   <Recapitulatif choix={choix} />
   {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { textAlign: 'center' }]}>{erreur}</Text>}
@@ -127,7 +141,7 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
   onFermer={onFermer} onChoisir={c => { if (c.product_id) w.validerManque(lineKey, qty, c.product_id); }}
   basesOuvertes={false}
   apres={<RechercheDrives requete={nom} autres={autres} onPhase={setEtape} choix={choix} onChoix={c => { setChoix(c); setErreur(null); }}
-   onValider={o => { void valider(o); }} occupe={occupe} erreurValider={erreur} />} />;
+   onValider={o => { void valider(o); }} occupe={occupe} erreurValider={erreur} comparaison={comparaison} onComparaison={setComparaison} />} />;
 }
 
 /** Un doublon possible (DB1) : « Garder celui-ci » sous chaque photo ; l'autre est retiré, annulable. */
@@ -181,6 +195,7 @@ const s = StyleSheet.create({
  retirerTexte: { fontSize: 15, fontWeight: '600', color: colors.danger },
  lienPied: { minHeight: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
  liensPied: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
+ coches: { fontSize: 14, fontWeight: '600', color: colors.text, textAlign: 'center' },
  valider: { minHeight: 50, borderRadius: 12, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
  validerInactif: { backgroundColor: colors.off },
  validerTexte: { fontSize: 15, fontWeight: '600', color: colors.accentContrast },

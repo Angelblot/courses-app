@@ -48,7 +48,10 @@ const insecable = (t: string) => t.replace(/ %/g, '\u00a0%');
  * fait passer à l'autre, la barre du bas (dans Préciser) récapitule et valide ;
  * le comparatif groupe les deux enseignes. Le choix appartient au parent.
  */
-export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoix, onValider, occupe, erreurValider }: {
+/** Le mode comparaison : les produits cochés pour le comparatif, et s'il est ouvert. null : on choisit. */
+export type Comparaison = { coches: string[]; ouvert: boolean } | null;
+
+export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoix, onValider, occupe, erreurValider, comparaison, onComparaison }: {
   requete: string; ean13?: string | null;
   /** Dit au parent où en est la recherche : son pied change pendant l'attente et avec les résultats. */
   onPhase?: (p: ReturnType<typeof phase>) => void;
@@ -57,11 +60,13 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
   /** Le choix en cours, une offre par enseigne, et sa validation (portés par Préciser). */
   choix: ChoixOffres; onChoix: (c: ChoixOffres) => void;
   onValider: (offres: OffreRelevee[]) => void; occupe: boolean; erreurValider: string | null;
+  /** Le mode comparaison, porté lui aussi par Préciser : son pied fixe offre « Comparer » à portée du pouce. */
+  comparaison: Comparaison; onComparaison: (c: Comparaison) => void;
 }) {
   const { recherches, offres, chargement, recharger, fichesEnCours } = useRecherchesDrive(requete);
   const [envoi, setEnvoi] = useState(false), [erreur, setErreur] = useState<string | null>(null);
   const [ouverts, setOuverts] = useState<Partial<Record<DriveRecherche, boolean>>>({}), [onglet, setOnglet] = useState<DriveRecherche | null>(null);
-  const [comparer, setComparer] = useState(false), [lot, setLot] = useState(false);
+  const [lot, setLot] = useState(false);
   // Les mesures de toutes les offres, et la mesure commune : le prix comparable se lit dès la liste.
   const mesures = new Map(offres.map(o => [o.id, mesuresDe(o)]));
   const unite = uniteCommune([...mesures.values()]);
@@ -159,7 +164,13 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
   const liste = parDrive[actif], tout = ouverts[actif] || liste.length <= PREMIERS + 1;
   const choisir = (o: OffreRelevee) => { const suite = choisirOffre(choix, o); onChoix(suite); setOnglet(ongletApres(suite, o.drive, nombres)); };
   const autre = DRIVES_RECHERCHE.find(d => d !== actif)!;
-  const consigne = choix[actif] ? `${NOMS_DRIVE[actif]} : choisi` : choix[autre] ? `Puis ton produit ${NOMS_DRIVE[actif]}` : `Choisis ton produit ${NOMS_DRIVE[actif]}`;
+  const enComparaison = !!comparaison;
+  const consigne = enComparaison ? 'Coche les produits à comparer' : choix[actif] ? `${NOMS_DRIVE[actif]} : choisi` : choix[autre] ? `Puis ton produit ${NOMS_DRIVE[actif]}` : `Choisis ton produit ${NOMS_DRIVE[actif]}`;
+  const cocher = (o: OffreRelevee) => { if (!comparaison) return; const c = comparaison.coches;
+    onComparaison({ ...comparaison, coches: c.includes(o.id) ? c.filter(x => x !== o.id) : [...c, o.id] }); };
+  // Les produits cochés, groupés par enseigne dans l'ordre du drive : les colonnes du comparatif.
+  const cochees = DRIVES_RECHERCHE.flatMap(d => parDrive[d].filter(o => comparaison?.coches.includes(o.id)));
+  const releve = dernieres[actif] && !estEnAttente(dernieres[actif]!.statut) && liste.length ? `Prix relevés ${ilYa(dernieres[actif]!.faite_le)}. ` : '';
   return <View style={s.bloc}>
     <View accessibilityRole="tablist" style={s.onglets}>
       {DRIVES_RECHERCHE.map(d => {
@@ -171,18 +182,24 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
         </Pressable>;
       })}
     </View>
+    {/* « Comparer » en haut, toujours visible : les bons candidats sont en tête de liste. */}
     <View style={s.sousEntete}>
       <Text style={s.consigne}>{consigne}</Text>
-      <Text style={s.quand}>{dernieres[actif] && !estEnAttente(dernieres[actif]!.statut) && liste.length ? `relevé ${ilYa(dernieres[actif]!.faite_le)}` : ''}</Text>
+      {!enComparaison && offres.length >= 2 && <Pressable accessibilityRole="button" accessibilityLabel="Comparer des produits" accessibilityHint="Coche ensuite les produits à comparer, d’une enseigne ou des deux"
+        hitSlop={4} onPress={() => onComparaison({ coches: DRIVES_RECHERCHE.flatMap(d => (choix[d] ? [choix[d]!.id] : [])), ouvert: false })} style={({ pressed }) => [s.comparer, pressed && { opacity: .8 }]}>
+        <Feather name="columns" size={15} color={colors.accent} /><Text style={s.comparerTexte}>Comparer</Text>
+      </Pressable>}
     </View>
     {liste.length > 0 ? <View style={s.liste}>
       {(tout ? liste : liste.slice(0, PREMIERS)).map((o, i, vus) => {
-        const pris = choix[actif]?.id === o.id, m = mesures.get(o.id)!, pu = unite ? prixParUnite(o.prix, m, unite) : null;
+        const pris = choix[actif]?.id === o.id, coche = !!comparaison?.coches.includes(o.id), m = mesures.get(o.id)!, pu = unite ? prixParUnite(o.prix, m, unite) : null;
         const cont = contenanceDe(m), detail = [cont, o.disponible ? null : 'indisponible'].filter(Boolean).join(' · ');
-        return <Pressable key={o.id} accessibilityRole="radio" accessibilityState={{ checked: pris }}
+        // En comparaison, toucher coche ; sinon, toucher choisit le produit de l'enseigne.
+        return <Pressable key={o.id} accessibilityRole={enComparaison ? 'checkbox' : 'radio'} accessibilityState={{ checked: enComparaison ? coche : pris }}
           accessibilityLabel={`${o.libelle}, ${[prixLisible(o.prix), pu != null && unite ? prixUnitaireLisible(pu, unite) : null, cont, o.promotion].filter(Boolean).join(', ')}`}
-          accessibilityHint="Appui long pour voir la fiche détaillée" onPress={() => choisir(o)} onLongPress={() => voir(o)} delayLongPress={350}
-          style={({ pressed }) => [s.offre, (i < vus.length - 1 || !tout) && s.separee, pris && s.offrePrise, pressed && { opacity: .75 }]}>
+          accessibilityHint="Appui long pour voir la fiche détaillée" onPress={() => (enComparaison ? cocher(o) : choisir(o))} onLongPress={() => voir(o)} delayLongPress={350}
+          style={({ pressed }) => [s.offre, (i < vus.length - 1 || !tout) && s.separee, (enComparaison ? coche : pris) && s.offrePrise, pressed && { opacity: .75 }]}>
+          {enComparaison && <View style={[s.boite, coche && s.boiteCochee]}>{coche && <Feather name="check" size={14} color={colors.accentContrast} />}</View>}
           <Photo name={o.libelle} url={o.image_url} style={s.photo} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={ui.productName} numberOfLines={2}>{o.libelle}</Text>
@@ -193,29 +210,26 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
             <Text style={s.prixListe}>{prixLisible(o.prix) ?? NC}</Text>
             {pu != null && unite && <Text style={[s.unite, meilleurs.has(o.id) && s.uniteMeilleure]}>{m.estime?.[unite] ? '≈ ' : ''}{prixUnitaireLisible(pu, unite)}</Text>}
           </View>
-          <View style={[s.radio, pris && s.radioPris]}>{pris && <View style={s.radioPoint} />}</View>
+          {!enComparaison && <View style={[s.radio, pris && s.radioPris]}>{pris && <View style={s.radioPoint} />}</View>}
         </Pressable>;
       })}
       {!tout && <Pressable accessibilityRole="button" onPress={() => setOuverts(x => ({ ...x, [actif]: true }))} style={s.voir}><Text style={ui.link}>Voir les {liste.length - PREMIERS} autres</Text></Pressable>}
     </View> : <View style={s.carte}><Text style={s.texte}>{dernieres[actif] && estEnAttente(dernieres[actif]!.statut)
       ? `${NOMS_DRIVE[actif]} n’a pas encore répondu : ${libelleStatut(dernieres[actif])}.` : `Rien trouvé sur ${NOMS_DRIVE[actif]}. Tu peux valider le seul produit ${NOMS_DRIVE[autre]}.`}</Text></View>}
-    {offres.length >= 2 && <Pressable accessibilityRole="button" accessibilityLabel="Comparer Carrefour et E.Leclerc" onPress={() => setComparer(true)} style={({ pressed }) => [s.secondaireLarge, pressed && { opacity: .8 }]}>
-      <Feather name="columns" size={16} color={colors.accent} /><Text style={s.secondaireTexte}>Comparer Carrefour et E.Leclerc</Text>
-    </Pressable>}
-    <Text style={[s.texte, s.marge, { textAlign: 'center' }]}>Appui long sur un produit pour sa fiche.{unite && [...mesures.values()].some(m => m.estime?.[unite]) ? ' « ≈ » : mètres estimés d’après la taille des feuilles.' : ''}</Text>
+    <Text style={[s.texte, s.marge, { textAlign: 'center' }]}>{releve}Appui long sur un produit pour sa fiche.{unite && [...mesures.values()].some(m => m.estime?.[unite]) ? ' « ≈ » : mètres estimés d’après la taille des feuilles.' : ''}</Text>
     {pied}
     <FicheOffre fiche={detail?.fiche ?? null} proches={[]} onFermer={() => setDetail(null)} description={detail ? descriptionDe(detail.offre) : null}
       action={detail ? (choix[detail.offre.drive]?.id === detail.offre.id ? 'Ne plus choisir' : `Choisir pour ${NOMS_DRIVE[detail.offre.drive]}`) : undefined}
       enseigne={detail ? [NOMS_DRIVE[detail.offre.drive], prixLisible(detail.offre.prix), contenanceDe(mesures.get(detail.offre.id) ?? {}), detail.offre.promotion].filter(Boolean).join(' · ') : null}
       onChoisir={() => { const o = detail?.offre; setDetail(null); if (o) choisir(o); }} />
-    <ComparerOffres visible={comparer} offres={offres} choix={choix} onChoix={onChoix} occupe={occupe} erreur={comparer ? erreurValider : null} fichesEnCours={fichesEnCours}
-      onOuvert={() => { void demanderFiches(colonnesComparatif(offres, choix), fichesEnCours).then(() => recharger()); }} onFermer={() => setComparer(false)} onValider={onValider} />
+    <ComparerOffres visible={!!comparaison?.ouvert} offres={cochees} choix={choix} onChoix={onChoix} occupe={occupe} erreur={comparaison?.ouvert ? erreurValider : null} fichesEnCours={fichesEnCours}
+      onOuvert={() => { void demanderFiches(cochees, fichesEnCours).then(() => recharger()); }} onFermer={() => comparaison && onComparaison({ ...comparaison, ouvert: false })} onValider={onValider} />
   </View>;
 }
 
 /**
- * Le comparatif groupé par enseigne : un bandeau Carrefour, un bandeau
- * E.Leclerc, quatre produits au plus par enseigne (le choisi en tête), les
+ * Le comparatif groupé par enseigne : les produits cochés, sous un bandeau
+ * Carrefour et un bandeau E.Leclerc (une seule enseigne s'il le faut), les
  * libellés figés à gauche. Il s'adapte au produit (contenance lue dans le
  * libellé et la fiche du drive, prix ramené à la même mesure) ; les bases
  * ouvertes complètent Nutri-Score, NOVA et repères. Un choix par enseigne,
@@ -229,10 +243,8 @@ function ComparerOffres({ visible, offres: toutes, choix, onChoix, occupe, erreu
 }) {
   // À l'ouverture, les fiches qui manquent sont demandées à l'extension ; le tableau se complète à leur arrivée.
   useEffect(() => { if (visible) onOuvert(); }, [visible]);
-  // Les colonnes se fixent à l'ouverture : choisir ne les fait pas sauter de place.
-  const [ordre, setOrdre] = useState<string[]>([]);
-  useEffect(() => { if (visible) setOrdre(colonnesComparatif(toutes, choix).map(o => o.id)); }, [visible]);
-  const offres = ordre.map(id => toutes.find(o => o.id === id)).filter((o): o is OffreRelevee => !!o);
+  // Les produits cochés, groupés par enseigne (ils arrivent dans cet ordre).
+  const offres = toutes;
   const lecture = offres.filter(o => fichesEnCours.includes(o.id)).length;
   // Les fiches des bases ouvertes, par offre : undefined tant qu'on cherche, null si rien.
   const [fiches, setFiches] = useState<Record<string, FicheProduit | null>>({});

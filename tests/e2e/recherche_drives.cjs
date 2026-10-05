@@ -91,7 +91,17 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
  if(!(await page.getByText('« Papier sulfurisé »',{exact:true}).count()))throw Error('Le choix a fait passer au point suivant');
  await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd3-leclerc.png'});
  // 4. Le comparatif groupé : un bandeau par enseigne, le prix au mètre, un choix par enseigne.
- await btn('Comparer Carrefour et E.Leclerc').click();
+ // Le bouton « Comparer » est en haut ; en comparaison, on coche dans une enseigne ou les deux, le choisi l'est déjà.
+ await btn('Comparer des produits').click();
+ await page.getByText('Coche les produits à comparer',{exact:true}).waitFor();
+ await page.getByRole('checkbox',{name:/^Papier cuisson Repère 8 m,/}).click();
+ await page.getByRole('tab',{name:/^Carrefour/}).click();
+ await page.getByRole('checkbox',{name:/^Papier cuisson sulfurisé Carrefour 8 m,/}).click();
+ await page.getByRole('checkbox',{name:/^Papier cuisson 20 feuilles,/}).click();
+ await page.getByText('4 produits cochés',{exact:true}).waitFor();
+ await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd3-comparaison.png'});
+ // « Comparer » vit dans le pied fixe : toujours à portée, sans descendre la liste.
+ await page.getByRole('button',{name:'Comparer les 4 produits cochés'}).click();
  await page.getByText('CARREFOUR',{exact:true}).waitFor();await page.getByText('à choisir',{exact:true}).last().waitFor();
  await page.getByText('Prix au mètre',{exact:true}).waitFor();await page.getByText('0,17 €/m',{exact:true}).last().waitFor();
  // La fiche Open Products Facts n'apporte que le nom : elle n'est pas citée comme source.
@@ -102,8 +112,10 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
  await page.getByRole('button',{name:'Choisir Papier cuisson Repère 8 m pour E.Leclerc'}).click();
  await page.getByText('E.LECLERC',{exact:true}).waitFor();if(await page.getByText('à choisir',{exact:true}).count()>1)throw Error('E.Leclerc pas marqué choisi');
  await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd4-comparer.png'});
- // Le choix fait dans le comparatif se retrouve dans Préciser, qui valide.
+ // Fermer revient aux cases ; « Annuler » quitte la comparaison, et le choix fait dans le comparatif se retrouve dans Préciser, qui valide.
  await btn('Fermer').last().click();await page.waitForTimeout(600);
+ await page.getByText('4 produits cochés',{exact:true}).waitFor();
+ await btn('Annuler').click();
  await page.getByText('Papier cuisson Repère 8 m · 1,39 €',{exact:true}).waitFor();
  await btn('Valider les 2 produits').click();
  // 5. Deux produits, chacun réservé à son drive, l'un alternative de l'autre ; le point suivant arrive.
