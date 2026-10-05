@@ -28,7 +28,7 @@ const etat={quotidien:{},quotidienQty:{},ligneQuantites:{},lignePossedees:{},sel
   await route.fulfill({json:data});});
  await page.addInitScript(({session,id,etat})=>{localStorage.setItem('sb-qmymwicsgilhoihtfdjm-auth-token',JSON.stringify(session));if(!localStorage.getItem('seeded')){localStorage.setItem('tablee-maison-v1:'+id,JSON.stringify(etat));localStorage.setItem('seeded','yes');}},{session,id:user.id,etat});
  const btn=(name)=>page.getByRole('button',{name,exact:true});
- await page.goto('http://localhost:8082');await page.getByText('Les courses, à ton rythme.',{exact:true}).waitFor({timeout:60000});
+ await page.goto('http://localhost:8082');await btn('Préparer mes courses').waitFor({timeout:60000});
  await btn('Préparer mes courses').click();await btn('Voir le bilan').click();
  await page.getByRole('button',{name:/^Manques :.*Préciser$/}).last().click();
  await page.getByText('« Pepito »',{exact:true}).waitFor();

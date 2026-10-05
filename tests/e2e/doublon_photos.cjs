@@ -14,7 +14,7 @@ const IMAGE='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
  const btn=(name)=>page.getByRole('button',{name,exact:true});
  const texte=t=>page.getByText(t,{exact:true}).last();
  // D2 : un doublon possible se règle en touchant la photo du produit gardé.
- await page.goto('http://localhost:8082');await page.getByText('Les courses, à ton rythme.',{exact:true}).waitFor({timeout:60000});
+ await page.goto('http://localhost:8082');await btn('Préparer mes courses').waitFor({timeout:60000});
  await btn('Préparer mes courses').click();await btn('Voir le bilan').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  await page.getByRole('button',{name:/^Manques :.*1 doublon possible.*Préciser$/}).last().click();
  // PR1 : un point à la fois ; le manque « lessive » vient d'abord, gardé sous son nom.
