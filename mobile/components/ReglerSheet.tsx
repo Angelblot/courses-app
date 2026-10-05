@@ -96,6 +96,7 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
  </View>;
  return <SelecteurIngredient titre={titre} verbe="Choisir" sansProduit={false} requeteInitiale={nom} proches={produitsProches(nom, products)} entete={entete} pied={pied}
   onFermer={onFermer} onChoisir={c => { if (c.product_id) w.validerManque(lineKey, qty, c.product_id); }}
+  basesOuvertes={false}
   apres={<RechercheDrives requete={nom} autres={autres} onPhase={setEtape} onGarde={productId => w.validerManque(lineKey, qty, productId)} />} />;
 }
 

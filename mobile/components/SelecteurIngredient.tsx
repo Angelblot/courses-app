@@ -46,6 +46,8 @@ type Props = {
   verbe?: string;
   /** Sous les résultats, dans le défilement : la recherche sur les drives. */
   apres?: ReactNode;
+  /** Faux dans Préciser : on part des produits du drive, les bases ouvertes ne font que les enrichir. */
+  basesOuvertes?: boolean;
 };
 
 const MAX_CATALOGUE = 8;
@@ -77,7 +79,7 @@ function useHauteurClavier() {
  * après une pause de frappe. « Ajouter « x » sans produit » reste collé en
  * bas, au-dessus du clavier.
  */
-export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un ingrédient', sansProduit = true, suggestions = [], exclure = [], requeteInitiale = '', proches = [], entete, pied, scan = Platform.OS !== 'web', verbe = 'Ajouter', apres }: Props) {
+export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un ingrédient', sansProduit = true, suggestions = [], exclure = [], requeteInitiale = '', proches = [], entete, pied, scan = Platform.OS !== 'web', verbe = 'Ajouter', apres, basesOuvertes = true }: Props) {
   const { produits, recharger } = useProducts();
   const insets = useSafeAreaInsets(), clavier = useHauteurClavier();
   const [requete, setRequete] = useState(requeteInitiale), [focus, setFocus] = useState(false), [scanner, setScanner] = useState(false);
@@ -96,7 +98,7 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
 
   useEffect(() => {
     off.reinitialiser();
-    if (texte.length < 3) return;
+    if (!basesOuvertes || texte.length < 3) return;
     const t = setTimeout(() => { void off.chercher(texte, { garderClavier: true }); }, ATTENTE_OFF_MS);
     return () => clearTimeout(t);
   }, [texte]);
@@ -148,7 +150,7 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
           : !prochesVus.length && !entete && <Text style={s.vide}>Aucun de tes produits ne correspond.</Text>}
 
         {/* Dans Préciser (en-tête), une section vide n'apprend rien : elle ne s'affiche qu'avec quelque chose dedans. */}
-        {texte.length >= 3 && (!entete || off.enRecherche || !!off.erreur || !!off.resultats?.length) && <>
+        {basesOuvertes && texte.length >= 3 && (!entete || off.enRecherche || !!off.erreur || !!off.resultats?.length) && <>
           <Text style={s.section}>Sur les bases ouvertes</Text>
           {off.enRecherche && <View style={s.attente} accessibilityLiveRegion="polite"><ActivityIndicator color={colors.accent} /><Text style={[ui.detail, { marginTop: 0 }]}>{off.progression}</Text></View>}
           {!!off.erreur && <Text accessibilityLiveRegion="polite" style={s.vide}>{off.erreur}</Text>}

@@ -34,7 +34,12 @@ export function Reperes({ d }: { d: Details }) {
  * puis un comparatif côte à côte avec des produits proches de la même
  * recherche (à la FD3), le meilleur de chaque ligne en vert.
  */
-export function FicheOffre(props: { fiche: FicheProduit | null; proches: FicheProduit[]; onChoisir: (f: FicheProduit) => void; onFermer: () => void }) {
+export function FicheOffre(props: { fiche: FicheProduit | null; proches: FicheProduit[]; onChoisir: (f: FicheProduit) => void; onFermer: () => void;
+  /** Une ligne sous le nom : le drive, son prix, sa contenance (produit vu sur un drive). */
+  enseigne?: string | null;
+  /** Le libellé du bouton du bas (« Choisir ce produit » par défaut). */
+  action?: string;
+}) {
   if (!props.fiche) return null;
   // La modale a sa propre fenêtre : le fournisseur y rend les marges d'iOS (barre d'accueil).
   return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={props.onFermer}>
@@ -42,7 +47,7 @@ export function FicheOffre(props: { fiche: FicheProduit | null; proches: FichePr
   </Modal>;
 }
 
-function Contenu({ fiche, proches, onChoisir, onFermer }: { fiche: FicheProduit | null; proches: FicheProduit[]; onChoisir: (f: FicheProduit) => void; onFermer: () => void }) {
+function Contenu({ fiche, proches, onChoisir, onFermer, enseigne, action = 'Choisir ce produit' }: { fiche: FicheProduit | null; proches: FicheProduit[]; onChoisir: (f: FicheProduit) => void; onFermer: () => void; enseigne?: string | null; action?: string }) {
   const insets = useSafeAreaInsets();
   const [tout, setTout] = useState(false);
   if (!fiche) return null;
@@ -57,7 +62,8 @@ function Contenu({ fiche, proches, onChoisir, onFermer }: { fiche: FicheProduit 
         <View style={s.heros}>
           <View style={s.cadre}><Photo name={fiche.name} url={fiche.imageUrl} style={s.photo} /></View>
           <View style={{ flex: 1, gap: 4 }}><Text style={s.nom}>{fiche.name}</Text>
-            <Text style={ui.detail}>{[fiche.brand, contenance(fiche), d?.portion ? `portion ${d.portion}` : null].filter(Boolean).join(' · ')}</Text></View>
+            <Text style={ui.detail}>{[fiche.brand, contenance(fiche), d?.portion ? `portion ${d.portion}` : null].filter(Boolean).join(' · ')}</Text>
+            {!!enseigne && <Text style={s.enseigne}>{enseigne}</Text>}</View>
         </View>
         <View style={s.scores}>
           <Score libelle="Nutri-Score" valeur={fiche.nutriscore?.toUpperCase() ?? null} teinte={fiche.nutriscore ? NOTES[fiche.nutriscore] : undefined} />
@@ -79,7 +85,7 @@ function Contenu({ fiche, proches, onChoisir, onFermer }: { fiche: FicheProduit 
             {ingredients && <Text style={s.paragraphe} numberOfLines={tout ? undefined : 3}><Text style={s.gras}>Ingrédients : </Text>{ingredients}</Text>}
             {ingredients && ingredients.length > 140 && <Pressable accessibilityRole="button" onPress={() => setTout(!tout)} style={s.lien}><Text style={ui.link}>{tout ? 'Réduire' : 'Tout lire'}</Text></Pressable>}
           </View>}
-        </> : <Text style={[ui.detail, { paddingHorizontal: 16 }]}>Open Food Facts n’a pas encore les repères nutritionnels de ce produit.</Text>}
+        </> : <Text style={[ui.detail, { paddingHorizontal: 16 }]}>Les bases ouvertes n’ont pas encore les repères de ce produit.</Text>}
 
         {colonnes.length > 1 && <>
           <Text style={s.section}>Comparé à des produits proches</Text>
@@ -88,7 +94,7 @@ function Contenu({ fiche, proches, onChoisir, onFermer }: { fiche: FicheProduit 
         </>}
       </ScrollView>
       <View style={[s.pied, { paddingBottom: 10 + insets.bottom }]}>
-        <Pressable accessibilityRole="button" onPress={() => onChoisir(fiche)} style={({ pressed }) => [s.choisir, pressed && { opacity: .85 }]}><Text style={s.choisirTexte}>Choisir ce produit</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => onChoisir(fiche)} style={({ pressed }) => [s.choisir, pressed && { opacity: .85 }]}><Text style={s.choisirTexte}>{action}</Text></Pressable>
       </View>
     </SafeAreaView>;
 }
@@ -207,6 +213,7 @@ const s = StyleSheet.create({
   libelleComp: { width: 92, fontSize: 12, fontWeight: '600', color: colors.textMuted, paddingHorizontal: 8, alignSelf: 'center' },
   colonne: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 4, gap: 4 },
   colonneMoi: { backgroundColor: '#F6F8F3' },
+  enseigne: { fontSize: 14, fontWeight: '600', color: colors.text, marginTop: 2 },
   libellesFiges: { width: 92, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border, backgroundColor: colors.surface, zIndex: 1 },
   mieux: { backgroundColor: '#E6F0DD' },
   cellule: { fontSize: 12, color: colors.text, textAlign: 'center', fontVariant: ['tabular-nums'] },
