@@ -1,17 +1,18 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useWizard } from '../contexts/WizardContext';
-import type { Product } from '../stores/products';
+import { useProducts, type Product } from '../stores/products';
+import { garderOffres } from '../stores/recherches-drive';
 import type { LigneMaison } from '../lib/liste-maison';
 import { produitsProches, type Manque } from '../lib/session-courses';
 import { sources } from './Manques';
 import { SelecteurIngredient } from './SelecteurIngredient';
-import { RechercheDrives } from './RechercheDrives';
+import { RechercheDrives, Recapitulatif } from './RechercheDrives';
 import { EtatExtension } from './EtatExtension';
 import { useExtension } from '../stores/extension';
-import type { phase as Phase } from '../lib/recherche-drive.ts';
+import type { ChoixOffres, OffreRelevee, phase as Phase } from '../lib/recherche-drive.ts';
 import { Photo, ui } from './MaisonUI';
 import { colors } from '../lib/theme';
 
@@ -51,12 +52,27 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
 }
 
 /**
- * Un manque : la recherche commune, puis « Chercher sur les drives » par
- * l'extension (CD), et en bas « garder sans produit » ou « retirer ».
+ * Un manque : tes produits proches, puis « Chercher sur les drives » par
+ * l'extension. Avec des résultats, on choisit un produit par enseigne et le
+ * pied récapitule et valide ; rien ne passe au point suivant avant « Valider ».
+ * Sinon, en bas, « garder sans produit » ou « retirer ».
  */
 function PreciserManque({ titre, progression, lineKey, manque, products, onFermer, onRetrait, toast, autres, onPasser }: { titre: string; progression: ReactNode; lineKey: string; manque: Manque; products: Product[]; onFermer: () => void; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode; autres: string[]; onPasser?: () => void }) {
  const w = useWizard(), extension = useExtension();
  const [etape, setEtape] = useState<ReturnType<typeof Phase>>('aucune');
+ const { recharger } = useProducts();
+ const [choix, setChoix] = useState<ChoixOffres>({}), [occupe, setOccupe] = useState(false), [erreur, setErreur] = useState<string | null>(null);
+ // Valider : chaque produit choisi rejoint « Mes produits », relié à son drive ; le point est réglé.
+ const valider = async (offres: OffreRelevee[]) => {
+  if (!offres.length || occupe) return;
+  setOccupe(true); setErreur(null);
+  const r = await garderOffres(offres, nom);
+  setOccupe(false);
+  if (!r.ok || !r.productId) { setErreur(r.erreur ?? 'Impossible d’ajouter ce produit. Réessaie.'); return; }
+  await recharger();
+  w.validerManque(lineKey, qty, r.productId);
+ };
+ const choisies = [choix.carrefour, choix.leclerc].filter((o): o is OffreRelevee => !!o);
  const id = lineKey.startsWith('produit:') ? lineKey.slice(8) : undefined, extra = w.extras.find(x => `extra:${x.id}` === lineKey);
  const qty = id ? w.quotidienQty[id] ?? 1 : extra?.quantity ?? 1, nom = extra?.name ?? manque.name;
  const disparu = !!id && !products.some(p => p.id === id);
@@ -70,8 +86,21 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
    <Text style={s.qte}>× {qty}</Text>
   </View>
  </View>;
+ // Des résultats : le pied récapitule le choix par enseigne et valide ; garder sans produit et retirer restent à portée.
+ const pied = etape === 'resultats' ? <View style={{ gap: 8 }}>
+  {toast}
+  <Recapitulatif choix={choix} />
+  {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { textAlign: 'center' }]}>{erreur}</Text>}
+  <Pressable accessibilityRole="button" disabled={!choisies.length || occupe} onPress={() => { void valider(choisies); }} style={[s.valider, (!choisies.length || occupe) && s.validerInactif]}>
+   {occupe ? <ActivityIndicator color={colors.accentContrast} /> : <Text style={[s.validerTexte, !choisies.length && { color: colors.offText }]}>{choisies.length === 2 ? 'Valider les 2 produits' : choisies.length === 1 ? 'Valider ce seul produit' : 'Choisis un produit'}</Text>}
+  </Pressable>
+  <View style={s.liensPied}>
+   <Pressable accessibilityRole="button" accessibilityLabel={`Garder « ${nom} » sans produit. L’extension le cherchera par son nom.`} onPress={() => w.validerManque(lineKey, qty)} hitSlop={6} style={s.lienPied}><Text style={s.lienPiedTexte}>Garder sans produit</Text></Pressable>
+   <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${nom} de ta liste`} onPress={retirer} hitSlop={6} style={s.lienPied}><Text style={[s.lienPiedTexte, { color: colors.danger }]}>Retirer</Text></Pressable>
+  </View>
+ </View>
  // Recherche confiée à l'extension : le pied dit où elle en est, et l'on peut passer au point suivant.
- const pied = etape === 'attente' ? <View style={{ gap: 8 }}>
+ : etape === 'attente' ? <View style={{ gap: 8 }}>
   {toast}
   <EtatExtension etat={extension} attendu="recherches" compact />
   <View style={s.issues}>
@@ -97,7 +126,8 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
  return <SelecteurIngredient titre={titre} verbe="Choisir" sansProduit={false} requeteInitiale={nom} proches={produitsProches(nom, products)} entete={entete} pied={pied}
   onFermer={onFermer} onChoisir={c => { if (c.product_id) w.validerManque(lineKey, qty, c.product_id); }}
   basesOuvertes={false}
-  apres={<RechercheDrives requete={nom} autres={autres} onPhase={setEtape} onGarde={productId => w.validerManque(lineKey, qty, productId)} />} />;
+  apres={<RechercheDrives requete={nom} autres={autres} onPhase={setEtape} choix={choix} onChoix={c => { setChoix(c); setErreur(null); }}
+   onValider={o => { void valider(o); }} occupe={occupe} erreurValider={erreur} />} />;
 }
 
 /** Un doublon possible (DB1) : « Garder celui-ci » sous chaque photo ; l'autre est retiré, annulable. */
@@ -149,7 +179,11 @@ const s = StyleSheet.create({
  garderNomTexte: { fontSize: 15, fontWeight: '600', color: colors.accent, textAlign: 'center' },
  retirer: { minHeight: 50, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12 },
  retirerTexte: { fontSize: 15, fontWeight: '600', color: colors.danger },
- lienPied: { minHeight: 50, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+ lienPied: { minHeight: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+ liensPied: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
+ valider: { minHeight: 50, borderRadius: 12, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+ validerInactif: { backgroundColor: colors.off },
+ validerTexte: { fontSize: 15, fontWeight: '600', color: colors.accentContrast },
  lienPiedTexte: { fontSize: 15, fontWeight: '600', color: colors.accent, textAlign: 'center' },
  explication: { fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
  question: { fontSize: 17, fontWeight: '700', color: colors.text },

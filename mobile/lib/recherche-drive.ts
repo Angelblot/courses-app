@@ -111,3 +111,36 @@ export function prixLisible(prix: number | null, unite?: OffreRelevee['unite_pri
   const t = `${prix.toFixed(2).replace('.', ',')} €`;
   return unite ? `${t}/${unite === 'unite' ? 'unité' : unite === 'l' ? 'L' : unite}` : t;
 }
+
+/** Le choix en cours dans Préciser : au plus une offre par enseigne. */
+export type ChoixOffres = Partial<Record<DriveRecherche, OffreRelevee>>;
+
+/** Choisir une offre : elle remplace celle de son enseigne ; rechoisir la même la retire. */
+export function choisirOffre(choix: ChoixOffres, offre: OffreRelevee): ChoixOffres {
+  const suite = { ...choix };
+  if (suite[offre.drive]?.id === offre.id) delete suite[offre.drive];
+  else suite[offre.drive] = offre;
+  return suite;
+}
+
+/**
+ * L'onglet à montrer après un choix (variante A, onglets guidés) : l'autre
+ * enseigne si elle a des résultats et n'est pas encore choisie, sinon on reste.
+ */
+export function ongletApres(choix: ChoixOffres, actuel: DriveRecherche, offresParDrive: Partial<Record<DriveRecherche, number>>): DriveRecherche {
+  const autre = DRIVES_RECHERCHE.find(d => d !== actuel)!;
+  return !choix[autre] && (offresParDrive[autre] ?? 0) > 0 && choix[actuel] ? autre : actuel;
+}
+
+/**
+ * Les colonnes du comparatif groupé : pour chaque enseigne, l'offre choisie
+ * d'abord puis les suivantes dans l'ordre du drive, au plus `parEnseigne`.
+ * Carrefour d'abord, E.Leclerc ensuite.
+ */
+export function colonnesComparatif(offres: OffreRelevee[], choix: ChoixOffres, parEnseigne = 4): OffreRelevee[] {
+  return DRIVES_RECHERCHE.flatMap(d => {
+    const liste = offresDuDrive(offres, d), pris = choix[d];
+    const tete = pris ? [liste.find(o => o.id === pris.id) ?? pris] : [];
+    return [...tete, ...liste.filter(o => o.id !== pris?.id)].slice(0, parEnseigne);
+  });
+}

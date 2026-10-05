@@ -3,19 +3,33 @@ import { AccessibilityInfo, ActivityIndicator, Modal, Platform, Pressable, Scrol
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import {
-  basculerChoix, dernieresParDrive, DRIVES_RECHERCHE, estEnAttente, ficheDepuisOffre, libelleStatut, NOMS_DRIVE, offresDuDrive, phase, prixLisible,
-  type ChoixParDrive, type DriveRecherche, type OffreRelevee,
+  choisirOffre, colonnesComparatif, dernieresParDrive, DRIVES_RECHERCHE, estEnAttente, ficheDepuisOffre, libelleStatut, NOMS_DRIVE, offresDuDrive, ongletApres, phase, prixLisible,
+  type ChoixOffres, type DriveRecherche, type OffreRelevee,
 } from '../lib/recherche-drive.ts';
-import { contenanceLisible, libellePrixUnitaire, lireMesures, ORDRE_UNITES, prixParUnite, prixUnitaireLisible, uniteCommune, type Mesures } from '../lib/caracteristiques.ts';
-import { plusPetits } from '../lib/analyse-comparatif.ts';
+import { contenanceLisible, libellePrixUnitaire, lireMesures, ORDRE_UNITES, prixParUnite, prixUnitaireLisible, uniteCommune, type Mesures, type Unite } from '../lib/caracteristiques.ts';
+import { nomCourt, plusPetits } from '../lib/analyse-comparatif.ts';
 import { lookupEan, type FicheProduit } from '../lib/openfoodfacts.ts';
-import { annulerRecherche, demanderFiches, demanderRecherches, garderOffres, useRecherchesDrive } from '../stores/recherches-drive';
-import { useProducts } from '../stores/products';
+import { annulerRecherche, demanderFiches, demanderRecherches, useRecherchesDrive } from '../stores/recherches-drive';
 import { FicheOffre, TableauComparatif, type LigneComparatif } from './FicheOffre';
 import { Photo, ui } from './MaisonUI';
 import { colors } from '../lib/theme';
 
-const contenance = (o: OffreRelevee) => o.volume_ml ? (o.volume_ml >= 1000 ? `${String(o.volume_ml / 1000).replace('.', ',')} L` : `${o.volume_ml} ml`) : o.grammage_g ? `${o.grammage_g} g` : null;
+/** Les mesures d'une offre : son libellé, la fiche lue sur le drive, puis le poids ou le volume relevés (ou ceux des bases ouvertes). */
+const mesuresDe = (o: OffreRelevee, f?: FicheProduit | null): Mesures => {
+  const m = lireMesures(o.libelle, o.fiche_texte);
+  const g = m.g ?? o.grammage_g ?? f?.grammageG ?? null, ml = m.ml ?? o.volume_ml ?? f?.volumeMl ?? null;
+  return { ...m, ...(g ? { g: Number(g) } : {}), ...(ml ? { ml: Number(ml) } : {}) } as Mesures;
+};
+/** La description lue sur la fiche du drive : ce qui suit « Description », jusqu'aux caractéristiques. */
+const descriptionDe = (o: OffreRelevee): string | null => {
+  const t = o.fiche_texte?.split(/Description \| /)[1]?.split(/ \| (?:Caract[ée]ristiques|Voir plus)/)[0]?.replace(/ \| /g, ' · ').trim();
+  return t ? t.slice(0, 600) : null;
+};
+/** « 15 m », « ≈ 8,4 m » : dans la mesure commune si le produit l'a, sinon la plus parlante qu'il ait. */
+const contenanceDe = (m: Mesures, unite?: Unite | null): string | null => {
+  const u = unite && m[unite] != null ? unite : ORDRE_UNITES.find(x => m[x] != null);
+  return u ? `${m.estime?.[u] ? '≈ ' : ''}${contenanceLisible(u, m[u]!)}` : null;
+};
 const ilYa = (iso: string | null) => {
   if (!iso) return null;
   const min = Math.round((Date.now() - Date.parse(iso)) / 60000);
@@ -28,30 +42,39 @@ const NC = 'n.c.';
 const insecable = (t: string) => t.replace(/ %/g, '\u00a0%');
 
 /**
- * « Chercher sur les drives » dans Préciser (maquette CD) : l'extension cherche
- * le produit sur Carrefour puis E.Leclerc depuis Chrome, sur l'ordinateur ; les
- * résultats reviennent ici en temps réel. On coche pour comparer, on garde un
- * produit, ou un par drive.
+ * « Chercher sur les drives » dans Préciser : l'extension cherche le produit
+ * sur Carrefour puis E.Leclerc depuis Chrome ; les résultats reviennent ici en
+ * temps réel. Variante A validée : un onglet par enseigne, choisir un produit
+ * fait passer à l'autre, la barre du bas (dans Préciser) récapitule et valide ;
+ * le comparatif groupe les deux enseignes. Le choix appartient au parent.
  */
-export function RechercheDrives({ requete, ean13, autres, onGarde, onPhase }: {
+export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoix, onValider, occupe, erreurValider }: {
   requete: string; ean13?: string | null;
-  /** Dit au parent où en est la recherche : son pied change pendant l'attente. */
+  /** Dit au parent où en est la recherche : son pied change pendant l'attente et avec les résultats. */
   onPhase?: (p: ReturnType<typeof phase>) => void;
   /** Les autres points à préciser : « Tout envoyer » les cherche dans la même séance. */
   autres: string[];
-  onGarde: (productId: string) => void;
+  /** Le choix en cours, une offre par enseigne, et sa validation (portés par Préciser). */
+  choix: ChoixOffres; onChoix: (c: ChoixOffres) => void;
+  onValider: (offres: OffreRelevee[]) => void; occupe: boolean; erreurValider: string | null;
 }) {
   const { recherches, offres, chargement, recharger, fichesEnCours } = useRecherchesDrive(requete);
-  const { recharger: rechargerProduits } = useProducts();
   const [envoi, setEnvoi] = useState(false), [erreur, setErreur] = useState<string | null>(null);
-  const [coches, setCoches] = useState<string[]>([]), [ouverts, setOuverts] = useState<Partial<Record<DriveRecherche, boolean>>>({});
-  const [comparer, setComparer] = useState(false), [garde, setGarde] = useState<string | null>(null), [lot, setLot] = useState(false);
+  const [ouverts, setOuverts] = useState<Partial<Record<DriveRecherche, boolean>>>({}), [onglet, setOnglet] = useState<DriveRecherche | null>(null);
+  const [comparer, setComparer] = useState(false), [lot, setLot] = useState(false);
+  // Les mesures de toutes les offres, et la mesure commune : le prix comparable se lit dès la liste.
+  const mesures = new Map(offres.map(o => [o.id, mesuresDe(o)]));
+  const unite = uniteCommune([...mesures.values()]);
+  const meilleurs = new Set(plusPetits(offres.map(o => (unite ? prixParUnite(o.prix, mesures.get(o.id)!, unite) : null))).map(i => offres[i].id));
   const etape = phase(recherches, offres), dernieres = dernieresParDrive(recherches);
   useEffect(() => { if (!chargement) onPhase?.(etape); }, [etape, chargement]);
   // VoiceOver n'a pas de région live : on annonce l'arrivée des résultats et les erreurs.
   const annoncer = (t: string) => { if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(t); };
   useEffect(() => { if (!chargement && etape === 'resultats') annoncer(`${offres.length} produit${offres.length > 1 ? 's' : ''} trouvé${offres.length > 1 ? 's' : ''} sur tes drives.`); }, [etape, chargement]);
   useEffect(() => { if (erreur) annoncer(erreur); }, [erreur]);
+  // Dès que les résultats arrivent, les fiches des premiers produits Carrefour sont lues : la liste se complète d'elle-même.
+  const premiers = offresDuDrive(offres, 'carrefour').slice(0, 4);
+  useEffect(() => { if (!chargement && etape === 'resultats') void demanderFiches(premiers, fichesEnCours); }, [etape, chargement, premiers.map(o => o.id).join(',')]);
 
   const demander = async () => {
     setEnvoi(true); setErreur(null);
@@ -66,16 +89,6 @@ export function RechercheDrives({ requete, ean13, autres, onGarde, onPhase }: {
     if (r.ok) setLot(true); else setErreur(r.erreur ?? null);
   };
   const annuler = async () => { const r = await annulerRecherche(requete); if (!r.ok) setErreur(r.erreur ?? null); else await recharger(); };
-  const garder = async (choisies: OffreRelevee[]) => {
-    setGarde(choisies.map(o => o.id).join(',')); setErreur(null);
-    const r = await garderOffres(choisies, requete);
-    setGarde(null);
-    if (!r.ok || !r.productId) { setErreur(r.erreur ?? null); return; }
-    setComparer(false);
-    await rechargerProduits();
-    onGarde(r.productId);
-  };
-  const cocher = (id: string) => setCoches(c => c.includes(id) ? c.filter(x => x !== id) : [...c, id]);
   // Appui long : la vue détaillée, comme ailleurs, enrichie des bases ouvertes quand le code-barres y est.
   const [detail, setDetail] = useState<{ offre: OffreRelevee; fiche: FicheProduit } | null>(null);
   const voir = (o: OffreRelevee) => {
@@ -139,124 +152,126 @@ export function RechercheDrives({ requete, ean13, autres, onGarde, onPhase }: {
     {pied}
   </View>;
 
-  const cochees = offres.filter(o => coches.includes(o.id));
+  // Variante A : un onglet par enseigne. Choisir fait passer à l'autre ; la barre du bas récapitule et valide.
+  const parDrive = Object.fromEntries(DRIVES_RECHERCHE.map(d => [d, offresDuDrive(offres, d)])) as Record<DriveRecherche, OffreRelevee[]>;
+  const nombres = Object.fromEntries(DRIVES_RECHERCHE.map(d => [d, parDrive[d].length])) as Record<DriveRecherche, number>;
+  const actif = onglet ?? (nombres.carrefour ? 'carrefour' : 'leclerc');
+  const liste = parDrive[actif], tout = ouverts[actif] || liste.length <= PREMIERS + 1;
+  const choisir = (o: OffreRelevee) => { const suite = choisirOffre(choix, o); onChoix(suite); setOnglet(ongletApres(suite, o.drive, nombres)); };
+  const autre = DRIVES_RECHERCHE.find(d => d !== actif)!;
+  const consigne = choix[actif] ? `${NOMS_DRIVE[actif]} : choisi` : choix[autre] ? `Puis ton produit ${NOMS_DRIVE[actif]}` : `Choisis ton produit ${NOMS_DRIVE[actif]}`;
   return <View style={s.bloc}>
-    <View style={s.entete}>
-      <Text style={s.section} accessibilityRole="header">Sur tes drives</Text>
+    <View accessibilityRole="tablist" style={s.onglets}>
+      {DRIVES_RECHERCHE.map(d => {
+        const sel = d === actif, r = dernieres[d];
+        const sous = choix[d] ? 'choisi' : nombres[d] ? `${nombres[d]} produit${nombres[d] > 1 ? 's' : ''}` : libelleStatut(r);
+        return <Pressable key={d} accessibilityRole="tab" accessibilityState={{ selected: sel }} accessibilityLabel={`${NOMS_DRIVE[d]}, ${sous}`} onPress={() => setOnglet(d)} style={[s.onglet, sel && s.ongletActif]}>
+          <Text style={s.ongletNom}>{NOMS_DRIVE[d]}</Text>
+          <View style={s.ongletSous}>{choix[d] && <Feather name="check" size={12} color="#2F6B2F" />}<Text style={[s.ongletEtat, choix[d] && { color: '#2F6B2F' }]}>{sous}</Text></View>
+        </Pressable>;
+      })}
     </View>
-    {DRIVES_RECHERCHE.map(d => {
-      const liste = offresDuDrive(offres, d), r = dernieres[d], tout = ouverts[d] || liste.length <= PREMIERS + 1;
-      return <View key={d} style={{ gap: 6 }}>
-        <View style={s.sousEntete}>
-          <Text style={s.drive} accessibilityRole="header" accessibilityLabel={NOMS_DRIVE[d]}>{NOMS_DRIVE[d].toUpperCase()}</Text>
-          <Text style={s.quand}>{r && !estEnAttente(r.statut) && liste.length ? ilYa(r.faite_le) : libelleStatut(r)}</Text>
-        </View>
-        {liste.length > 0 && <View style={s.liste}>
-          {(tout ? liste : liste.slice(0, PREMIERS)).map((o, i, vus) => {
-            const coche = coches.includes(o.id), detail = [contenance(o), prixLisible(o.prix), prixLisible(o.prix_unitaire, o.unite_prix), o.disponible ? null : 'indisponible'].filter(Boolean).join(' · ');
-            // Toucher la ligne la coche pour comparer ; « Garder » est le seul geste qui choisit.
-            return <View key={o.id} style={[s.offre, (i < vus.length - 1 || !tout) && s.separee]}>
-              <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: coche }} accessibilityLabel={`Comparer ${o.libelle}, ${[detail, o.promotion].filter(Boolean).join(', ')}`}
-                accessibilityHint="Appui long pour voir la fiche détaillée" onPress={() => cocher(o.id)} onLongPress={() => voir(o)} delayLongPress={350}
-                style={({ pressed }) => [s.offreCoche, pressed && { opacity: .7 }]}>
-                <View style={[s.boite, coche && s.boiteCochee]}>{coche && <Feather name="check" size={14} color={colors.accentContrast} />}</View>
-                <Photo name={o.libelle} url={o.image_url} style={s.photo} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={ui.productName} numberOfLines={2}>{o.libelle}</Text>
-                  {!!detail && <Text style={[ui.detail, { marginTop: 0 }]} numberOfLines={1}>{detail}</Text>}
-                  {!!o.promotion && <Text style={s.promo} numberOfLines={1}>{insecable(o.promotion)}</Text>}
-                </View>
-              </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={`Garder ${o.libelle}, sur ${NOMS_DRIVE[d]}`} disabled={!!garde} hitSlop={6} onPress={() => { void garder([o]); }} style={({ pressed }) => [s.garder, pressed && { opacity: .8 }]}>
-                {garde === o.id ? <ActivityIndicator size="small" color={colors.accent} /> : <Text style={s.garderTexte}>Garder</Text>}
-              </Pressable>
-            </View>;
-          })}
-          {!tout && <Pressable accessibilityRole="button" onPress={() => setOuverts(x => ({ ...x, [d]: true }))} style={s.voir}><Text style={ui.link}>Voir les {liste.length - PREMIERS} autres</Text></Pressable>}
-        </View>}
-      </View>;
-    })}
-    {cochees.length >= 2 && <Pressable accessibilityRole="button" accessibilityLabel={`Comparer les ${cochees.length} produits`} onPress={() => setComparer(true)} style={({ pressed }) => [s.secondaireLarge, pressed && { opacity: .8 }]}>
-      <Feather name="columns" size={16} color={colors.accent} /><Text style={s.secondaireTexte}>Comparer les {cochees.length} produits</Text>
+    <View style={s.sousEntete}>
+      <Text style={s.consigne}>{consigne}</Text>
+      <Text style={s.quand}>{dernieres[actif] && !estEnAttente(dernieres[actif]!.statut) && liste.length ? `relevé ${ilYa(dernieres[actif]!.faite_le)}` : ''}</Text>
+    </View>
+    {liste.length > 0 ? <View style={s.liste}>
+      {(tout ? liste : liste.slice(0, PREMIERS)).map((o, i, vus) => {
+        const pris = choix[actif]?.id === o.id, m = mesures.get(o.id)!, pu = unite ? prixParUnite(o.prix, m, unite) : null;
+        const cont = contenanceDe(m), detail = [cont, o.disponible ? null : 'indisponible'].filter(Boolean).join(' · ');
+        return <Pressable key={o.id} accessibilityRole="radio" accessibilityState={{ checked: pris }}
+          accessibilityLabel={`${o.libelle}, ${[prixLisible(o.prix), pu != null && unite ? prixUnitaireLisible(pu, unite) : null, cont, o.promotion].filter(Boolean).join(', ')}`}
+          accessibilityHint="Appui long pour voir la fiche détaillée" onPress={() => choisir(o)} onLongPress={() => voir(o)} delayLongPress={350}
+          style={({ pressed }) => [s.offre, (i < vus.length - 1 || !tout) && s.separee, pris && s.offrePrise, pressed && { opacity: .75 }]}>
+          <Photo name={o.libelle} url={o.image_url} style={s.photo} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={ui.productName} numberOfLines={2}>{o.libelle}</Text>
+            {!!detail && <Text style={[ui.detail, { marginTop: 0 }]} numberOfLines={1}>{detail}</Text>}
+            {!!o.promotion && <Text style={s.promo} numberOfLines={1}>{insecable(o.promotion)}</Text>}
+          </View>
+          <View style={s.prixColonne}>
+            <Text style={s.prixListe}>{prixLisible(o.prix) ?? NC}</Text>
+            {pu != null && unite && <Text style={[s.unite, meilleurs.has(o.id) && s.uniteMeilleure]}>{m.estime?.[unite] ? '≈ ' : ''}{prixUnitaireLisible(pu, unite)}</Text>}
+          </View>
+          <View style={[s.radio, pris && s.radioPris]}>{pris && <View style={s.radioPoint} />}</View>
+        </Pressable>;
+      })}
+      {!tout && <Pressable accessibilityRole="button" onPress={() => setOuverts(x => ({ ...x, [actif]: true }))} style={s.voir}><Text style={ui.link}>Voir les {liste.length - PREMIERS} autres</Text></Pressable>}
+    </View> : <View style={s.carte}><Text style={s.texte}>{dernieres[actif] && estEnAttente(dernieres[actif]!.statut)
+      ? `${NOMS_DRIVE[actif]} n’a pas encore répondu : ${libelleStatut(dernieres[actif])}.` : `Rien trouvé sur ${NOMS_DRIVE[actif]}. Tu peux valider le seul produit ${NOMS_DRIVE[autre]}.`}</Text></View>}
+    {offres.length >= 2 && <Pressable accessibilityRole="button" accessibilityLabel="Comparer Carrefour et E.Leclerc" onPress={() => setComparer(true)} style={({ pressed }) => [s.secondaireLarge, pressed && { opacity: .8 }]}>
+      <Feather name="columns" size={16} color={colors.accent} /><Text style={s.secondaireTexte}>Comparer Carrefour et E.Leclerc</Text>
     </Pressable>}
-    <Text style={[s.texte, s.marge]}>Touche des produits pour les comparer. « Garder » l’ajoute à « Mes produits », déjà relié à son drive.</Text>
+    <Text style={[s.texte, s.marge, { textAlign: 'center' }]}>Appui long sur un produit pour sa fiche.{unite && [...mesures.values()].some(m => m.estime?.[unite]) ? ' « ≈ » : mètres estimés d’après la taille des feuilles.' : ''}</Text>
     {pied}
-    <FicheOffre fiche={detail?.fiche ?? null} proches={[]} onFermer={() => setDetail(null)} action="Garder ce produit"
-      enseigne={detail ? [NOMS_DRIVE[detail.offre.drive], prixLisible(detail.offre.prix), contenance(detail.offre), detail.offre.promotion].filter(Boolean).join(' · ') : null}
-      onChoisir={() => { const o = detail?.offre; setDetail(null); if (o) void garder([o]); }} />
-    <ComparerOffres visible={comparer} offres={cochees} occupe={!!garde} erreur={comparer ? erreur : null} fichesEnCours={fichesEnCours}
-      onOuvert={() => { void demanderFiches(cochees, fichesEnCours).then(() => recharger()); }} onFermer={() => setComparer(false)} onGarder={o => { void garder(o); }} />
+    <FicheOffre fiche={detail?.fiche ?? null} proches={[]} onFermer={() => setDetail(null)} description={detail ? descriptionDe(detail.offre) : null}
+      action={detail ? (choix[detail.offre.drive]?.id === detail.offre.id ? 'Ne plus choisir' : `Choisir pour ${NOMS_DRIVE[detail.offre.drive]}`) : undefined}
+      enseigne={detail ? [NOMS_DRIVE[detail.offre.drive], prixLisible(detail.offre.prix), contenanceDe(mesures.get(detail.offre.id) ?? {}), detail.offre.promotion].filter(Boolean).join(' · ') : null}
+      onChoisir={() => { const o = detail?.offre; setDetail(null); if (o) choisir(o); }} />
+    <ComparerOffres visible={comparer} offres={offres} choix={choix} onChoix={onChoix} occupe={occupe} erreur={comparer ? erreurValider : null} fichesEnCours={fichesEnCours}
+      onOuvert={() => { void demanderFiches(colonnesComparatif(offres, choix), fichesEnCours).then(() => recharger()); }} onFermer={() => setComparer(false)} onValider={onValider} />
   </View>;
 }
 
 /**
- * Le comparatif des offres cochées (CD 3 bis) : le tableau de l'ordre d'essai,
- * au plus un choix par drive. Il s'adapte au produit : la contenance lue dans
- * le libellé (mètres, feuilles, lavages, grammes…) et le prix ramené à cette
- * mesure ; les fiches Open Food, Beauty et Products Facts des codes-barres
- * connus ajoutent Nutri-Score, NOVA et repères ; le meilleur de chaque ligne
- * est en vert. À deux, chaque panier prendra celui de son drive.
+ * Le comparatif groupé par enseigne : un bandeau Carrefour, un bandeau
+ * E.Leclerc, quatre produits au plus par enseigne (le choisi en tête), les
+ * libellés figés à gauche. Il s'adapte au produit (contenance lue dans le
+ * libellé et la fiche du drive, prix ramené à la même mesure) ; les bases
+ * ouvertes complètent Nutri-Score, NOVA et repères. Un choix par enseigne,
+ * puis « Valider ».
  */
-function ComparerOffres({ visible, offres, occupe, erreur, fichesEnCours, onOuvert, onFermer, onGarder }: {
-  visible: boolean; offres: OffreRelevee[]; occupe: boolean; erreur: string | null;
+function ComparerOffres({ visible, offres: toutes, choix, onChoix, occupe, erreur, fichesEnCours, onOuvert, onFermer, onValider }: {
+  visible: boolean; offres: OffreRelevee[]; choix: ChoixOffres; onChoix: (c: ChoixOffres) => void; occupe: boolean; erreur: string | null;
   /** Les fiches que l'extension lit en ce moment, pour compléter les contenances. */
   fichesEnCours: string[]; onOuvert: () => void;
-  onFermer: () => void; onGarder: (o: OffreRelevee[]) => void;
+  onFermer: () => void; onValider: (o: OffreRelevee[]) => void;
 }) {
   // À l'ouverture, les fiches qui manquent sont demandées à l'extension ; le tableau se complète à leur arrivée.
   useEffect(() => { if (visible) onOuvert(); }, [visible]);
+  // Les colonnes se fixent à l'ouverture : choisir ne les fait pas sauter de place.
+  const [ordre, setOrdre] = useState<string[]>([]);
+  useEffect(() => { if (visible) setOrdre(colonnesComparatif(toutes, choix).map(o => o.id)); }, [visible]);
+  const offres = ordre.map(id => toutes.find(o => o.id === id)).filter((o): o is OffreRelevee => !!o);
   const lecture = offres.filter(o => fichesEnCours.includes(o.id)).length;
-  const [choix, setChoix] = useState<ChoixParDrive>({});
   // Les fiches des bases ouvertes, par offre : undefined tant qu'on cherche, null si rien.
   const [fiches, setFiches] = useState<Record<string, FicheProduit | null>>({});
   const cles = offres.map(o => o.id).join(',');
   useEffect(() => {
     if (!visible) return;
-    let actif = true;
+    let vivant = true;
     for (const o of offres) {
       if (o.id in fiches) continue;
       if (!o.ean13) { setFiches(f => ({ ...f, [o.id]: null })); continue; }
-      void lookupEan(o.ean13).then(r => { if (actif) setFiches(f => ({ ...f, [o.id]: r.etat === 'trouve' ? r.fiche : null })); })
-        .catch(() => { if (actif) setFiches(f => ({ ...f, [o.id]: null })); });
+      void lookupEan(o.ean13).then(r => { if (vivant) setFiches(f => ({ ...f, [o.id]: r.etat === 'trouve' ? r.fiche : null })); })
+        .catch(() => { if (vivant) setFiches(f => ({ ...f, [o.id]: null })); });
     }
-    return () => { actif = false; };
+    return () => { vivant = false; };
   }, [visible, cles]);
   const attente = offres.some(o => !(o.id in fiches));
 
-  const choisies = offres.filter(o => choix[o.drive] === o.id);
-  // Les mesures : le libellé d'abord, puis le relevé du drive et la fiche ouverte pour le poids ou le volume.
-  const mesures: Mesures[] = offres.map(o => {
-    const m = lireMesures(o.libelle, o.fiche_texte), f = fiches[o.id];
-    const g = m.g ?? o.grammage_g ?? f?.grammageG ?? null, ml = m.ml ?? o.volume_ml ?? f?.volumeMl ?? null;
-    return { ...m, ...(g ? { g: Number(g) } : {}), ...(ml ? { ml: Number(ml) } : {}) } as Mesures;
-  });
+  const choisies = DRIVES_RECHERCHE.flatMap(d => (choix[d] ? [choix[d]!] : []));
+  const mesures: Mesures[] = offres.map(o => mesuresDe(o, fiches[o.id]));
   const unite = uniteCommune(mesures);
   const parUnite = offres.map((o, i) => (unite ? prixParUnite(o.prix, mesures[i], unite) : null));
   const colonnes = offres.map(o => { const f = fiches[o.id];
     return { ean13: o.id, name: o.libelle, brand: o.marque, imageUrl: o.image_url ?? f?.imageUrl ?? null, grammageG: o.grammage_g, volumeMl: o.volume_ml,
       productType: null, categoryKey: null, nutriscore: o.nutriscore ?? f?.nutriscore ?? null, ...(f?.details ? { details: f.details } : {}) }; });
   const estime = (i: number) => !!(unite && mesures[i].estime?.[unite]);
-  const contenance = (m: Mesures) => {
-    const u = unite && m[unite] != null ? unite : ORDRE_UNITES.find(x => m[x] != null);
-    return u ? `${m.estime?.[u] ? '≈ ' : ''}${contenanceLisible(u, m[u]!)}` : NC;
-  };
   // Une base n'est citée que si elle a apporté quelque chose : repères, Nutri-Score ou contenance.
   const sources = [...new Set(offres.map(o => { const f = fiches[o.id];
     return f && (f.details || f.nutriscore || f.grammageG || f.volumeMl) ? f.origine ?? 'Open Food Facts' : null; }).filter(Boolean))];
   const releve = offres.reduce((p, o) => (!p || o.vu_le < p ? o.vu_le : p), '' as string);
   const avant: LigneComparatif[] = [
-    ['drive', 'Drive', (_, i) => <Text style={s.pastille}>{NOMS_DRIVE[offres[i].drive]}</Text>],
-    ['prix', 'Prix au drive', (_, i) => offres[i].prix != null ? <Text style={s.prix}>{prixLisible(offres[i].prix)}</Text> : <Text style={s.nc}>{NC}</Text>],
-    // Une ligne vide pour tous n'apprend rien : contenance, prix à la mesure, promo, dispo et fiche n'apparaissent que si l'un en a.
-    ...(mesures.some(m => Object.keys(m).length) ? [['contenance', 'Contenance', (_, i) => <Text style={s.cellule}>{contenance(mesures[i])}</Text>] as LigneComparatif] : []),
+    ['prix', 'Prix', (_, i) => offres[i].prix != null ? <Text style={s.prix}>{prixLisible(offres[i].prix)}</Text> : <Text style={s.nc}>{NC}</Text>],
+    // Une ligne vide pour tous n'apprend rien : contenance, prix à la mesure, promo et dispo n'apparaissent que si l'un en a.
+    ...(mesures.some(m => Object.keys(m).length) ? [['contenance', 'Contenance', (_, i) => <Text style={s.cellule}>{contenanceDe(mesures[i], unite)}</Text>] as LigneComparatif] : []),
     ...(unite ? [['unite', libellePrixUnitaire(unite), (_, i) => <Text style={parUnite[i] != null ? s.cellule : s.nc}>{parUnite[i] != null ? `${estime(i) ? '≈ ' : ''}${prixUnitaireLisible(parUnite[i]!, unite)}` : NC}</Text>] as LigneComparatif] : []),
     ...(offres.some(o => o.promotion) ? [['promo', 'Promo', (_, i) => <Text style={offres[i].promotion ? [s.cellule, { color: colors.attentionText, fontWeight: '700' }] : s.nc}>{offres[i].promotion ? insecable(offres[i].promotion!) : NC}</Text>] as LigneComparatif] : []),
     ...(offres.some(o => !o.disponible) ? [['dispo', 'Dispo', (_, i) => <Text style={s.cellule}>{offres[i].disponible ? 'en stock' : 'indisponible'}</Text>] as LigneComparatif] : []),
   ];
-  const resume = (d: DriveRecherche) => {
-    const o = choisies.find(x => x.drive === d), autre = choisies.find(x => x.drive !== d);
-    return o ? o.libelle : autre ? `le même : ${autre.libelle}` : 'rien de choisi';
-  };
+  const groupes = DRIVES_RECHERCHE.map(d => ({ d, nombre: offres.filter(o => o.drive === d).length })).filter(g => g.nombre)
+    .map(g => ({ titre: NOMS_DRIVE[g.d].toUpperCase(), etat: choix[g.d] ? 'choisi' : 'à choisir', nombre: g.nombre, actif: !!choix[g.d] }));
   const n = choisies.length;
   return <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onFermer}>
     <SafeAreaView edges={['bottom']} style={s.ecran}>
@@ -265,34 +280,42 @@ function ComparerOffres({ visible, offres, occupe, erreur, fichesEnCours, onOuve
         <Text style={s.titreBarre} accessibilityRole="header">Comparer</Text>
         <View style={[s.bouton, { alignItems: 'flex-end' }]}>{attente && <ActivityIndicator accessibilityLabel="Recherche des fiches produits" color={colors.accent} />}</View>
       </View>
-      <ScrollView contentContainerStyle={{ paddingTop: 8, paddingBottom: 24, gap: 14 }}>
+      <ScrollView contentContainerStyle={{ paddingTop: 4, paddingBottom: 24, gap: 12 }}>
+        <Text style={[s.texte, { paddingHorizontal: 16 }]}>Un choix par enseigne. Appui long sur un produit pour sa fiche.</Text>
         {lecture > 0 && <View style={s.lecture} accessibilityLiveRegion="polite">
           <ActivityIndicator size="small" color={colors.accent} />
           <Text style={[s.texte, { flex: 1 }]}>Lecture {lecture > 1 ? `des ${lecture} fiches` : 'de la fiche'} sur Carrefour : les contenances se complètent d’elles-mêmes.</Text>
         </View>}
-        <Text style={[s.texte, { paddingHorizontal: 16 }]}>Garde un produit par drive, ou un seul pour les deux. Un 2ᵉ sur le même drive remplace le 1er.</Text>
-        <TableauComparatif colonnes={colonnes} avant={avant} meilleursAvant={{ unite: plusPetits(parUnite), prix: plusPetits(offres.map(o => o.prix)) }} enAvant={offres.flatMap((o, i) => choix[o.drive] === o.id ? [i] : [])}
-          pied={(_, i) => { const o = offres[i], pris = choix[o.drive] === o.id;
-            return <Pressable accessibilityRole="button" accessibilityState={{ selected: pris }} accessibilityLabel={`${pris ? 'Ne plus garder' : 'Garder'} ${o.libelle} pour ${NOMS_DRIVE[o.drive]}`}
-              onPress={() => setChoix(c => basculerChoix(c, o))} style={[s.choisir, pris && s.choisi]}>
+        <TableauComparatif colonnes={colonnes} avant={avant} groupes={groupes} meilleursAvant={{ unite: plusPetits(parUnite), prix: plusPetits(offres.map(o => o.prix)) }}
+          enAvant={offres.flatMap((o, i) => choix[o.drive]?.id === o.id ? [i] : [])}
+          pied={(_, i) => { const o = offres[i], pris = choix[o.drive]?.id === o.id;
+            return <Pressable accessibilityRole="button" accessibilityState={{ selected: pris }} accessibilityLabel={`${pris ? 'Ne plus choisir' : 'Choisir'} ${o.libelle} pour ${NOMS_DRIVE[o.drive]}`}
+              onPress={() => onChoix(choisirOffre(choix, o))} style={[s.choisir, pris && s.choisi]}>
               {pris && <Feather name="check" size={14} color={colors.accentContrast} />}
-              <Text style={[s.choisirTexte, pris && { color: colors.accentContrast }]}>{pris ? 'Gardé' : 'Garder'}</Text>
+              <Text style={[s.choisirTexte, pris && { color: colors.accentContrast }]}>{pris ? 'Choisi' : 'Choisir'}</Text>
             </Pressable>; }} />
         <Text style={[s.texte, { textAlign: 'center', paddingHorizontal: 16 }]}>
-          {[`Le meilleur de chaque ligne en vert. Prix relevés ${ilYa(releve) ?? ''}.`, offres.some((_, i) => estime(i)) ? '« ≈ » : mètres estimés d’après la taille des feuilles.' : null, sources.length ? `Repères : ${sources.join(', ')}.` : null].filter(Boolean).join(' ')}
+          {[`Vert : le meilleur de chaque ligne, toutes enseignes. Prix relevés ${ilYa(releve) ?? ''}.`, offres.some((_, i) => estime(i)) ? '« ≈ » : mètres estimés d’après la taille des feuilles.' : null, sources.length ? `Repères : ${sources.join(', ')}.` : null].filter(Boolean).join(' ')}
         </Text>
       </ScrollView>
       <View style={s.validation}>
         {!!erreur && <Text style={[ui.error, { textAlign: 'center' }]}>{erreur}</Text>}
-        {DRIVES_RECHERCHE.map(d => <View key={d} style={s.resume}><Text style={s.etatDrive}>{NOMS_DRIVE[d]}</Text>
-          <Text style={[s.resumeTexte, !choisies.some(x => x.drive === d) && { color: colors.textMuted, fontWeight: '400' }]} numberOfLines={1}>{resume(d)}</Text></View>)}
-        <Pressable accessibilityRole="button" disabled={!n || occupe} onPress={() => onGarder(choisies)} style={[s.principal, (!n || occupe) && s.inactif]}>
-          {occupe ? <ActivityIndicator color={colors.accentContrast} /> : <Text style={[s.principalTexte, !n && { color: colors.offText }]}>{n === 2 ? 'Garder ces 2 produits' : n === 1 ? 'Garder ce produit' : 'Choisis au moins un produit'}</Text>}
+        <Recapitulatif choix={choix} />
+        <Pressable accessibilityRole="button" disabled={!n || occupe} onPress={() => onValider(choisies)} style={[s.principal, (!n || occupe) && s.inactif]}>
+          {occupe ? <ActivityIndicator color={colors.accentContrast} /> : <Text style={[s.principalTexte, !n && { color: colors.offText }]}>{n === 2 ? 'Valider les 2 produits' : n === 1 ? 'Valider ce seul produit' : 'Choisis un produit'}</Text>}
         </Pressable>
-        <Text style={[s.texte, { textAlign: 'center', fontSize: 12 }]}>{n === 2 ? 'Chaque panier prend celui de son drive ; l’un devient l’alternative de l’autre.' : n === 1 ? 'Un seul produit : il est cherché sur les deux drives.' : 'Rien ne change tant que tu n’as pas choisi.'}</Text>
       </View>
     </SafeAreaView>
   </Modal>;
+}
+
+/** Le récapitulatif du choix, une ligne par enseigne : le produit et son prix, ou « à choisir ». */
+export function Recapitulatif({ choix }: { choix: ChoixOffres }) {
+  return <View style={{ gap: 4 }}>
+    {DRIVES_RECHERCHE.map(d => { const o = choix[d];
+      return <View key={d} style={s.resume}><Text style={s.etatDrive}>{NOMS_DRIVE[d]}</Text>
+        <Text style={[s.resumeTexte, !o && { color: colors.textMuted, fontWeight: '400' }]} numberOfLines={1}>{o ? `${nomCourt(o.libelle)} · ${prixLisible(o.prix) ?? NC}` : 'à choisir'}</Text></View>; })}
+  </View>;
 }
 
 const s = StyleSheet.create({
@@ -321,11 +344,11 @@ const s = StyleSheet.create({
   section: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
   comparer: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: colors.accentSoft },
   comparerTexte: { fontSize: 14, fontWeight: '600', color: colors.accent },
-  sousEntete: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 4, marginTop: 4 },
+  sousEntete: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 4 },
   drive: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, color: colors.textMuted },
   quand: { fontSize: 12, color: colors.textMuted },
   liste: { backgroundColor: colors.surface, borderRadius: 16, overflow: 'hidden' },
-  offre: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingRight: 12 },
+  offre: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 64, paddingVertical: 8, paddingHorizontal: 12 },
   separee: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   case: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   boite: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: colors.traitControle, alignItems: 'center', justifyContent: 'center' },
@@ -354,4 +377,19 @@ const s = StyleSheet.create({
   resume: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   resumeTexte: { flex: 1, textAlign: 'right', fontSize: 14, fontWeight: '600', color: colors.text },
   lecture: { marginHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  onglets: { flexDirection: 'row', backgroundColor: '#E4E7E0', borderRadius: 12, padding: 4, gap: 4 },
+  onglet: { flex: 1, minHeight: 52, borderRadius: 9, alignItems: 'center', justifyContent: 'center', gap: 1 },
+  ongletActif: { backgroundColor: colors.surface, shadowColor: '#141C10', shadowOpacity: .12, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  ongletNom: { fontSize: 15, fontWeight: '700', color: colors.text },
+  ongletSous: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  ongletEtat: { fontSize: 12, fontWeight: '600', color: colors.textMuted },
+  consigne: { fontSize: 14, fontWeight: '600', color: colors.text },
+  offrePrise: { backgroundColor: '#EEF4E8' },
+  prixColonne: { alignItems: 'flex-end', gap: 2, minWidth: 64 },
+  prixListe: { fontSize: 15, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+  unite: { fontSize: 12, color: colors.textMuted, fontVariant: ['tabular-nums'] },
+  uniteMeilleure: { fontWeight: '700', color: '#2F6B2F' },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: colors.traitControle, alignItems: 'center', justifyContent: 'center' },
+  radioPris: { borderColor: colors.accent },
+  radioPoint: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.accent },
 });

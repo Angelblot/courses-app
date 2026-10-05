@@ -26,11 +26,12 @@ const etat={quotidien:{},quotidienQty:{},ligneQuantites:{},lignePossedees:{},sel
  await btn('Préparer mes courses').click();await btn('Voir le bilan').click();
  await page.getByRole('button',{name:/^Manques :.*Préciser$/}).last().click();
  await page.getByText('Préciser · 1 sur 2',{exact:true}).waitFor();await page.getByText('« Antikal »',{exact:true}).waitFor();
- const choix=page.getByRole('button',{name:/^Choisir Antikal Original Spray/});await choix.waitFor({timeout:20000});
+ // On part des produits du drive : la liste Open Food Facts n'apparaît plus, la recherche sur les drives si.
+ await btn('Chercher sur Carrefour et E.Leclerc').waitFor({timeout:20000});
+ await page.waitForTimeout(1500);if(await page.getByText('Sur les bases ouvertes').count())throw Error('Liste Open Food Facts encore affichée');
  await page.waitForTimeout(400);await page.screenshot({path:dossier+'/pr1-manque.png'});
- await choix.click();
+ await btn('Garder « Antikal » sans produit. L’extension le cherchera par son nom.').click();
  await page.getByText('Préciser · 2 sur 2',{exact:true}).waitFor();await page.getByText('« Sel regenerant lave vaisselle »',{exact:true}).waitFor();
- if(!cree||cree.name!=='Antikal Original Spray')throw Error('OFF product not created '+JSON.stringify(cree));
  await btn('Retirer Sel regenerant lave vaisselle de ta liste').click();
  await page.getByText('Sel regenerant lave vaisselle retiré de ta liste').last().waitFor();
  await page.waitForTimeout(500);await page.screenshot({path:dossier+'/pr1-retire.png'});

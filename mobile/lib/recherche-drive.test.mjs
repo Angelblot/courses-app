@@ -57,3 +57,29 @@ test('recherche drive : la fiche d’une offre et ses prix lisibles', () => {
   assert.equal(prixLisible(12.4, 'kg'), '12,40 €/kg');
   assert.equal(prixLisible(null), null);
 });
+
+import { choisirOffre, ongletApres, colonnesComparatif } from './recherche-drive.ts';
+
+test('choix par enseigne : remplacer, retirer, et passer à l’autre enseigne', () => {
+  const c1 = offre('c1', 'carrefour', 0), c2 = offre('c2', 'carrefour', 1), l1 = offre('l1', 'leclerc', 0);
+  let c = choisirOffre({}, c1);
+  assert.equal(c.carrefour.id, 'c1');
+  assert.equal(ongletApres(c, 'carrefour', { carrefour: 2, leclerc: 3 }), 'leclerc');
+  // Pas de résultat E.Leclerc : on reste sur Carrefour.
+  assert.equal(ongletApres(c, 'carrefour', { carrefour: 2, leclerc: 0 }), 'carrefour');
+  c = choisirOffre(c, c2);
+  assert.equal(c.carrefour.id, 'c2');
+  c = choisirOffre(c, l1);
+  // Les deux sont choisis : on reste où l'on est.
+  assert.equal(ongletApres(c, 'leclerc', { carrefour: 2, leclerc: 3 }), 'leclerc');
+  c = choisirOffre(c, c2);
+  assert.deepEqual(Object.keys(c), ['leclerc']);
+  // Retirer son choix ne fait pas changer d'onglet.
+  assert.equal(ongletApres(c, 'carrefour', { carrefour: 2, leclerc: 3 }), 'carrefour');
+});
+
+test('comparatif groupé : le choix de chaque enseigne en tête, quatre au plus par enseigne', () => {
+  const o = [offre('c1', 'carrefour', 0), offre('c2', 'carrefour', 1), offre('c3', 'carrefour', 2), offre('c4', 'carrefour', 3), offre('c5', 'carrefour', 4), offre('l1', 'leclerc', 0), offre('l2', 'leclerc', 1)];
+  assert.deepEqual(colonnesComparatif(o, { carrefour: o[4] }).map(x => x.id), ['c5', 'c1', 'c2', 'c3', 'l1', 'l2']);
+  assert.deepEqual(colonnesComparatif(o, {}, 2).map(x => x.id), ['c1', 'c2', 'l1', 'l2']);
+});

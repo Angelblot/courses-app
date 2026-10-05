@@ -39,6 +39,8 @@ export function FicheOffre(props: { fiche: FicheProduit | null; proches: FichePr
   enseigne?: string | null;
   /** Le libellé du bouton du bas (« Choisir ce produit » par défaut). */
   action?: string;
+  /** Ce que dit la fiche du produit sur le drive (sa description), quand l'extension l'a lue. */
+  description?: string | null;
 }) {
   if (!props.fiche) return null;
   // La modale a sa propre fenêtre : le fournisseur y rend les marges d'iOS (barre d'accueil).
@@ -47,7 +49,7 @@ export function FicheOffre(props: { fiche: FicheProduit | null; proches: FichePr
   </Modal>;
 }
 
-function Contenu({ fiche, proches, onChoisir, onFermer, enseigne, action = 'Choisir ce produit' }: { fiche: FicheProduit | null; proches: FicheProduit[]; onChoisir: (f: FicheProduit) => void; onFermer: () => void; enseigne?: string | null; action?: string }) {
+function Contenu({ fiche, proches, onChoisir, onFermer, enseigne, action = 'Choisir ce produit', description }: { fiche: FicheProduit | null; proches: FicheProduit[]; onChoisir: (f: FicheProduit) => void; onFermer: () => void; enseigne?: string | null; action?: string; description?: string | null }) {
   const insets = useSafeAreaInsets();
   const [tout, setTout] = useState(false);
   if (!fiche) return null;
@@ -65,11 +67,14 @@ function Contenu({ fiche, proches, onChoisir, onFermer, enseigne, action = 'Choi
             <Text style={ui.detail}>{[fiche.brand, contenance(fiche), d?.portion ? `portion ${d.portion}` : null].filter(Boolean).join(' · ')}</Text>
             {!!enseigne && <Text style={s.enseigne}>{enseigne}</Text>}</View>
         </View>
-        <View style={s.scores}>
+        {/* Des scores tous inconnus (un papier cuisson) n'apprennent rien : la rangée disparaît. */}
+        {(fiche.nutriscore || d?.nova || d?.ecoscore) && <View style={s.scores}>
           <Score libelle="Nutri-Score" valeur={fiche.nutriscore?.toUpperCase() ?? null} teinte={fiche.nutriscore ? NOTES[fiche.nutriscore] : undefined} />
           <Score libelle="Transformation" valeur={d?.nova ? `NOVA ${d.nova}` : null} teinte={d?.nova ? NOVA[d.nova] : undefined} />
           <Score libelle="Eco-Score" valeur={d?.ecoscore?.toUpperCase() ?? null} teinte={d?.ecoscore ? NOTES[d.ecoscore] : undefined} />
-        </View>
+        </View>}
+        {!!description && <View style={s.texte}><Text style={s.paragraphe} numberOfLines={tout ? undefined : 4}><Text style={s.gras}>Sur la fiche du drive : </Text>{description}</Text>
+          {description.length > 180 && <Pressable accessibilityRole="button" onPress={() => setTout(!tout)} style={s.lien}><Text style={ui.link}>{tout ? 'Réduire' : 'Tout lire'}</Text></Pressable>}</View>}
         {d ? <>
           <Text style={s.section}>Pour 100 g</Text>
           <View style={s.tableau}>
@@ -85,7 +90,7 @@ function Contenu({ fiche, proches, onChoisir, onFermer, enseigne, action = 'Choi
             {ingredients && <Text style={s.paragraphe} numberOfLines={tout ? undefined : 3}><Text style={s.gras}>Ingrédients : </Text>{ingredients}</Text>}
             {ingredients && ingredients.length > 140 && <Pressable accessibilityRole="button" onPress={() => setTout(!tout)} style={s.lien}><Text style={ui.link}>{tout ? 'Réduire' : 'Tout lire'}</Text></Pressable>}
           </View>}
-        </> : <Text style={[ui.detail, { paddingHorizontal: 16 }]}>Les bases ouvertes n’ont pas encore les repères de ce produit.</Text>}
+        </> : !description && <Text style={[ui.detail, { paddingHorizontal: 16 }]}>Les bases ouvertes n’ont pas encore les repères de ce produit.</Text>}
 
         {colonnes.length > 1 && <>
           <Text style={s.section}>Comparé à des produits proches</Text>
@@ -108,11 +113,13 @@ export type LigneComparatif = [string, string, (c: FicheProduit, i: number) => R
  * le tableau défile de côté. `avant` ajoute des lignes en tête (le prix,
  * par exemple), avec leurs propres gagnants ; `pied` une action par colonne.
  */
-export function TableauComparatif({ colonnes, avant = [], meilleursAvant = {}, pied, enAvant = [0] }: {
+export function TableauComparatif({ colonnes, avant = [], meilleursAvant = {}, pied, enAvant = [0], groupes }: {
   colonnes: FicheProduit[]; avant?: LigneComparatif[]; meilleursAvant?: Record<string, number[]>;
   pied?: (c: FicheProduit, i: number) => ReactNode;
   /** Colonnes teintées : la référence de l'ordre d'essai, ou les produits choisis. */
   enAvant?: number[];
+  /** Des colonnes groupées par enseigne, dans l'ordre : un bandeau au-dessus de chaque groupe. */
+  groupes?: { titre: string; etat: string; nombre: number; actif: boolean }[];
 }) {
   const m = { ...meilleurs(colonnes.map(c => ({ nutriscore: c.nutriscore, details: c.details ?? null }))), ...meilleursAvant };
   const vert = (cle: string, i: number) => m[cle]?.includes(i);
@@ -134,7 +141,7 @@ export function TableauComparatif({ colonnes, avant = [], meilleursAvant = {}, p
     sucres: c => c.details?.sucres != null, sel: c => c.details?.sel != null, allergenes: c => !!c.details,
   };
   const visibles = lignes.filter(([cle]) => !connu[cle] || colonnes.some(connu[cle]));
-  const large = colonnes.length > 3, col = large ? s.colonneFixe : null;
+  const large = colonnes.length > 3 || !!groupes, col = large ? s.colonneFixe : null;
   // Au-delà de trois produits, le tableau défile de côté et les libellés restent en place à gauche :
   // chaque ligne défilante mesure sa hauteur, que reprend son libellé figé.
   const [hauteurs, setHauteurs] = useState<Record<string, number>>({});
@@ -143,15 +150,21 @@ export function TableauComparatif({ colonnes, avant = [], meilleursAvant = {}, p
     setHauteurs(x => (x[cle] === h ? x : { ...x, [cle]: h }));
   };
   if (large) {
-    const rangees: [string, string | null][] = [['entete', null], ...visibles.map(([cle, libelle]) => [cle, libelle] as [string, string]), ...(pied ? [['pied', null] as [string, null]] : [])];
+    const rangees: [string, string | null][] = [...(groupes ? [['bandes', null] as [string, null]] : []), ['entete', null], ...visibles.map(([cle, libelle]) => [cle, libelle] as [string, string]), ...(pied ? [['pied', null] as [string, null]] : [])];
     return <View style={[s.comparatif, { flexDirection: 'row' }]}>
       <View style={s.libellesFiges}>
-        {rangees.map(([cle, libelle]) => <View key={cle} style={[s.ligneComp, { height: hauteurs[cle] }, cle === 'pied' && { borderBottomWidth: 0 }]}>
+        {rangees.map(([cle, libelle]) => <View key={cle} style={[s.ligneComp, hauteurs[cle] != null && { height: hauteurs[cle], minHeight: 0 }, cle === 'pied' && { borderBottomWidth: 0 }]}>
           {libelle ? <Text style={s.libelleComp}>{libelle}</Text> : null}
         </View>)}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
         <View>
+          {groupes && <View onLayout={mesurer('bandes')} style={{ flexDirection: 'row' }}>
+            {groupes.map((g, i) => <View key={g.titre} style={[s.bande, { width: g.nombre * 104 }, g.actif && s.bandeActive, i > 0 && s.bandeSuivante]}>
+              <Text style={[s.bandeTexte, g.actif && { color: '#2F6B2F' }]} numberOfLines={1}>{g.titre}</Text>
+              <Text style={[s.bandeEtat, g.actif && { color: '#2F6B2F' }]} numberOfLines={1}>{g.etat}</Text>
+            </View>)}
+          </View>}
           <View onLayout={mesurer('entete')} style={s.ligneComp}>{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, enAvant.includes(i) && s.colonneMoi]}><Photo name={c.name} url={c.imageUrl} style={s.mini52} /><Text style={s.nomComp} numberOfLines={3}>{c.name}</Text></View>)}</View>
           {visibles.map(([cle, , rendu]) => <View key={cle} onLayout={mesurer(cle)} style={s.ligneComp}>
             {colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, enAvant.includes(i) && s.colonneMoi, vert(cle, i) && s.mieux]}>{rendu(c, i)}</View>)}
@@ -214,6 +227,11 @@ const s = StyleSheet.create({
   colonne: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 4, gap: 4 },
   colonneMoi: { backgroundColor: '#F6F8F3' },
   enseigne: { fontSize: 14, fontWeight: '600', color: colors.text, marginTop: 2 },
+  bande: { minHeight: 40, paddingHorizontal: 10, paddingVertical: 4, justifyContent: 'center', backgroundColor: colors.off },
+  bandeEtat: { fontSize: 11, color: colors.textMuted },
+  bandeActive: { backgroundColor: '#E7F0E1' },
+  bandeSuivante: { borderLeftWidth: 2, borderLeftColor: colors.surface },
+  bandeTexte: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4, color: colors.textMuted },
   libellesFiges: { width: 92, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border, backgroundColor: colors.surface, zIndex: 1 },
   mieux: { backgroundColor: '#E6F0DD' },
   cellule: { fontSize: 12, color: colors.text, textAlign: 'center', fontVariant: ['tabular-nums'] },

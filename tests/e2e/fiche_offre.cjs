@@ -1,4 +1,4 @@
-/* Appui long sur un résultat Open Food Facts : la fiche détaillée, son comparatif avec des produits proches, et « Choisir ». */
+/* Appui long sur un résultat Open Food Facts dans le sélecteur d'ingrédients d'une recette : la fiche détaillée, son comparatif avec des produits proches, et « Choisir ». (Dans Préciser, les bases ouvertes ne font plus qu'enrichir les produits du drive.) */
 const {chromium}=require('playwright');
 const user={id:'11111111-1111-4111-8111-111111111111',aud:'authenticated',role:'authenticated',email:'demo@example.test'};
 const token=['eyJhbGciOiJIUzI1NiJ9',Buffer.from(JSON.stringify({sub:user.id,exp:Math.floor(Date.now()/1000)+36000,role:'authenticated'})).toString('base64url'),'demo'].join('.');
@@ -28,11 +28,9 @@ const etat={quotidien:{},quotidienQty:{},ligneQuantites:{},lignePossedees:{},sel
   await route.fulfill({json:data});});
  await page.addInitScript(({session,id,etat})=>{localStorage.setItem('sb-qmymwicsgilhoihtfdjm-auth-token',JSON.stringify(session));if(!localStorage.getItem('seeded')){localStorage.setItem('tablee-maison-v1:'+id,JSON.stringify(etat));localStorage.setItem('seeded','yes');}},{session,id:user.id,etat});
  const btn=(name)=>page.getByRole('button',{name,exact:true});
- await page.goto('http://localhost:8082');await btn('Préparer mes courses').waitFor({timeout:60000});
- await btn('Préparer mes courses').click();await btn('Voir le bilan').click();
- await page.getByRole('button',{name:/^Manques :.*Préciser$/}).last().click();
- await page.getByText('« Pepito »',{exact:true}).waitFor();
- const ligne=page.getByRole('button',{name:/^Choisir Pepito pépite choco/});await ligne.waitFor({timeout:20000});
+ await page.goto('http://localhost:8082/nouvelle-recette');await btn('Ajouter un ingrédient').click({timeout:60000});
+ const champ=page.getByPlaceholder('Lardons, crème, spaghetti…');await champ.fill('Pepito');
+ const ligne=page.getByRole('button',{name:/^Ajouter Pepito pépite choco/});await ligne.waitFor({timeout:20000});
  // Appui long : sur le web, la fiche complète s'ouvre directement.
  const r=await ligne.boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.waitForTimeout(900);await page.mouse.up();
  await page.getByText('Comparé à des produits proches',{exact:true}).waitFor();
