@@ -636,6 +636,9 @@ export function pageAgent(cfg, item, mode) {
         ean: eanFromUrl(lien),
         prix: textOf(queryFirst(card, cfg.price)).slice(0, 40),
         texte: textOf(card).slice(0, 400),
+        // Pour comprendre une carte mal lue : sa classe et son balisage, en bref.
+        cls: String(card.className ?? '').slice(0, 80),
+        html: card.outerHTML.replace(/\s+/g, ' ').slice(0, 1500),
         image: img ? img.currentSrc || img.getAttribute('src') || '' : '',
         nutri: nutri
           ? nutri.getAttribute('alt') || nutri.getAttribute('aria-label') || nutri.getAttribute('title') || String(nutri.getAttribute('class') ?? '')

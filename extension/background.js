@@ -848,7 +848,9 @@ async function faireRecherches(file, { auto = false } = {}) {
       const statut = issueRecherche(compte, lignes.length);
       await majRecherche(rech.id, {
         statut, resultats: lignes.length, faite_le: statut === 'verification' ? null : new Date().toISOString(),
-        diagnostic: lignes.length ? null : { raison: compte.reason ?? null, message: String(compte.message ?? '').slice(0, 200), cadres: compte.cadres ?? null },
+        diagnostic: lignes.length
+          ? { echantillon: (compte.releve ?? []).slice(0, 8).map((c) => ({ label: c.label, prix: c.prix, image: Boolean(c.image), href: String(c.href ?? '').slice(0, 120), cls: c.cls, texte: String(c.texte ?? '').slice(0, 300), html: c.html })) }
+          : { raison: compte.reason ?? null, message: String(compte.message ?? '').slice(0, 200), cadres: compte.cadres ?? null },
       });
       if (statut === 'verification') {
         // L'onglet d'arrière-plan passe devant : c'est là que la vérification se résout.
