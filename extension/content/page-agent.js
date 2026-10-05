@@ -651,6 +651,16 @@ export function pageAgent(cfg, item, mode) {
         if (!lues.length) lues = cards;
       }
       chargement = { cartes: lues.length, completesAvant: avant, completesApres: lues.filter(complete).length };
+      // Les produits pas encore dessinés sont-ils déjà dans un script de la page ?
+      const attente = lues.find((c) => !complete(c));
+      const nomAttente = attente ? textOf(queryFirst(attente, cfg.title) || attente).split('\n')[0].trim() : '';
+      if (nomAttente) {
+        const scripts = [...document.querySelectorAll('script:not([src])')].map((x) => x.textContent || '');
+        const dedans = scripts.find((t) => t.includes(nomAttente));
+        const i = dedans ? dedans.indexOf(nomAttente) : -1;
+        chargement.script = { nom: nomAttente.slice(0, 60), scripts: scripts.length, trouve: i >= 0, taille: dedans?.length ?? 0,
+          debut: dedans ? dedans.slice(0, 300) : '', autour: i >= 0 ? dedans.slice(Math.max(0, i - 700), i + 900) : '' };
+      }
     }
     const releve = lues.slice(0, MAX_RELEVE).map((card) => {
       // L'adresse du produit, pas celle du rayon : chez E.Leclerc, le premier
