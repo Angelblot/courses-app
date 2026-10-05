@@ -286,8 +286,9 @@ $('recherches-lancer').addEventListener('click', async () => {
   $('recherches-lancer').disabled = true;
   const res = await send({ type: 'lancerRecherches' });
   $('recherches-lancer').disabled = false;
-  if (!res?.ok) $('recherches-message').textContent = `Échec : ${res?.error ?? 'inconnu'}`;
   await relireRecherches();
+  // Après la relecture, qui réécrit le message : sinon l'échec s'effaçait aussitôt.
+  if (!res?.ok) $('recherches-message').textContent = `Impossible de lancer : ${String(res?.error ?? 'erreur inconnue').replace(/^Error: /, '')}`;
 });
 $('recherches-pause').addEventListener('click', async () => { await send({ type: 'pauseRecherches' }); await relireRecherches(); });
 

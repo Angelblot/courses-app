@@ -23,6 +23,7 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
    else if(m==='DELETE')recherches=[];
    else data=url.includes('statut=in.')?recherches.filter(r=>['en_attente','en_cours','verification'].includes(r.statut)):recherches.filter(r=>url.includes(`requete=eq.${r.requete}`));}
   else if(url.includes('/rest/v1/offres_drive'))data=offres;
+  else if(url.includes('/rest/v1/extension_presence'))data={vue_le:new Date().toISOString(),activite:'prete',detail:{}};
   else if(url.includes('/rest/v1/products')&&m==='POST'){const c=req.postDataJSON();const p={...base,...c,id:`cree-${ecrit.produits.length}`};ecrit.produits.push(c);products.push(p);data=p;}
   else if(url.includes('/rest/v1/products')&&m==='PATCH'){ecrit.majProduits.push({url,corps:req.postDataJSON()});}
   else if(url.includes('/rest/v1/product_equivalents')&&m==='POST'){ecrit.liens.push(req.postDataJSON());}
@@ -42,11 +43,16 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
  await page.getByText('Recherche envoyée',{exact:true}).waitFor();
  const deux=JSON.stringify(ecrit.recherches.map(r=>[r.drive,r.requete]));
  if(deux!==JSON.stringify([['carrefour','Papier sulfurisé'],['leclerc','Papier sulfurisé']]))throw Error('Mauvaises recherches '+deux);
- if(await page.getByText('en attente de l’ordinateur',{exact:true}).count()!==2)throw Error('États des drives absents');
+ if(await page.getByText('pas encore lancée',{exact:true}).count()!==2)throw Error('États des drives absents');
  await btn('Chercher aussi les 1 autres points sur les drives').click();
  await page.getByText('Les autres sont envoyés aussi',{exact:true}).waitFor();
  if(ecrit.recherches.length!==4||ecrit.recherches[3].requete!=='Gel intime')throw Error('Lot mal envoyé '+JSON.stringify(ecrit.recherches));
+ // Le pied dit où en est l'extension (vue il y a un instant, prête) et propose de passer au suivant.
+ await page.getByText('Chrome est ouvert',{exact:true}).waitFor();
+ await page.getByText('Dans l’extension, clique sur « Lancer les recherches ».',{exact:true}).waitFor();
  await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd2-attente.png'});
+ await btn('Passer au suivant').click();await page.getByText('« Gel intime »',{exact:true}).waitFor();
+ await btn('Passer au suivant').click();await page.getByText('« Papier sulfurisé »',{exact:true}).waitFor();
  // 3. L'extension a cherché : les résultats reviennent, par drive.
  recherches=recherches.map(r=>r.requete!=='Papier sulfurisé'?r:{...r,id:r.drive==='carrefour'?'rc':'rl',statut:'faite',resultats:r.drive==='carrefour'?4:1,faite_le:new Date().toISOString()});
  offres=[offre('c1','carrefour',0,'Papier cuisson sulfurisé Carrefour 8 m',1.59,'3560070000001'),offre('c2','carrefour',1,'Papier cuisson Albal 10 m',2.99,'3560070000002'),

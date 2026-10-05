@@ -12,6 +12,8 @@ import { ComparaisonCommande } from '../../components/ComparaisonCommande';
 import { VerdictDrives } from '../../components/VerdictDrives';
 import { etapesEnvoi, resume, type EtapeEnvoi } from '../../lib/suivi-libelles.ts';
 import { CONSIGNES_EXTENSION } from '../../lib/extension-consignes';
+import { EtatExtension } from '../../components/EtatExtension';
+import { useExtension } from '../../stores/extension';
 import { colors } from '../../lib/theme';
 
 const NOMS: Record<string, string> = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' };
@@ -24,6 +26,8 @@ const NOMS: Record<string, string> = { carrefour: 'Carrefour', leclerc: 'E.Lecle
 export default function Envoye() {
  const { id, n, drives, heure: heureEnvoi } = useLocalSearchParams<{ id: string; n?: string; drives?: string; heure?: string }>();
  const { travail } = useSuiviTravail(id ?? null);
+ // L'ordinateur vu d'ici : est-il là, et que fait l'extension ? (synchronisation dans les deux sens)
+ const extension = useExtension();
  const total = Number(n) || 0, noms = (drives ?? '').split(',').filter(Boolean).map(d => NOMS[d] ?? d);
  const [envoyee, prise, remplie] = etapesEnvoi(travail?.status);
  // L'heure d'envoi vient de la feuille d'envoi ; à défaut, l'heure d'arrivée ici.
@@ -63,6 +67,7 @@ export default function Envoye() {
      {t.aide && <Pressable accessibilityRole="button" onPress={() => { void Share.share({ message: CONSIGNES_EXTENSION }); }} style={e.aide}><Text style={ui.link}>Elle n’est pas installée ?</Text></Pressable>}
     </View>)}
    </View>}
+   {!plusieurs && remplie !== 'fait' && remplie !== 'erreur' && <EtatExtension etat={extension} attendu="remplissage" />}
    {plusieurs && <VerdictDrives comparaison={comparerDrives(commande!)} introuvables={introuvables}
     historique={commande!.drives.map(d => { const h = comparerHistorique(commande!, commandes, d); return { drive: d, ecart: h.ecart, communs: h.communs }; })}
     onDrive={d => router.push({ pathname: '/commandes/[id]', params: { id: commande!.id, drive: d } })} />}

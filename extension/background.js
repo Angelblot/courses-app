@@ -17,7 +17,7 @@ import { pageAgent } from './content/page-agent.js';
 import {
   travauxEnAttente, travauxAbandonnes, revendiquer,
   progresser, terminer, equivalencesDe, enregistrerEquivalence, enregistrerOffres,
-  recherchesAFaire, majRecherche,
+  recherchesAFaire, majRecherche, signalerPresence,
 } from './supabase.js';
 import { fileDeRecherches, pauseEntreRecherches, adresseRecherche, issueRecherche } from './lib/recherches.js';
 import { strategie, indexer } from './lib/equivalences.js';
@@ -42,8 +42,40 @@ chrome.runtime.onInstalled.addListener(armerAlarme);
 chrome.runtime.onStartup.addListener(armerAlarme);
 
 chrome.alarms.onAlarm.addListener((a) => {
-  if (a.name === 'travaux') rafraichirPastille();
+  if (a.name === 'travaux') { rafraichirPastille(); signaler(true); }
 });
+
+// --- Présence : l'app voit si l'ordinateur est là et ce qui avance ---
+
+/**
+ * Ce qui tourne vraiment, en mémoire du service worker. L'état rangé dans
+ * chrome.storage survit à un arrêt du worker : un « running » qui y traîne
+ * n'est donc pas la preuve qu'un remplissage avance, et ne doit rien bloquer.
+ */
+const enMarche = { remplissage: false, recherches: false };
+let dernierSignal = 0;
+
+/** L'activité à annoncer, d'après ce qui tourne et ce qui attend une main. */
+async function activiteCourante() {
+  const job = await getState(), rech = await etatRecherches();
+  if (enMarche.recherches && rech) {
+    return ['recherches', { fait: rech.fait ?? 0, total: rech.total ?? 0, drive: rech.drive ?? null, requete: rech.requete ?? null }];
+  }
+  if (enMarche.remplissage && job) {
+    return ['remplissage', { fait: job.cursor ?? 0, total: job.items?.length ?? 0, drive: job.site ?? null }];
+  }
+  if (job?.status === 'paused') return ['pause', { message: `Vérification demandée sur ${SITES[job.site]?.label ?? 'le drive'}.` }];
+  if (rech?.statut === 'pause' && rech.message) return ['pause', { message: rech.message }];
+  return ['prete', {}];
+}
+
+/** Envoie la présence ; au plus toutes les 4 secondes, sauf changement d'étape (force). */
+async function signaler(force = false) {
+  if (!force && Date.now() - dernierSignal < 4000) return;
+  dernierSignal = Date.now();
+  const [activite, detail] = await activiteCourante();
+  try { await signalerPresence(activite, detail, chrome.runtime.getManifest().version); } catch { /* l'app ne verra rien, sans conséquence ici */ }
+}
 
 /**
  * Allume la pastille quand une liste attend.
@@ -61,7 +93,17 @@ async function rafraichirPastille() {
   const premier = r.data?.[0];
   let n = premier ? (premier.items?.length ?? 0) : 0;
   // Sans liste à remplir, la pastille compte les recherches demandées.
-  if (!n) { const rech = await recherchesAFaire(); n = rech.ok ? (rech.data?.length ?? 0) : 0; }
+  if (!n) {
+    const rech = await recherchesAFaire();
+    n = rech.ok ? (rech.data?.length ?? 0) : 0;
+    // Des recherches arrivent de l'iPhone : on le dit une fois, sans rien lancer.
+    const { recherches_annoncees: avant = 0 } = await chrome.storage.local.get('recherches_annoncees');
+    if (n > avant && !enMarche.recherches) {
+      chrome.notifications.create('recherches', { type: 'basic', iconUrl: 'icon-128.png', title: 'Recherches demandées',
+        message: `${n} recherche${n > 1 ? 's' : ''} depuis l'application. Ouvre l'extension et clique sur « Lancer les recherches ».` });
+    }
+    await chrome.storage.local.set({ recherches_annoncees: n });
+  }
   await chrome.action.setBadgeText({ text: n > 0 ? String(n) : '' });
   await chrome.action.setBadgeBackgroundColor({ color: '#2D6A4F' });
 }
@@ -95,6 +137,7 @@ async function setState(patch) {
   await chrome.storage.local.set({ [STATE_KEY]: next });
   // Le popup s'actualise s'il est ouvert ; sans lui l'erreur est sans effet.
   chrome.runtime.sendMessage({ type: 'state', state: next }).catch(() => {});
+  signaler(patch.status !== undefined);
   return next;
 }
 
@@ -276,6 +319,12 @@ async function releverOffres(releve, contexte) {
 
 /** Boucle principale : déroule la liste jusqu'au bout, une pause, ou un arrêt. */
 async function processJob() {
+  if (enMarche.remplissage) return;
+  enMarche.remplissage = true;
+  try { await deroulerJob(); } finally { enMarche.remplissage = false; await signaler(true); }
+}
+
+async function deroulerJob() {
   let state = await getState();
   if (!state || state.status !== 'running') return;
 
@@ -607,6 +656,7 @@ async function majEtatRecherches(patch) {
   const suite = { ...((await etatRecherches()) ?? {}), ...patch };
   await chrome.storage.local.set({ [CLE_RECHERCHES]: suite });
   chrome.runtime.sendMessage({ type: 'recherches', etat: suite }).catch(() => {});
+  signaler(patch.statut !== undefined);
   return suite;
 }
 
@@ -638,15 +688,18 @@ async function ongletDuDrive(cfg) {
  * vérification est refaite au lancement suivant.
  */
 async function lancerRecherches() {
-  if ((await etatRecherches())?.statut === 'en_cours') throw new Error('Recherches déjà en cours');
-  if ((await getState())?.status === 'running') throw new Error('Un remplissage de panier est en cours, attends sa fin');
+  if (enMarche.recherches) throw new Error('Recherches déjà en cours');
+  if (enMarche.remplissage) throw new Error('Un remplissage de panier est en cours, attends sa fin');
   const r = await recherchesAFaire();
   if (!r.ok) throw new Error(r.deconnecte ? 'Session expirée, reconnecte-toi' : 'Base injoignable, réessaie');
   const file = fileDeRecherches(r.data);
   const total = file.reduce((n, g) => n + g.recherches.length, 0);
   if (!total) return { total: 0 };
-  await majEtatRecherches({ statut: 'en_cours', total, fait: 0, journal: [], drive: file[0].drive, message: null });
-  faireRecherches(file);
+  await majEtatRecherches({ statut: 'en_cours', total, fait: 0, journal: [], drive: file[0].drive, requete: null, message: null });
+  enMarche.recherches = true;
+  faireRecherches(file)
+    .catch(async (e) => { await majEtatRecherches({ statut: 'pause', message: `Les recherches se sont arrêtées : ${String(e).slice(0, 120)}. Relance pour reprendre.` }); })
+    .finally(async () => { enMarche.recherches = false; await signaler(true); });
   return { total };
 }
 
@@ -669,6 +722,7 @@ async function faireRecherches(file) {
       const etat = await etatRecherches();
       if (etat?.statut !== 'en_cours') return;
       await majRecherche(rech.id, { statut: 'en_cours' });
+      await majEtatRecherches({ requete: rech.requete });
       const item = { name: rech.requete, quantity: 1, ean: rech.ean13 ?? null };
       let compte = { ok: false, reason: 'no_results' };
       // Un code-barres ouvre la fiche Carrefour sans recherche ni ambiguïté.
@@ -705,7 +759,11 @@ async function faireRecherches(file) {
 /** Pour le popup : l'état de la séance et le nombre de recherches en attente. */
 async function recherchesPourPopup() {
   const r = await recherchesAFaire();
-  return { etat: await etatRecherches(), aFaire: r.ok ? (r.data?.length ?? 0) : 0 };
+  const etat = await etatRecherches();
+  // Un « en cours » rangé par un worker arrêté depuis n'avance plus : on le montre en pause.
+  const vrai = etat?.statut === 'en_cours' && !enMarche.recherches ? { ...etat, statut: 'pause', message: 'Les recherches ont été interrompues. Relance pour reprendre.' } : etat;
+  await signaler(true);
+  return { etat: vrai, aFaire: r.ok ? (r.data?.length ?? 0) : 0 };
 }
 
 // --- Messages venant du popup ---

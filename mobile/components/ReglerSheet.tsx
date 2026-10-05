@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -9,6 +9,9 @@ import { produitsProches, type Manque } from '../lib/session-courses';
 import { sources } from './Manques';
 import { SelecteurIngredient } from './SelecteurIngredient';
 import { RechercheDrives } from './RechercheDrives';
+import { EtatExtension } from './EtatExtension';
+import { useExtension } from '../stores/extension';
+import type { phase as Phase } from '../lib/recherche-drive.ts';
 import { Photo, ui } from './MaisonUI';
 import { colors } from '../lib/theme';
 
@@ -24,7 +27,11 @@ type Point = { type: 'manque'; key: string; manque: Manque } | { type: 'doublon'
  * dès qu'il ne reste plus rien.
  */
 export function ReglerSheet({ visible, onFermer, manques, doublons, products, onRetrait, toast }: { visible: boolean; onFermer: () => void; manques: [string, Manque][]; doublons: Doublon[]; products: Product[]; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode }) {
- const points: Point[] = [...manques.map(([key, manque]) => ({ type: 'manque' as const, key, manque })), ...doublons.map(doublon => ({ type: 'doublon' as const, doublon }))];
+ // « Passer au suivant » range un point en fin de file, le temps que l'extension cherche.
+ const [reportes, setReportes] = useState<string[]>([]);
+ const cle = (p: Point) => p.type === 'manque' ? p.key : p.doublon.id;
+ const tous: Point[] = [...manques.map(([key, manque]) => ({ type: 'manque' as const, key, manque })), ...doublons.map(doublon => ({ type: 'doublon' as const, doublon }))];
+ const points = [...tous.filter(p => !reportes.includes(cle(p))), ...reportes.flatMap(k => tous.filter(p => cle(p) === k))];
  // Le total de départ fixe la progression : « 2 sur 4 » même quand un point réglé disparaît.
  const total = useRef(points.length);
  if (!visible || points.length > total.current) total.current = points.length;
@@ -35,7 +42,8 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
  return <Modal visible={visible && !!courant} animationType="slide" presentationStyle="pageSheet" onRequestClose={onFermer}>
   {courant?.type === 'manque'
    ? <PreciserManque key={courant.key} titre={titre} progression={progression} lineKey={courant.key} manque={courant.manque} products={products} onFermer={onFermer} onRetrait={onRetrait} toast={toast}
-     autres={manques.filter(([k]) => k !== courant.key).map(([, m]) => m.name)} />
+     autres={manques.filter(([k]) => k !== courant.key).map(([, m]) => m.name)}
+     onPasser={points.length > 1 ? () => setReportes(r => [...r.filter(k => k !== courant.key), courant.key]) : undefined} />
    : courant?.type === 'doublon'
     ? <GarderUn key={courant.doublon.id} titre={titre} progression={progression} doublon={courant.doublon} products={products} onFermer={onFermer} onRetrait={onRetrait} toast={toast} />
     : null}
@@ -46,8 +54,9 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
  * Un manque : la recherche commune, puis « Chercher sur les drives » par
  * l'extension (CD), et en bas « garder sans produit » ou « retirer ».
  */
-function PreciserManque({ titre, progression, lineKey, manque, products, onFermer, onRetrait, toast, autres }: { titre: string; progression: ReactNode; lineKey: string; manque: Manque; products: Product[]; onFermer: () => void; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode; autres: string[] }) {
- const w = useWizard();
+function PreciserManque({ titre, progression, lineKey, manque, products, onFermer, onRetrait, toast, autres, onPasser }: { titre: string; progression: ReactNode; lineKey: string; manque: Manque; products: Product[]; onFermer: () => void; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode; autres: string[]; onPasser?: () => void }) {
+ const w = useWizard(), extension = useExtension();
+ const [etape, setEtape] = useState<ReturnType<typeof Phase>>('aucune');
  const id = lineKey.startsWith('produit:') ? lineKey.slice(8) : undefined, extra = w.extras.find(x => `extra:${x.id}` === lineKey);
  const qty = id ? w.quotidienQty[id] ?? 1 : extra?.quantity ?? 1, nom = extra?.name ?? manque.name;
  const disparu = !!id && !products.some(p => p.id === id);
@@ -61,7 +70,19 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
    <Text style={s.qte}>× {qty}</Text>
   </View>
  </View>;
- const pied = <View style={{ gap: 6 }}>
+ // Recherche confiée à l'extension : le pied dit où elle en est, et l'on peut passer au point suivant.
+ const pied = etape === 'attente' ? <View style={{ gap: 8 }}>
+  {toast}
+  <EtatExtension etat={extension} attendu="recherches" compact />
+  <View style={s.issues}>
+   {onPasser && <Pressable accessibilityRole="button" onPress={onPasser} style={({ pressed }) => [s.garderNom, pressed && { opacity: .85 }]}>
+    <Text style={s.garderNomTexte}>Passer au suivant</Text>
+   </Pressable>}
+   <Pressable accessibilityRole="button" accessibilityLabel={`Garder « ${nom} » sans produit. L’extension le cherchera par son nom.`} onPress={() => w.validerManque(lineKey, qty)} style={({ pressed }) => [onPasser ? s.lienPied : s.garderNom, pressed && { opacity: .85 }]}>
+    <Text style={onPasser ? s.lienPiedTexte : s.garderNomTexte} numberOfLines={2}>Garder sans produit</Text>
+   </Pressable>
+  </View>
+ </View> : <View style={{ gap: 6 }}>
   {toast}
   <View style={s.issues}>
    <Pressable accessibilityRole="button" accessibilityLabel={`Garder « ${nom} » sans produit. L’extension le cherchera par son nom.`} onPress={() => w.validerManque(lineKey, qty)} style={({ pressed }) => [s.garderNom, pressed && { opacity: .85 }]}>
@@ -75,7 +96,7 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
  </View>;
  return <SelecteurIngredient titre={titre} verbe="Choisir" sansProduit={false} requeteInitiale={nom} proches={produitsProches(nom, products)} entete={entete} pied={pied}
   onFermer={onFermer} onChoisir={c => { if (c.product_id) w.validerManque(lineKey, qty, c.product_id); }}
-  apres={<RechercheDrives requete={nom} autres={autres} onGarde={productId => w.validerManque(lineKey, qty, productId)} />} />;
+  apres={<RechercheDrives requete={nom} autres={autres} onPhase={setEtape} onGarde={productId => w.validerManque(lineKey, qty, productId)} />} />;
 }
 
 /** Un doublon possible (DB1) : « Garder celui-ci » sous chaque photo ; l'autre est retiré, annulable. */
@@ -127,6 +148,8 @@ const s = StyleSheet.create({
  garderNomTexte: { fontSize: 15, fontWeight: '600', color: colors.accent, textAlign: 'center' },
  retirer: { minHeight: 50, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12 },
  retirerTexte: { fontSize: 15, fontWeight: '600', color: colors.danger },
+ lienPied: { minHeight: 50, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+ lienPiedTexte: { fontSize: 15, fontWeight: '600', color: colors.accent, textAlign: 'center' },
  explication: { fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
  question: { fontSize: 17, fontWeight: '700', color: colors.text },
  duo: { flexDirection: 'row', alignItems: 'center', gap: 8 },

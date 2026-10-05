@@ -180,3 +180,15 @@ export async function majRecherche(id, champs) {
     body: JSON.stringify(champs),
   });
 }
+
+/**
+ * Dit à l'app ce que fait l'extension : prête, en recherches, en
+ * remplissage ou en pause, avec l'avancement. Une ligne par foyer, réécrite.
+ */
+export async function signalerPresence(activite, detail, version) {
+  return appel('extension_presence?on_conflict=household_id', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ activite, detail, version, vue_le: new Date().toISOString() }),
+  });
+}

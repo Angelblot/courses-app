@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -27,8 +27,10 @@ const PREMIERS = 3;
  * résultats reviennent ici en temps réel. On coche pour comparer, on garde un
  * produit, ou un par drive.
  */
-export function RechercheDrives({ requete, ean13, autres, onGarde }: {
+export function RechercheDrives({ requete, ean13, autres, onGarde, onPhase }: {
   requete: string; ean13?: string | null;
+  /** Dit au parent où en est la recherche : son pied change pendant l'attente. */
+  onPhase?: (p: ReturnType<typeof phase>) => void;
   /** Les autres points à préciser : « Tout envoyer » les cherche dans la même séance. */
   autres: string[];
   onGarde: (productId: string) => void;
@@ -39,6 +41,7 @@ export function RechercheDrives({ requete, ean13, autres, onGarde }: {
   const [coches, setCoches] = useState<string[]>([]), [ouverts, setOuverts] = useState<Partial<Record<DriveRecherche, boolean>>>({});
   const [comparer, setComparer] = useState(false), [garde, setGarde] = useState<string | null>(null), [lot, setLot] = useState(false);
   const etape = phase(recherches, offres), dernieres = dernieresParDrive(recherches);
+  useEffect(() => { if (!chargement) onPhase?.(etape); }, [etape, chargement]);
 
   const demander = async () => {
     setEnvoi(true); setErreur(null);
@@ -94,7 +97,7 @@ export function RechercheDrives({ requete, ean13, autres, onGarde }: {
         <View style={{ flex: 1, gap: 3 }}>
           <Text style={s.titre}>{etape === 'attente' ? 'Recherche envoyée' : 'Rien trouvé sur les drives'}</Text>
           <Text style={s.texte}>{etape === 'attente'
-            ? 'Ouvre l’extension dans Chrome sur l’ordinateur et lance les recherches. Tu peux passer au point suivant : les résultats reviendront ici.'
+            ? 'L’extension la fera depuis Chrome, sur l’ordinateur : son état s’affiche en bas. Les résultats reviendront ici, même si tu passes au point suivant.'
             : 'Garde-le sans produit : l’extension le cherchera par son nom au remplissage. Ou relance la recherche.'}</Text>
         </View>
       </View>

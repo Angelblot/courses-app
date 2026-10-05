@@ -85,6 +85,8 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
   const [detail, setDetail] = useState<FicheProduit | null>(null), [largeur, setLargeur] = useState(0);
   const off = useRechercheOff();
   const [erreur, setErreur] = useState<string | null>(null), [ajout, setAjout] = useState<string | null>(null);
+  // Le pied change de hauteur (état de l'extension) : la liste garde toujours sa fin visible au-dessus.
+  const [hautPied, setHautPied] = useState(140);
   const texte = requete.trim();
   const exclus = new Set(exclure);
   const prochesVus = proches.filter(p => !exclus.has(p.id));
@@ -134,7 +136,7 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
         {scan && <Pressable accessibilityRole="button" accessibilityLabel="Scanner un code-barres" onPress={() => { Keyboard.dismiss(); setScanner(true); }} style={s.scan}><Feather name="maximize" size={18} color={colors.accent} /></Pressable>}
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: (sansProduit || pied ? 140 : 24) + clavier }} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: (pied ? hautPied + 16 : sansProduit ? 140 : 24) + clavier }} keyboardShouldPersistTaps="handled">
         {prochesVus.length > 0 && <><Text style={s.section}>Proches dans tes produits</Text>
           {prochesVus.map(p => ligne(`proche-${p.id}`, p.name, [p.brand, contenance(p.grammage_g, p.volume_ml)].filter(Boolean).join(' · ') || null, p.image_url, p.nutriscore, true, () => onChoisir(depuisProduit(p))))}</>}
         {memeType.length > 0 && <><Text style={s.section}>Même type dans tes produits</Text>
@@ -161,7 +163,7 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
         {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { paddingHorizontal: 16 }]}>{erreur}</Text>}
       </ScrollView>
 
-      {!!pied && <View style={[s.pied, { bottom: clavier, paddingBottom: clavier ? 10 : 10 + insets.bottom }]}>{pied}</View>}
+      {!!pied && <View onLayout={e => setHautPied(e.nativeEvent.layout.height)} style={[s.pied, { bottom: clavier, paddingBottom: clavier ? 10 : 10 + insets.bottom }]}>{pied}</View>}
       <FicheOffre fiche={detail} proches={[...(off.resultats ?? [])].filter(x => x.details).sort((a, b) => Number(b.productType === detail?.productType) - Number(a.productType === detail?.productType))} onFermer={() => setDetail(null)}
         onChoisir={f => { setDetail(null); void choisirFiche(f); }} />
       <ScanRapide visible={scanner} onFermer={() => setScanner(false)} onFiche={f => { setScanner(false); void choisirFiche(f); }} />

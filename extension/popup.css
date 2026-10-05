@@ -10,6 +10,8 @@
 }
 
 * { box-sizing: border-box; }
+/* Les panneaux sont en flex : sans cette règle, l'attribut hidden ne masquait rien. */
+[hidden] { display: none !important; }
 
 body {
   width: 380px;
