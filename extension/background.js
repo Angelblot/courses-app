@@ -19,7 +19,7 @@ import {
   progresser, terminer, equivalencesDe, enregistrerEquivalence, enregistrerOffres,
   recherchesAFaire, majRecherche, signalerPresence, enregistrerFiche,
 } from './supabase.js';
-import { fileDeRecherches, pauseEntreRecherches, adresseRecherche, issueRecherche, demarrageAuto } from './lib/recherches.js';
+import { fileDeRecherches, pauseEntreRecherches, adresseRecherche, issueRecherche, drivesAuto } from './lib/recherches.js';
 import { strategie, indexer } from './lib/equivalences.js';
 import { offresDepuisReleve } from './lib/offres.js';
 import { candidats, RAISONS_SUIVANT } from './lib/alternatives.js';
@@ -556,6 +556,11 @@ async function startJob({ site, items }, supplement = {}) {
   } catch {
     baseOrigin = null;
   }
+  // Le magasin du remplissage sert aussi aux recherches en arrière-plan.
+  if (cfg.storePathPattern && baseOrigin && /\/magasin-/.test(baseOrigin)) {
+    const { magasins = {} } = await chrome.storage.local.get('magasins');
+    await chrome.storage.local.set({ magasins: { ...magasins, [site]: baseOrigin } });
+  }
 
   await setState({
     site,
@@ -677,8 +682,9 @@ async function essayerDemarrageAuto() {
   if (enMarche.recherches || enMarche.remplissage) return;
   const r = await recherchesAFaire();
   if (!r.ok) return;
-  if (!demarrageAuto({ auto: await rechercheAuto(), aFaire: r.data?.length ?? 0, occupe: false, etat: await etatRecherches() })) return;
-  try { await lancerRecherches({ auto: true }); } catch { /* relancé à la prochaine alarme */ }
+  const drives = drivesAuto({ auto: await rechercheAuto(), recherches: r.data ?? [], occupe: false, etat: await etatRecherches() });
+  if (!drives.length) return;
+  try { await lancerRecherches({ auto: true, drives }); } catch { /* relancé à la prochaine alarme */ }
 }
 
 /**
@@ -688,15 +694,35 @@ async function essayerDemarrageAuto() {
  * détourner celui où l'on navigue. Chez E.Leclerc, sans magasin dans
  * l'adresse, la recherche ne vise rien.
  */
-async function ongletDuDrive(cfg, { auto = false } = {}) {
+/**
+ * L'adresse du magasin choisi sur ce drive (E.Leclerc la porte dans son
+ * chemin) : relevée sur tout onglet ouvert du drive et retenue, pour que
+ * l'onglet d'arrière-plan aille droit au bon magasin.
+ */
+async function magasinConnu(cfg, site) {
+  if (!cfg.storePathPattern) return cfg.origin;
+  const { magasins = {} } = await chrome.storage.local.get('magasins');
+  const onglets = await chrome.tabs.query({});
+  for (const t of onglets) {
+    try {
+      const u = new URL(t.url);
+      const segment = cfg.hostPattern.test(u.hostname) ? u.pathname.match(cfg.storePathPattern)?.[0] : null;
+      if (segment) { magasins[site] = u.origin + segment; await chrome.storage.local.set({ magasins }); break; }
+    } catch { /* onglet sans adresse lisible */ }
+  }
+  return magasins[site] ?? null;
+}
+
+async function ongletDuDrive(cfg, { auto = false, site = null } = {}) {
   let tab = null;
   if (auto) {
+    const depart = (await magasinConnu(cfg, site)) ?? cfg.origin;
     const { onglet_auto: id } = await chrome.storage.local.get('onglet_auto');
     if (id) {
-      try { tab = await chrome.tabs.get(id); await naviguer(id, cfg.origin); tab = await chrome.tabs.get(id); } catch { tab = null; }
+      try { tab = await chrome.tabs.get(id); await naviguer(id, depart); tab = await chrome.tabs.get(id); } catch { tab = null; }
     }
     if (!tab) {
-      tab = await chrome.tabs.create({ url: cfg.origin, active: false });
+      tab = await chrome.tabs.create({ url: depart, active: false });
       await chrome.storage.local.set({ onglet_auto: tab.id });
       await waitForTab(tab.id);
       tab = await chrome.tabs.get(tab.id);
@@ -716,6 +742,11 @@ async function ongletDuDrive(cfg, { auto = false } = {}) {
     const segment = cfg.storePathPattern ? (u.pathname.match(cfg.storePathPattern)?.[0] ?? '') : '';
     baseOrigin = cfg.storePathPattern && !segment ? null : u.origin + segment;
   } catch { baseOrigin = null; }
+  // Le magasin vu ici est retenu pour les prochaines fois.
+  if (cfg.storePathPattern && baseOrigin && site) {
+    const { magasins = {} } = await chrome.storage.local.get('magasins');
+    if (magasins[site] !== baseOrigin) await chrome.storage.local.set({ magasins: { ...magasins, [site]: baseOrigin } });
+  }
   return { tabId: tab.id, baseOrigin };
 }
 
@@ -724,12 +755,13 @@ async function ongletDuDrive(cfg, { auto = false } = {}) {
  * réglage automatique est actif. Une recherche interrompue par une
  * vérification est refaite au lancement suivant.
  */
-async function lancerRecherches({ auto = false } = {}) {
+async function lancerRecherches({ auto = false, drives = null } = {}) {
   if (enMarche.recherches) throw new Error('Recherches déjà en cours');
   if (enMarche.remplissage) throw new Error('Un remplissage de panier est en cours, attends sa fin');
   const r = await recherchesAFaire();
   if (!r.ok) throw new Error(r.deconnecte ? 'Session expirée, reconnecte-toi' : 'Base injoignable, réessaie');
-  const file = fileDeRecherches(r.data);
+  // En automatique, seuls les drives qui n'attendent pas une main.
+  const file = fileDeRecherches(r.data).filter((g) => !drives || drives.includes(g.drive));
   const total = file.reduce((n, g) => n + g.recherches.length, 0);
   if (!total) return { total: 0 };
   await majEtatRecherches({ statut: 'en_cours', total, fait: 0, journal: [], drive: file[0].drive, requete: null, message: null, cause: null, auto });
@@ -753,10 +785,10 @@ async function faireRecherches(file, { auto = false } = {}) {
   let fait = 0;
   for (const groupe of file) {
     const cfg = SITES[groupe.drive];
-    const { tabId, baseOrigin } = await ongletDuDrive(cfg, { auto });
+    const { tabId, baseOrigin } = await ongletDuDrive(cfg, { auto, site: groupe.drive });
     if (cfg.storePathPattern && !baseOrigin) {
       if (auto) await chrome.tabs.update(tabId, { active: true }).catch(() => {});
-      await majEtatRecherches({ statut: 'pause', cause: 'magasin', message: `Choisis ton magasin ${cfg.label} dans l'onglet, puis relance.` });
+      await majEtatRecherches({ statut: 'pause', cause: 'magasin', driveBloque: groupe.drive, message: `Choisis ton magasin ${cfg.label} dans l'onglet, puis relance.` });
       return;
     }
     await majEtatRecherches({ drive: groupe.drive });
@@ -774,7 +806,7 @@ async function faireRecherches(file, { auto = false } = {}) {
         await majRecherche(rech.id, { statut: statutFiche, resultats: lue ? 1 : 0, faite_le: statutFiche === 'verification' ? null : new Date().toISOString() });
         if (statutFiche === 'verification') {
           if (auto) await chrome.tabs.update(tabId, { active: true }).catch(() => {});
-          await majEtatRecherches({ statut: 'pause', cause: 'verification', message: `Vérification demandée sur ${cfg.label}. Résous-la dans l'onglet, puis relance.` });
+          await majEtatRecherches({ statut: 'pause', cause: 'verification', driveBloque: groupe.drive, message: `Vérification demandée sur ${cfg.label}. Résous-la dans l'onglet, puis relance.` });
           return;
         }
         fait += 1;
@@ -800,7 +832,7 @@ async function faireRecherches(file, { auto = false } = {}) {
       if (statut === 'verification') {
         // L'onglet d'arrière-plan passe devant : c'est là que la vérification se résout.
         if (auto) await chrome.tabs.update(tabId, { active: true }).catch(() => {});
-        await majEtatRecherches({ statut: 'pause', cause: 'verification', message: `Vérification demandée sur ${cfg.label}. Résous-la dans l'onglet, puis relance.` });
+        await majEtatRecherches({ statut: 'pause', cause: 'verification', driveBloque: groupe.drive, message: `Vérification demandée sur ${cfg.label}. Résous-la dans l'onglet, puis relance.` });
         chrome.notifications.create({ type: 'basic', iconUrl: 'icon-128.png', title: 'Vérification demandée',
           message: `${cfg.label} demande une vérification. Résous-la dans l'onglet, puis relance les recherches.` });
         return;

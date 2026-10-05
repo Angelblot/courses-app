@@ -52,16 +52,17 @@ export function issueRecherche(compteRendu, nombreOffres) {
   return 'echec';
 }
 
-/** Les pauses qui attendent une main : l'extension ne repart pas seule après elles. */
-const PAUSES_HUMAINES = ['verification', 'magasin', 'manuel'];
-
 /**
- * Faut-il lancer les recherches tout seul, au passage de l'alarme ? Oui si le
- * réglage est actif, que des recherches attendent et que rien ne tourne ; non
- * après une vérification, un magasin à choisir ou une pause demandée : là,
- * c'est à l'utilisateur de relancer.
+ * Les drives sur lesquels lancer les recherches tout seul, au passage de
+ * l'alarme : ceux qui ont des recherches en attente, si le réglage est actif
+ * et que rien ne tourne. Une pause demandée par l'utilisateur arrête tout ;
+ * une vérification ou un magasin à choisir n'arrête que son drive : un
+ * magasin E.Leclerc introuvable ne bloque plus les fiches Carrefour.
  */
-export function demarrageAuto({ auto, aFaire, occupe, etat }) {
-  if (!auto || !aFaire || occupe) return false;
-  return !(etat?.statut === 'pause' && PAUSES_HUMAINES.includes(etat.cause));
+export function drivesAuto({ auto, recherches, occupe, etat }) {
+  if (!auto || occupe) return [];
+  if (etat?.statut === 'pause' && etat.cause === 'manuel') return [];
+  const bloque = etat?.statut === 'pause' && ['verification', 'magasin'].includes(etat.cause) ? etat.driveBloque ?? null : null;
+  return [...new Set((recherches ?? []).filter((r) => ['en_attente', 'en_cours'].includes(r.statut)).map((r) => r.drive))]
+    .filter((d) => d !== bloque);
 }

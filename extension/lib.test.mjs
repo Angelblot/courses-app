@@ -135,17 +135,18 @@ test('recherches : une vérification rend la main, des offres font une recherche
   assert.equal(issueRecherche({ ok: false, reason: 'inject_failed' }, 0), 'echec');
 });
 
-import { demarrageAuto } from './lib/recherches.js';
+import { drivesAuto } from './lib/recherches.js';
 
-test('recherches : démarrage automatique, sauf après une pause qui attend une main', () => {
-  assert.equal(demarrageAuto({ auto: true, aFaire: 3, occupe: false, etat: null }), true);
-  assert.equal(demarrageAuto({ auto: false, aFaire: 3, occupe: false, etat: null }), false);
-  assert.equal(demarrageAuto({ auto: true, aFaire: 0, occupe: false, etat: null }), false);
-  assert.equal(demarrageAuto({ auto: true, aFaire: 3, occupe: true, etat: null }), false);
-  for (const cause of ['verification', 'magasin', 'manuel']) assert.equal(demarrageAuto({ auto: true, aFaire: 3, occupe: false, etat: { statut: 'pause', cause } }), false);
-  // Une séance interrompue par l'arrêt du worker, ou une erreur passagère, repart seule.
-  assert.equal(demarrageAuto({ auto: true, aFaire: 3, occupe: false, etat: { statut: 'pause', cause: 'erreur' } }), true);
-  assert.equal(demarrageAuto({ auto: true, aFaire: 3, occupe: false, etat: { statut: 'fini' } }), true);
+test('recherches : démarrage automatique par drive ; un drive en attente d’une main ne bloque pas l’autre', () => {
+  const r = [{ drive: 'carrefour', statut: 'en_attente' }, { drive: 'leclerc', statut: 'en_attente' }, { drive: 'leclerc', statut: 'verification' }];
+  assert.deepEqual(drivesAuto({ auto: true, recherches: r, occupe: false, etat: null }), ['carrefour', 'leclerc']);
+  assert.deepEqual(drivesAuto({ auto: false, recherches: r, occupe: false, etat: null }), []);
+  assert.deepEqual(drivesAuto({ auto: true, recherches: r, occupe: true, etat: null }), []);
+  assert.deepEqual(drivesAuto({ auto: true, recherches: r, occupe: false, etat: { statut: 'pause', cause: 'manuel' } }), []);
+  // Le magasin E.Leclerc manque : Carrefour (et ses fiches) repart seul.
+  assert.deepEqual(drivesAuto({ auto: true, recherches: r, occupe: false, etat: { statut: 'pause', cause: 'magasin', driveBloque: 'leclerc' } }), ['carrefour']);
+  assert.deepEqual(drivesAuto({ auto: true, recherches: r, occupe: false, etat: { statut: 'pause', cause: 'verification', driveBloque: 'carrefour' } }), ['leclerc']);
+  assert.deepEqual(drivesAuto({ auto: true, recherches: [], occupe: false, etat: null }), []);
 });
 
 test('recherches : les fiches à lire passent avant les recherches du même drive', () => {
