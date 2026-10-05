@@ -16,7 +16,7 @@ import { SITES } from './content/sites.js';
 import { pageAgent } from './content/page-agent.js';
 import {
   travauxEnAttente, travauxAbandonnes, revendiquer,
-  progresser, terminer, equivalencesDe, enregistrerEquivalence, enregistrerOffres,
+  progresser, terminer, equivalencesDe, enregistrerEquivalence, enregistrerOffres, effacerOffresRecherche,
   recherchesAFaire, majRecherche, signalerPresence, enregistrerFiche,
 } from './supabase.js';
 import { fileDeRecherches, pauseEntreRecherches, adresseRecherche, issueRecherche, drivesAuto } from './lib/recherches.js';
@@ -844,12 +844,14 @@ async function faireRecherches(file, { auto = false } = {}) {
         compte = await runAgent(tabId, cfg, item, 'releve');
       }
       let lignes = compte.ok ? offresDepuisReleve(compte.releve, { drive: groupe.drive, recherche: rech.requete, rechercheId: rech.id }) : [];
+      // Une recherche refaite remplace ses offres au lieu de les doubler.
+      if (compte.ok) await effacerOffresRecherche(rech.id);
       if (lignes.length && !(await enregistrerOffres(lignes)).ok) lignes = [];
       const statut = issueRecherche(compte, lignes.length);
       await majRecherche(rech.id, {
         statut, resultats: lignes.length, faite_le: statut === 'verification' ? null : new Date().toISOString(),
         diagnostic: lignes.length
-          ? { echantillon: (compte.releve ?? []).slice(0, 8).map((c) => ({ label: c.label, prix: c.prix, image: Boolean(c.image), href: String(c.href ?? '').slice(0, 120), cls: c.cls, texte: String(c.texte ?? '').slice(0, 300), html: c.html })) }
+          ? { echantillon: (compte.releve ?? []).slice(0, 8).map((c) => ({ label: c.label, prix: c.prix, image: Boolean(c.image), href: String(c.href ?? '').slice(0, 120), cls: c.cls, texte: String(c.texte ?? '').slice(0, 300) })) }
           : { raison: compte.reason ?? null, message: String(compte.message ?? '').slice(0, 200), cadres: compte.cadres ?? null },
       });
       if (statut === 'verification') {

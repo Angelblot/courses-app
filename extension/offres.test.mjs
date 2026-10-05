@@ -67,3 +67,19 @@ test('deux chargements de page jamais à moins de l’intervalle', () => {
   assert.equal(attenteAvantNavigation(10000, 11000), INTERVALLE_NAVIGATION_MS - 1000);
   assert.equal(attenteAvantNavigation(10000, 10000 + INTERVALLE_NAVIGATION_MS + 1), 0);
 });
+
+test('le prix E.Leclerc découpé en trois blocs se recolle', () => {
+  assert.equal(lirePrix('0\n\n€\n\n,87'), 0.87);
+  assert.equal(lirePrix('1\n\n€\n\n,00'), 1);
+  // Le prix au litre qui suit ne prend pas la place du prix.
+  assert.equal(lirePrix('Gel Syphon 750ml\n\nAjouter au panier\n\n0\n\n€\n\n,87\n\n1,16 € / l'), 0.87);
+});
+
+test('une carte E.Leclerc pas encore dessinée n’est pas une offre, une vraie carte garde son prix', () => {
+  const lignes = offresDepuisReleve([
+    { label: 'Gel nettoyant wc javel Syphon\nAgrumes 750ml', href: '', prix: '0\n\n€\n\n,87', texte: 'Gel nettoyant wc javel Syphon\nAgrumes 750ml\n\nAjouter au panier\n\n0\n\n€\n\n,87\n\n1,16 € / l', image: 'https://fd3-photos.leclercdrive.fr/image.ashx?id=1' },
+    { label: 'Javel en gel Clair\nCitron vert - 750ml', href: '', prix: '1\n\n€\n\n,15', texte: '1\n\n€\n\n,15\n\n1,53 € / l', image: 'https://fd3-photos.leclercdrive.fr/image.ashx?id=2' },
+    { label: 'Eau de Javel Clair', href: '', prix: '', texte: 'Eau de Javel Clair', image: '' },
+  ], { drive: 'leclerc', recherche: 'Javel' });
+  assert.deepEqual(lignes.map((l) => [l.libelle, l.prix]), [['Gel nettoyant wc javel Syphon Agrumes 750ml', 0.87], ['Javel en gel Clair Citron vert - 750ml', 1.15]]);
+});

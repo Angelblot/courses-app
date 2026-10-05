@@ -9,7 +9,8 @@ const nombre = (t) => Number(String(t).replace(/\s/g, '').replace(',', '.'));
 /** « 2,45 € », « 2€45 », « 12,90€ » : le premier prix en euros, ou null. */
 export function lirePrix(texte) {
   if (!texte) return null;
-  const t = String(texte).replace(/ /g, ' ');
+  // E.Leclerc découpe son prix en trois blocs : « 0 », « € », « ,87 ».
+  const t = String(texte).replace(/ /g, ' ').replace(/(\d{1,4})\s*€\s*,\s*(\d{2})(?!\d)/g, '$1,$2 €');
   const m = t.match(/(?<![\d,.])(\d{1,4})€(\d{2})(?![\d,.])/) || t.match(/(\d{1,4})\s*(?:[,.](\d{1,2}))?\s*€/);
   if (!m) return null;
   const v = Number(`${m[1]}.${(m[2] ?? '0').padEnd(2, '0')}`);
@@ -85,6 +86,8 @@ export function offresDepuisReleve(releve, { drive, recherche, productId = null,
     const prix = lirePrix(c.prix) ?? lirePrix(texte);
     const contenance = lireContenance(libelle) ?? lireContenance(texte);
     const unitaire = lirePrixUnitaire(texte) ?? prixAuKilo(prix, contenance);
+    // Une carte pas encore dessinée (onglet en arrière-plan) n'a que son nom : ce n'est pas une offre.
+    if (prix == null && !c.image && !unitaire) return [];
     return [{
       drive, recherche: String(recherche).slice(0, 200), product_id: productId, cart_job_id: jobId,
       // Une recherche demandée depuis l'app : ses offres y reviennent.

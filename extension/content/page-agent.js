@@ -622,10 +622,12 @@ export function pageAgent(cfg, item, mode) {
     // comparatif des alternatives s'en nourrit. Seuls des textes bruts
     // remontent ; l'extension les comprend hors de la page.
     const releve = cards.slice(0, MAX_RELEVE).map((card) => {
-      const lien =
-        [...card.querySelectorAll('a[href]')]
-          .map((a) => a.getAttribute('href'))
-          .find((h) => h && !h.startsWith('#')) ?? '';
+      // L'adresse du produit, pas celle du rayon : chez E.Leclerc, le premier
+      // lien d'une carte est « Voir le rayon », commun à toutes ses voisines.
+      const liens = [...card.querySelectorAll('a[href]')]
+        .map((a) => a.getAttribute('href'))
+        .filter((h) => h && !h.startsWith('#'));
+      const lien = liens.find((h) => productPageRe?.test(h) || productUrlRe?.test(h)) ?? (productPageRe ? '' : liens[0] ?? '');
       const img = card.querySelector('img');
       const nutri = card.querySelector('[alt*="utri" i], [aria-label*="utri" i], [class*="nutri" i], [title*="utri" i]');
       let adresse = '';
@@ -636,9 +638,8 @@ export function pageAgent(cfg, item, mode) {
         ean: eanFromUrl(lien),
         prix: textOf(queryFirst(card, cfg.price)).slice(0, 40),
         texte: textOf(card).slice(0, 400),
-        // Pour comprendre une carte mal lue : sa classe et son balisage, en bref.
+        // Pour comprendre une carte mal lue : sa classe.
         cls: String(card.className ?? '').slice(0, 80),
-        html: card.outerHTML.replace(/\s+/g, ' ').slice(0, 1500),
         image: img ? img.currentSrc || img.getAttribute('src') || '' : '',
         nutri: nutri
           ? nutri.getAttribute('alt') || nutri.getAttribute('aria-label') || nutri.getAttribute('title') || String(nutri.getAttribute('class') ?? '')

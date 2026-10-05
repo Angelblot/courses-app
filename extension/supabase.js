@@ -167,6 +167,11 @@ export async function enregistrerOffres(lignes) {
   });
 }
 
+/** Les offres d'une recherche, avant d'y ranger celles d'un nouveau passage. */
+export async function effacerOffresRecherche(rechercheId) {
+  return appel(`offres_drive?recherche_id=eq.${rechercheId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+}
+
 /** Recherches demandées depuis l'app et pas encore faites (ou interrompues). */
 export async function recherchesAFaire() {
   return appel('recherches_drive?statut=in.(en_attente,en_cours,verification)&select=id,drive,requete,ean13,statut,demandee_le,type,url,offre_id&order=demandee_le.asc');
