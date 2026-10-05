@@ -176,6 +176,7 @@ async function relireCompte() {
   rendreCompte(session);
   if (!session?.jeton) {
     $('travaux').hidden = true;
+    $('recherches').hidden = true;
     return;
   }
   const res = await send({ type: 'travaux' });
@@ -253,15 +254,17 @@ const LIBELLE_STATUT = { faite: 'trouvés', vide: 'rien trouvé', echec: 'échec
  * la séance, et ce que chacune a donné. Rien ne part sans « Lancer ».
  */
 function rendreRecherches(donnees) {
-  const etat = donnees?.etat ?? null, aFaire = donnees?.aFaire ?? 0;
+  const etat = donnees?.etat ?? null, aFaire = donnees?.aFaire ?? 0, auto = donnees?.auto !== false;
   const enCours = etat?.statut === 'en_cours';
-  $('recherches').hidden = !enCours && !aFaire && !etat?.journal?.length;
+  // Toujours visible une fois connecté : c'est là que se règle le lancement automatique.
+  $('recherches').hidden = !donnees;
   if ($('recherches').hidden) return;
+  $('recherches-auto').checked = auto;
   $('recherches-resume').textContent = enCours
     ? `Recherches demandées · ${etat.fait ?? 0} sur ${etat.total ?? 0} — sur ${LIBELLE_DRIVE[etat.drive] ?? etat.drive}, une toutes les 8 à 15 secondes.`
     : aFaire
-      ? `${aFaire} recherche${aFaire > 1 ? 's' : ''} demandée${aFaire > 1 ? 's' : ''} depuis l'application, sur Carrefour puis E.Leclerc.`
-      : 'Recherches terminées : les résultats sont dans l\'application.';
+      ? `${aFaire} recherche${aFaire > 1 ? 's' : ''} demandée${aFaire > 1 ? 's' : ''} depuis l'application, sur Carrefour puis E.Leclerc.${auto && etat?.statut !== 'pause' ? ' Elles partent d\'elles-mêmes dans les 30 secondes.' : ''}`
+      : etat?.journal?.length ? 'Recherches terminées : les résultats sont dans l\'application.' : 'Aucune recherche demandée depuis l\'application.';
   $('recherches-progression').hidden = !enCours;
   $('recherches-barre').style.width = enCours && etat.total ? `${Math.round(((etat.fait ?? 0) / etat.total) * 100)}%` : '0%';
   $('recherches-message').textContent = etat?.message ?? (enCours ? '' : 'Si le drive demande une vérification, l\'extension s\'arrête et te rend la main.');
@@ -289,6 +292,10 @@ $('recherches-lancer').addEventListener('click', async () => {
   await relireRecherches();
   // Après la relecture, qui réécrit le message : sinon l'échec s'effaçait aussitôt.
   if (!res?.ok) $('recherches-message').textContent = `Impossible de lancer : ${String(res?.error ?? 'erreur inconnue').replace(/^Error: /, '')}`;
+});
+$('recherches-auto').addEventListener('change', async () => {
+  await send({ type: 'reglerAuto', actif: $('recherches-auto').checked });
+  await relireRecherches();
 });
 $('recherches-pause').addEventListener('click', async () => { await send({ type: 'pauseRecherches' }); await relireRecherches(); });
 

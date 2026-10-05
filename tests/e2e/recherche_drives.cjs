@@ -23,7 +23,7 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
    else if(m==='DELETE')recherches=[];
    else data=url.includes('statut=in.')?recherches.filter(r=>['en_attente','en_cours','verification'].includes(r.statut)):recherches.filter(r=>url.includes(`requete=eq.${r.requete}`));}
   else if(url.includes('/rest/v1/offres_drive'))data=offres;
-  else if(url.includes('/rest/v1/extension_presence'))data={vue_le:new Date().toISOString(),activite:'prete',detail:{}};
+  else if(url.includes('/rest/v1/extension_presence'))data={vue_le:new Date().toISOString(),activite:'prete',detail:{auto:true}};
   else if(url.includes('/rest/v1/products')&&m==='POST'){const c=req.postDataJSON();const p={...base,...c,id:`cree-${ecrit.produits.length}`};ecrit.produits.push(c);products.push(p);data=p;}
   else if(url.includes('/rest/v1/products')&&m==='PATCH'){ecrit.majProduits.push({url,corps:req.postDataJSON()});}
   else if(url.includes('/rest/v1/product_equivalents')&&m==='POST'){ecrit.liens.push(req.postDataJSON());}
@@ -49,7 +49,7 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
  if(ecrit.recherches.length!==4||ecrit.recherches[3].requete!=='Gel intime')throw Error('Lot mal envoyé '+JSON.stringify(ecrit.recherches));
  // Le pied dit où en est l'extension (vue il y a un instant, prête) et propose de passer au suivant.
  await page.getByText('Chrome est ouvert',{exact:true}).waitFor();
- await page.getByText('Dans l’extension, clique sur « Lancer les recherches ».',{exact:true}).waitFor();
+ await page.getByText('Les recherches partent d’elles-mêmes dans les 30 secondes.',{exact:true}).waitFor();
  await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd2-attente.png'});
  await btn('Passer au suivant').click();await page.getByText('« Gel intime »',{exact:true}).waitFor();
  await btn('Passer au suivant').click();await page.getByText('« Papier sulfurisé »',{exact:true}).waitFor();

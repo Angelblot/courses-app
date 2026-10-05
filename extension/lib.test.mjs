@@ -134,3 +134,16 @@ test('recherches : une vérification rend la main, des offres font une recherche
   assert.equal(issueRecherche({ ok: false, reason: 'no_results' }, 0), 'vide');
   assert.equal(issueRecherche({ ok: false, reason: 'inject_failed' }, 0), 'echec');
 });
+
+import { demarrageAuto } from './lib/recherches.js';
+
+test('recherches : démarrage automatique, sauf après une pause qui attend une main', () => {
+  assert.equal(demarrageAuto({ auto: true, aFaire: 3, occupe: false, etat: null }), true);
+  assert.equal(demarrageAuto({ auto: false, aFaire: 3, occupe: false, etat: null }), false);
+  assert.equal(demarrageAuto({ auto: true, aFaire: 0, occupe: false, etat: null }), false);
+  assert.equal(demarrageAuto({ auto: true, aFaire: 3, occupe: true, etat: null }), false);
+  for (const cause of ['verification', 'magasin', 'manuel']) assert.equal(demarrageAuto({ auto: true, aFaire: 3, occupe: false, etat: { statut: 'pause', cause } }), false);
+  // Une séance interrompue par l'arrêt du worker, ou une erreur passagère, repart seule.
+  assert.equal(demarrageAuto({ auto: true, aFaire: 3, occupe: false, etat: { statut: 'pause', cause: 'erreur' } }), true);
+  assert.equal(demarrageAuto({ auto: true, aFaire: 3, occupe: false, etat: { statut: 'fini' } }), true);
+});

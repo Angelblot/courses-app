@@ -34,6 +34,20 @@ Concrètement : un clic pour quarante produits, au lieu de quarante allers-retou
 
 Le lien entre les deux appareils utilise Supabase (`cart_jobs`). L’extension
 relève les travaux en arrière-plan, mais ne remplit rien sans confirmation.
+
+## Recherches demandées depuis l'iPhone
+
+Dans « Préciser », « Chercher sur Carrefour et E.Leclerc » demande à
+l'extension de chercher un produit introuvable (table `recherches_drive`).
+Par défaut, l'extension les lance **d'elle-même** dans les 30 secondes, dans
+un onglet ouvert en arrière-plan puis refermé : elle lit les résultats, ne met
+rien au panier. Carrefour d'abord, E.Leclerc ensuite, une recherche toutes les
+8 à 15 secondes. Après une vérification anti-robot, un magasin E.Leclerc à
+choisir ou une pause demandée, elle attend « Relancer ». Le réglage
+« Lancer automatiquement » se décoche dans le popup.
+
+L'extension signale sa présence et son avancement à l'app (table
+`extension_presence`), chaque 30 secondes tant que Chrome est ouvert.
 La refonte web du dossier `frontend/` utilise une autre base ; elle n’est pas
 encore raccordée à ce parcours iPhone. Les comptes et favoris iPhone ne sont
 pas remplacés par les données de démonstration du site local.

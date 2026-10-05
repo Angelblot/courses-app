@@ -19,7 +19,7 @@ import {
   progresser, terminer, equivalencesDe, enregistrerEquivalence, enregistrerOffres,
   recherchesAFaire, majRecherche, signalerPresence,
 } from './supabase.js';
-import { fileDeRecherches, pauseEntreRecherches, adresseRecherche, issueRecherche } from './lib/recherches.js';
+import { fileDeRecherches, pauseEntreRecherches, adresseRecherche, issueRecherche, demarrageAuto } from './lib/recherches.js';
 import { strategie, indexer } from './lib/equivalences.js';
 import { offresDepuisReleve } from './lib/offres.js';
 import { candidats, RAISONS_SUIVANT } from './lib/alternatives.js';
@@ -33,7 +33,9 @@ import { attenteAvantNavigation, ENTRE_PRODUITS_MS, LECTURE_MS } from './lib/ryt
  * est la voie native. Pour une commande mensuelle, une minute de latence ne se
  * voit pas.
  */
-const PERIODE_MINUTES = 1;
+// Trente secondes, le minimum de chrome.alarms : une recherche demandée depuis
+// l'iPhone part ainsi en moins d'une demi-minute quand Chrome est ouvert.
+const PERIODE_MINUTES = 0.5;
 
 function armerAlarme() {
   chrome.alarms.create('travaux', { periodInMinutes: PERIODE_MINUTES });
@@ -42,7 +44,7 @@ chrome.runtime.onInstalled.addListener(armerAlarme);
 chrome.runtime.onStartup.addListener(armerAlarme);
 
 chrome.alarms.onAlarm.addListener((a) => {
-  if (a.name === 'travaux') { rafraichirPastille(); signaler(true); }
+  if (a.name === 'travaux') { rafraichirPastille(); signaler(true); essayerDemarrageAuto(); }
 });
 
 // --- Présence : l'app voit si l'ordinateur est là et ce qui avance ---
@@ -65,8 +67,8 @@ async function activiteCourante() {
     return ['remplissage', { fait: job.cursor ?? 0, total: job.items?.length ?? 0, drive: job.site ?? null }];
   }
   if (job?.status === 'paused') return ['pause', { message: `Vérification demandée sur ${SITES[job.site]?.label ?? 'le drive'}.` }];
-  if (rech?.statut === 'pause' && rech.message) return ['pause', { message: rech.message }];
-  return ['prete', {}];
+  if (rech?.statut === 'pause' && rech.message && rech.cause !== 'erreur') return ['pause', { message: rech.message }];
+  return ['prete', { auto: await rechercheAuto() }];
 }
 
 /** Envoie la présence ; au plus toutes les 4 secondes, sauf changement d'étape (force). */
@@ -98,7 +100,7 @@ async function rafraichirPastille() {
     n = rech.ok ? (rech.data?.length ?? 0) : 0;
     // Des recherches arrivent de l'iPhone : on le dit une fois, sans rien lancer.
     const { recherches_annoncees: avant = 0 } = await chrome.storage.local.get('recherches_annoncees');
-    if (n > avant && !enMarche.recherches) {
+    if (n > avant && !enMarche.recherches && !(await rechercheAuto())) {
       chrome.notifications.create('recherches', { type: 'basic', iconUrl: 'icon-128.png', title: 'Recherches demandées',
         message: `${n} recherche${n > 1 ? 's' : ''} depuis l'application. Ouvre l'extension et clique sur « Lancer les recherches ».` });
     }
@@ -660,18 +662,53 @@ async function majEtatRecherches(patch) {
   return suite;
 }
 
+/** Le réglage « Lancer automatiquement les recherches demandées » (actif par défaut). */
+async function rechercheAuto() {
+  const { recherches_auto: auto = true } = await chrome.storage.local.get('recherches_auto');
+  return auto !== false;
+}
+
 /**
- * L'onglet où chercher sur ce drive : un onglet déjà ouvert sur le site, où
- * l'utilisateur est connecté et a choisi son magasin, sinon un nouvel onglet.
- * Chez E.Leclerc, sans magasin dans l'adresse, la recherche ne vise rien.
+ * Au passage de l'alarme : des recherches attendent et rien ne tourne, on les
+ * lance sans clic, dans un onglet d'arrière-plan. Jamais après une pause qui
+ * attend une main (vérification, magasin, pause demandée).
  */
-async function ongletDuDrive(cfg) {
-  const onglets = await chrome.tabs.query({});
-  let tab = onglets.find((t) => { try { return Boolean(t.url) && cfg.hostPattern.test(new URL(t.url).hostname); } catch { return false; } });
-  if (!tab) {
-    tab = await chrome.tabs.create({ url: cfg.origin, active: true });
-    await waitForTab(tab.id);
-    tab = await chrome.tabs.get(tab.id);
+async function essayerDemarrageAuto() {
+  if (enMarche.recherches || enMarche.remplissage) return;
+  const r = await recherchesAFaire();
+  if (!r.ok) return;
+  if (!demarrageAuto({ auto: await rechercheAuto(), aFaire: r.data?.length ?? 0, occupe: false, etat: await etatRecherches() })) return;
+  try { await lancerRecherches({ auto: true }); } catch { /* relancé à la prochaine alarme */ }
+}
+
+/**
+ * L'onglet où chercher sur ce drive. À la main : un onglet déjà ouvert sur le
+ * site, où l'utilisateur est connecté et a choisi son magasin, sinon un
+ * nouveau. En automatique : un onglet à part, en arrière-plan, pour ne jamais
+ * détourner celui où l'on navigue. Chez E.Leclerc, sans magasin dans
+ * l'adresse, la recherche ne vise rien.
+ */
+async function ongletDuDrive(cfg, { auto = false } = {}) {
+  let tab = null;
+  if (auto) {
+    const { onglet_auto: id } = await chrome.storage.local.get('onglet_auto');
+    if (id) {
+      try { tab = await chrome.tabs.get(id); await naviguer(id, cfg.origin); tab = await chrome.tabs.get(id); } catch { tab = null; }
+    }
+    if (!tab) {
+      tab = await chrome.tabs.create({ url: cfg.origin, active: false });
+      await chrome.storage.local.set({ onglet_auto: tab.id });
+      await waitForTab(tab.id);
+      tab = await chrome.tabs.get(tab.id);
+    }
+  } else {
+    const onglets = await chrome.tabs.query({});
+    tab = onglets.find((t) => { try { return Boolean(t.url) && cfg.hostPattern.test(new URL(t.url).hostname); } catch { return false; } });
+    if (!tab) {
+      tab = await chrome.tabs.create({ url: cfg.origin, active: true });
+      await waitForTab(tab.id);
+      tab = await chrome.tabs.get(tab.id);
+    }
   }
   let baseOrigin = null;
   try {
@@ -683,11 +720,11 @@ async function ongletDuDrive(cfg) {
 }
 
 /**
- * Lance les recherches en attente, sur clic de l'utilisateur seulement : le
- * popup les annonce, rien ne part tout seul. Une recherche interrompue par une
+ * Lance les recherches en attente : sur clic dans le popup, ou seul quand le
+ * réglage automatique est actif. Une recherche interrompue par une
  * vérification est refaite au lancement suivant.
  */
-async function lancerRecherches() {
+async function lancerRecherches({ auto = false } = {}) {
   if (enMarche.recherches) throw new Error('Recherches déjà en cours');
   if (enMarche.remplissage) throw new Error('Un remplissage de panier est en cours, attends sa fin');
   const r = await recherchesAFaire();
@@ -695,26 +732,31 @@ async function lancerRecherches() {
   const file = fileDeRecherches(r.data);
   const total = file.reduce((n, g) => n + g.recherches.length, 0);
   if (!total) return { total: 0 };
-  await majEtatRecherches({ statut: 'en_cours', total, fait: 0, journal: [], drive: file[0].drive, requete: null, message: null });
+  await majEtatRecherches({ statut: 'en_cours', total, fait: 0, journal: [], drive: file[0].drive, requete: null, message: null, cause: null, auto });
   enMarche.recherches = true;
-  faireRecherches(file)
-    .catch(async (e) => { await majEtatRecherches({ statut: 'pause', message: `Les recherches se sont arrêtées : ${String(e).slice(0, 120)}. Relance pour reprendre.` }); })
+  if (auto) {
+    chrome.notifications.create('recherches', { type: 'basic', iconUrl: 'icon-128.png', title: 'Recherches lancées',
+      message: `${total} recherche${total > 1 ? 's' : ''} demandée${total > 1 ? 's' : ''} depuis l'application, dans un onglet en arrière-plan.` });
+  }
+  faireRecherches(file, { auto })
+    .catch(async (e) => { await majEtatRecherches({ statut: 'pause', cause: 'erreur', message: `Les recherches se sont arrêtées : ${String(e).slice(0, 120)}. Elles reprendront seules.` }); })
     .finally(async () => { enMarche.recherches = false; await signaler(true); });
   return { total };
 }
 
 async function pauseRecherches() {
-  await majEtatRecherches({ statut: 'pause', message: 'En pause. Relance pour continuer.' });
+  await majEtatRecherches({ statut: 'pause', cause: 'manuel', message: 'En pause. Relance pour continuer.' });
   return { ok: true };
 }
 
-async function faireRecherches(file) {
+async function faireRecherches(file, { auto = false } = {}) {
   let fait = 0;
   for (const groupe of file) {
     const cfg = SITES[groupe.drive];
-    const { tabId, baseOrigin } = await ongletDuDrive(cfg);
+    const { tabId, baseOrigin } = await ongletDuDrive(cfg, { auto });
     if (cfg.storePathPattern && !baseOrigin) {
-      await majEtatRecherches({ statut: 'pause', message: `Choisis ton magasin ${cfg.label} dans l'onglet, puis relance.` });
+      if (auto) await chrome.tabs.update(tabId, { active: true }).catch(() => {});
+      await majEtatRecherches({ statut: 'pause', cause: 'magasin', message: `Choisis ton magasin ${cfg.label} dans l'onglet, puis relance.` });
       return;
     }
     await majEtatRecherches({ drive: groupe.drive });
@@ -739,7 +781,9 @@ async function faireRecherches(file) {
       const statut = issueRecherche(compte, lignes.length);
       await majRecherche(rech.id, { statut, resultats: lignes.length, faite_le: statut === 'verification' ? null : new Date().toISOString() });
       if (statut === 'verification') {
-        await majEtatRecherches({ statut: 'pause', message: `Vérification demandée sur ${cfg.label}. Résous-la dans l'onglet, puis relance.` });
+        // L'onglet d'arrière-plan passe devant : c'est là que la vérification se résout.
+        if (auto) await chrome.tabs.update(tabId, { active: true }).catch(() => {});
+        await majEtatRecherches({ statut: 'pause', cause: 'verification', message: `Vérification demandée sur ${cfg.label}. Résous-la dans l'onglet, puis relance.` });
         chrome.notifications.create({ type: 'basic', iconUrl: 'icon-128.png', title: 'Vérification demandée',
           message: `${cfg.label} demande une vérification. Résous-la dans l'onglet, puis relance les recherches.` });
         return;
@@ -750,7 +794,12 @@ async function faireRecherches(file) {
       await sleep(pauseEntreRecherches());
     }
   }
-  await majEtatRecherches({ statut: 'fini', message: null });
+  await majEtatRecherches({ statut: 'fini', message: null, cause: null });
+  // L'onglet ouvert pour l'occasion se referme ; celui de l'utilisateur, jamais.
+  if (auto) {
+    const { onglet_auto: id } = await chrome.storage.local.get('onglet_auto');
+    if (id) { await chrome.tabs.remove(id).catch(() => {}); await chrome.storage.local.remove('onglet_auto'); }
+  }
   chrome.notifications.create({ type: 'basic', iconUrl: 'icon-128.png', title: 'Recherches terminées',
     message: `${fait} recherche${fait > 1 ? 's' : ''} faite${fait > 1 ? 's' : ''} : les résultats sont dans l'application.` });
   await rafraichirPastille();
@@ -763,7 +812,14 @@ async function recherchesPourPopup() {
   // Un « en cours » rangé par un worker arrêté depuis n'avance plus : on le montre en pause.
   const vrai = etat?.statut === 'en_cours' && !enMarche.recherches ? { ...etat, statut: 'pause', message: 'Les recherches ont été interrompues. Relance pour reprendre.' } : etat;
   await signaler(true);
-  return { etat: vrai, aFaire: r.ok ? (r.data?.length ?? 0) : 0 };
+  return { etat: vrai, aFaire: r.ok ? (r.data?.length ?? 0) : 0, auto: await rechercheAuto() };
+}
+
+async function reglerAuto(actif) {
+  await chrome.storage.local.set({ recherches_auto: actif !== false });
+  await signaler(true);
+  if (actif !== false) essayerDemarrageAuto();
+  return { auto: actif !== false };
 }
 
 // --- Messages venant du popup ---
@@ -778,8 +834,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     travaux: travauxRelevables,
     demarrerTravail: () => demarrerTravail(msg.jobId),
     recherches: recherchesPourPopup,
-    lancerRecherches,
+    lancerRecherches: () => lancerRecherches(),
     pauseRecherches,
+    reglerAuto: () => reglerAuto(msg.actif),
   };
   const handler = handlers[msg.type];
   if (!handler) return false;

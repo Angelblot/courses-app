@@ -7,13 +7,14 @@
 export type LignePresence = {
   vue_le: string;
   activite: 'prete' | 'recherches' | 'remplissage' | 'pause';
-  detail: { fait?: number; total?: number; drive?: string | null; requete?: string | null; message?: string } | null;
+  detail: { fait?: number; total?: number; drive?: string | null; requete?: string | null; message?: string; auto?: boolean } | null;
 };
 
 export type EtatExtension =
   | { etat: 'jamais' }
   | { etat: 'absente'; depuis: string }
-  | { etat: 'prete' }
+  /** auto : l'extension lance seule les recherches demandées (réglage, actif par défaut). */
+  | { etat: 'prete'; auto: boolean }
   | { etat: 'recherches' | 'remplissage'; fait: number; total: number; drive: string | null; requete: string | null }
   | { etat: 'pause'; message: string };
 
@@ -36,7 +37,7 @@ export function lireExtension(ligne: LignePresence | null, maintenant = Date.now
     return { etat: ligne.activite, fait: d.fait ?? 0, total: d.total ?? 0, drive: d.drive ?? null, requete: d.requete ?? null };
   }
   if (ligne.activite === 'pause') return { etat: 'pause', message: d.message || 'Une action t’attend sur l’ordinateur.' };
-  return { etat: 'prete' };
+  return { etat: 'prete', auto: d.auto !== false };
 }
 
 /**
@@ -48,7 +49,9 @@ export function texteExtension(e: EtatExtension, attendu: 'recherches' | 'rempli
   switch (e.etat) {
     case 'jamais': return { titre: 'Extension pas encore vue', consigne: 'Installe l’extension Courses dans Chrome sur l’ordinateur, et connecte-toi avec ce compte.' };
     case 'absente': return { titre: 'Ordinateur pas vu', consigne: `Dernier signe de l’extension ${e.depuis}. Ouvre Chrome sur l’ordinateur.` };
-    case 'prete': return { titre: 'Chrome est ouvert', consigne: `Dans l’extension, clique sur ${bouton}.` };
+    case 'prete': return attendu === 'recherches' && e.auto
+      ? { titre: 'Chrome est ouvert', consigne: 'Les recherches partent d’elles-mêmes dans les 30 secondes.' }
+      : { titre: 'Chrome est ouvert', consigne: `Dans l’extension, clique sur ${bouton}.` };
     case 'pause': return { titre: 'Une action t’attend sur l’ordinateur', consigne: e.message };
     default: {
       const ou = e.drive ? ` sur ${NOMS[e.drive] ?? e.drive}` : '';
