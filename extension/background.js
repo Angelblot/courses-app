@@ -727,7 +727,8 @@ async function magasinConnu(cfg, site) {
       if (segment) { magasins[site] = u.origin + segment; await chrome.storage.local.set({ magasins }); break; }
     } catch { /* onglet sans adresse lisible */ }
   }
-  return magasins[site] ?? null;
+  // Une adresse retenue par la 1.4.1 peut encore porter « .aspx ».
+  return magasins[site]?.replace(/\.aspx$/i, '') ?? null;
 }
 
 async function ongletDuDrive(cfg, { auto = false, site = null } = {}) {

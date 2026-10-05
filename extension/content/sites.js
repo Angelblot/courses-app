@@ -107,7 +107,9 @@ export const SITES = {
     // Chemin confirmé par un diagnostic réel le 18/08/2026, sur
     // fd3-courses.leclercdrive.fr/magasin-093401-093401-Le-Cres-Montpellier/
     searchPath: '/recherche.aspx?TexteRecherche={q}',
-    storePathPattern: /^\/magasin-[^/]+/,
+    // Sans le point : l'accueil du magasin est …/magasin-…-montpellier.aspx,
+    // et garder « .aspx » donnait …aspx/recherche.aspx, une page d'erreur.
+    storePathPattern: /^\/magasin-[^/.]+/,
     cookieReject: [
       "button:has-text('Continuer sans accepter')",
       "button:has-text('Tout refuser')",
