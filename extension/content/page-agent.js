@@ -183,8 +183,29 @@ export function pageAgent(cfg, item, mode) {
    * premiers titres, elle se trouve souvent plus bas dans la liste.
    */
   const MAX_CANDIDATES = 30;
-  // Cartes relevées pour le comparatif : assez pour voir les alternatives, sans alourdir l'envoi.
-  const MAX_RELEVE = 20;
+  // Cartes relevées pour le comparatif : toute la première page de résultats.
+  const MAX_RELEVE = 60;
+
+  /** Une carte dessinée a une photo ou un prix ; les autres attendent d'être vues. */
+  const complete = (card) => Boolean(card.querySelector('img[src]')) || /\d\s*€/.test(textOf(card));
+
+  /**
+   * Fait défiler la page par petits pas, à rythme de lecture, pour que les
+   * produits dessinés à la demande (E.Leclerc) s'affichent, puis remonte.
+   */
+  async function defiler() {
+    const fenetre = document.defaultView ?? window;
+    let avant = -1;
+    for (let pas = 0; pas < 30; pas += 1) {
+      const y = fenetre.scrollY;
+      if (y === avant) break;
+      avant = y;
+      fenetre.scrollBy(0, Math.round(fenetre.innerHeight * 0.8));
+      await sleep(500 + Math.random() * 400);
+    }
+    await sleep(600);
+    fenetre.scrollTo(0, 0);
+  }
 
   /**
    * Mots du candidat absents de la recherche, hors bruit.
@@ -621,7 +642,17 @@ export function pageAgent(cfg, item, mode) {
     // Relevé des offres affichées (prix, prix au kilo, Nutri-Score…) : le
     // comparatif des alternatives s'en nourrit. Seuls des textes bruts
     // remontent ; l'extension les comprend hors de la page.
-    const releve = cards.slice(0, MAX_RELEVE).map((card) => {
+    let lues = cards, chargement = null;
+    if (mode === 'releve') {
+      const avant = cards.filter(complete).length;
+      if (avant < Math.min(cards.length, MAX_RELEVE)) {
+        await defiler();
+        lues = queryFirstList(document, [cardSelector]).elements;
+        if (!lues.length) lues = cards;
+      }
+      chargement = { cartes: lues.length, completesAvant: avant, completesApres: lues.filter(complete).length };
+    }
+    const releve = lues.slice(0, MAX_RELEVE).map((card) => {
       // L'adresse du produit, pas celle du rayon : chez E.Leclerc, le premier
       // lien d'une carte est « Voir le rayon », commun à toutes ses voisines.
       const liens = [...card.querySelectorAll('a[href]')]
@@ -648,7 +679,7 @@ export function pageAgent(cfg, item, mode) {
     });
 
     // Recherche demandée depuis l'app : on lit les résultats, on ne clique rien.
-    if (mode === 'releve') return { ok: true, reason: 'releve', releve };
+    if (mode === 'releve') return { ok: true, reason: 'releve', releve, chargement };
 
     // Choix explicite de l'utilisateur après une ambiguïté : on cible le
     // libellé retenu et on n'évalue plus rien — il n'y a plus rien à décider.

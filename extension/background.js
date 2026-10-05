@@ -851,7 +851,7 @@ async function faireRecherches(file, { auto = false } = {}) {
       await majRecherche(rech.id, {
         statut, resultats: lignes.length, faite_le: statut === 'verification' ? null : new Date().toISOString(),
         diagnostic: lignes.length
-          ? { echantillon: (compte.releve ?? []).slice(0, 8).map((c) => ({ label: c.label, prix: c.prix, image: Boolean(c.image), href: String(c.href ?? '').slice(0, 120), cls: c.cls, texte: String(c.texte ?? '').slice(0, 300) })) }
+          ? { chargement: compte.chargement ?? null, echantillon: (compte.releve ?? []).slice(0, 4).map((c) => ({ label: c.label, prix: c.prix, image: Boolean(c.image), href: String(c.href ?? '').slice(0, 120), cls: c.cls, texte: String(c.texte ?? '').slice(0, 300) })) }
           : { raison: compte.reason ?? null, message: String(compte.message ?? '').slice(0, 200), cadres: compte.cadres ?? null },
       });
       if (statut === 'verification') {
