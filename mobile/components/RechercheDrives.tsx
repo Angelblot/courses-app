@@ -6,7 +6,9 @@ import {
   basculerChoix, dernieresParDrive, DRIVES_RECHERCHE, estEnAttente, libelleStatut, NOMS_DRIVE, offresDuDrive, phase, prixLisible,
   type ChoixParDrive, type DriveRecherche, type OffreRelevee,
 } from '../lib/recherche-drive.ts';
-import { moinsChers, type PrixUnitaire } from '../lib/historique-prix.ts';
+import { contenanceLisible, libellePrixUnitaire, lireMesures, ORDRE_UNITES, prixParUnite, prixUnitaireLisible, uniteCommune, type Mesures } from '../lib/caracteristiques.ts';
+import { analyser, plusPetits } from '../lib/analyse-comparatif.ts';
+import { lookupEan, type FicheProduit } from '../lib/openfoodfacts.ts';
 import { annulerRecherche, demanderRecherches, garderOffres, useRecherchesDrive } from '../stores/recherches-drive';
 import { useProducts } from '../stores/products';
 import { TableauComparatif, type LigneComparatif } from './FicheOffre';
@@ -162,26 +164,61 @@ export function RechercheDrives({ requete, ean13, autres, onGarde, onPhase }: {
 
 /**
  * Le comparatif des offres cochées (CD 3 bis) : le tableau de l'ordre d'essai,
- * au plus un choix par drive. À deux, chaque panier prendra celui de son drive.
+ * au plus un choix par drive. Il s'adapte au produit : la contenance lue dans
+ * le libellé (mètres, feuilles, lavages, grammes…) et le prix ramené à cette
+ * mesure ; les fiches Open Food, Beauty et Products Facts des codes-barres
+ * connus ajoutent Nutri-Score, NOVA et repères. Quelques phrases en tirent
+ * l'essentiel. À deux, chaque panier prendra celui de son drive.
  */
 function ComparerOffres({ visible, offres, occupe, onFermer, onGarder }: {
   visible: boolean; offres: OffreRelevee[]; occupe: boolean; onFermer: () => void; onGarder: (o: OffreRelevee[]) => void;
 }) {
   const [choix, setChoix] = useState<ChoixParDrive>({});
+  // Les fiches des bases ouvertes, par offre : undefined tant qu'on cherche, null si rien.
+  const [fiches, setFiches] = useState<Record<string, FicheProduit | null>>({});
+  const cles = offres.map(o => o.id).join(',');
+  useEffect(() => {
+    if (!visible) return;
+    let actif = true;
+    for (const o of offres) {
+      if (o.id in fiches) continue;
+      if (!o.ean13) { setFiches(f => ({ ...f, [o.id]: null })); continue; }
+      void lookupEan(o.ean13).then(r => { if (actif) setFiches(f => ({ ...f, [o.id]: r.etat === 'trouve' ? r.fiche : null })); });
+    }
+    return () => { actif = false; };
+  }, [visible, cles]);
+  const attente = offres.some(o => !(o.id in fiches));
+
   const choisies = offres.filter(o => choix[o.drive] === o.id);
-  const colonnes = offres.map(o => ({ ean13: o.id, name: o.libelle, brand: o.marque, imageUrl: o.image_url, grammageG: o.grammage_g, volumeMl: o.volume_ml,
-    productType: null, categoryKey: null, nutriscore: o.nutriscore }));
-  // Le vert ne départage que des prix de même unité (moinsChers les ignore sinon), « l » s'écrit « L » là-bas.
-  const unitaires = offres.map(o => o.prix_unitaire != null && o.unite_prix ? { valeur: o.prix_unitaire, unite: (o.unite_prix === 'l' ? 'L' : o.unite_prix) as PrixUnitaire['unite'] } : null);
+  // Les mesures : le libellé d'abord, puis le relevé du drive et la fiche ouverte pour le poids ou le volume.
+  const mesures: Mesures[] = offres.map(o => {
+    const m = lireMesures(o.libelle), f = fiches[o.id];
+    const g = m.g ?? o.grammage_g ?? f?.grammageG ?? null, ml = m.ml ?? o.volume_ml ?? f?.volumeMl ?? null;
+    return { ...m, ...(g ? { g: Number(g) } : {}), ...(ml ? { ml: Number(ml) } : {}) };
+  });
+  const unite = uniteCommune(mesures);
+  const parUnite = offres.map((o, i) => (unite ? prixParUnite(o.prix, mesures[i], unite) : null));
+  const colonnes = offres.map(o => { const f = fiches[o.id];
+    return { ean13: o.id, name: o.libelle, brand: o.marque, imageUrl: o.image_url ?? f?.imageUrl ?? null, grammageG: o.grammage_g, volumeMl: o.volume_ml,
+      productType: null, categoryKey: null, nutriscore: o.nutriscore ?? f?.nutriscore ?? null, ...(f?.details ? { details: f.details } : {}) }; });
+  const phrases = analyser(offres.map((o, i) => ({ nom: o.libelle, prix: o.prix, prixUnite: parUnite[i], nutriscore: colonnes[i].nutriscore,
+    nova: fiches[o.id]?.details?.nova ?? null, promotion: o.promotion, disponible: o.disponible })), unite);
+  const contenance = (m: Mesures) => {
+    const u = unite && m[unite] != null ? unite : ORDRE_UNITES.find(x => m[x] != null);
+    return u ? contenanceLisible(u, m[u]!) : '—';
+  };
+  const sources = offres.map(o => fiches[o.id]?.origine ?? (fiches[o.id] ? 'Open Food Facts' : null));
   const avant: LigneComparatif[] = [
     ['drive', 'Drive', (_, i) => <Text style={s.pastille}>{NOMS_DRIVE[offres[i].drive]}</Text>],
     ['prix', 'Prix au drive', (_, i) => offres[i].prix != null
       ? <><Text style={s.prix}>{prixLisible(offres[i].prix)}</Text><Text style={s.date}>{ilYa(offres[i].vu_le)}</Text></>
       : <Text style={s.cellule}>—</Text>],
-    // Une ligne vide pour tous n'apprend rien : au kilo, promo et dispo n'apparaissent que si l'un en a.
-    ...(offres.some(o => o.prix_unitaire != null) ? [['kilo', 'Au kilo', (_, i) => <Text style={s.cellule}>{prixLisible(offres[i].prix_unitaire, offres[i].unite_prix) ?? '—'}</Text>] as LigneComparatif] : []),
+    // Une ligne vide pour tous n'apprend rien : contenance, prix à la mesure, promo, dispo et fiche n'apparaissent que si l'un en a.
+    ...(mesures.some(m => Object.keys(m).length) ? [['contenance', 'Contenance', (_, i) => <Text style={s.cellule}>{contenance(mesures[i])}</Text>] as LigneComparatif] : []),
+    ...(unite ? [['unite', libellePrixUnitaire(unite), (_, i) => <Text style={s.cellule}>{parUnite[i] != null ? prixUnitaireLisible(parUnite[i]!, unite) : '—'}</Text>] as LigneComparatif] : []),
     ...(offres.some(o => o.promotion) ? [['promo', 'Promo', (_, i) => <Text style={[s.cellule, !!offres[i].promotion && { color: colors.attentionText, fontWeight: '700' }]}>{offres[i].promotion ?? '—'}</Text>] as LigneComparatif] : []),
     ...(offres.some(o => !o.disponible) ? [['dispo', 'Dispo', (_, i) => <Text style={s.cellule}>{offres[i].disponible ? 'en stock' : 'indisponible'}</Text>] as LigneComparatif] : []),
+    ...(sources.some(Boolean) ? [['fiche', 'Fiche', (_, i) => <Text style={[s.cellule, { fontSize: 11 }]}>{sources[i] ?? '—'}</Text>] as LigneComparatif] : []),
   ];
   const resume = (d: DriveRecherche) => {
     const o = choisies.find(x => x.drive === d), autre = choisies.find(x => x.drive !== d);
@@ -193,11 +230,15 @@ function ComparerOffres({ visible, offres, occupe, onFermer, onGarder }: {
       <View style={s.barre}>
         <Pressable accessibilityRole="button" onPress={onFermer} style={s.bouton}><Text style={s.boutonTexte}>Fermer</Text></Pressable>
         <Text style={s.titreBarre} accessibilityRole="header">Comparer</Text>
-        <View style={s.bouton} />
+        <View style={[s.bouton, { alignItems: 'flex-end' }]}>{attente && <ActivityIndicator color={colors.accent} />}</View>
       </View>
       <ScrollView contentContainerStyle={{ paddingTop: 8, paddingBottom: 24, gap: 14 }}>
+        {phrases.length > 0 && <View style={s.analyse} accessibilityLiveRegion="polite">
+          <Text style={s.analyseTitre}>Ce qu’on peut en dire</Text>
+          {phrases.map(p => <View key={p} style={s.puce}><View style={s.point} /><Text style={s.analyseTexte}>{p}</Text></View>)}
+        </View>}
         <Text style={[s.texte, { paddingHorizontal: 16 }]}>Choisis un produit par drive, ou un seul pour les deux.</Text>
-        <TableauComparatif colonnes={colonnes} avant={avant} meilleursAvant={{ kilo: moinsChers(unitaires) }} enAvant={offres.flatMap((o, i) => choix[o.drive] === o.id ? [i] : [])}
+        <TableauComparatif colonnes={colonnes} avant={avant} meilleursAvant={{ unite: plusPetits(parUnite), prix: plusPetits(offres.map(o => o.prix)) }} enAvant={offres.flatMap((o, i) => choix[o.drive] === o.id ? [i] : [])}
           pied={(_, i) => { const o = offres[i], pris = choix[o.drive] === o.id;
             return <Pressable accessibilityRole="button" accessibilityState={{ selected: pris }} accessibilityLabel={`${pris ? 'Retirer le choix de' : 'Choisir'} ${o.libelle} pour ${NOMS_DRIVE[o.drive]}`}
               onPress={() => setChoix(c => basculerChoix(c, o))} style={[s.choisir, pris && s.choisi]}>
@@ -269,4 +310,9 @@ const s = StyleSheet.create({
   validation: { backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 8 },
   resume: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   resumeTexte: { flex: 1, textAlign: 'right', fontSize: 14, fontWeight: '600', color: colors.text },
+  analyse: { marginHorizontal: 16, backgroundColor: colors.accentSoft, borderRadius: 14, padding: 14, gap: 8 },
+  analyseTitre: { fontSize: 14, fontWeight: '700', color: colors.text },
+  puce: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  point: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent, marginTop: 7 },
+  analyseTexte: { flex: 1, fontSize: 14, lineHeight: 20, color: '#3C4A34' },
 });

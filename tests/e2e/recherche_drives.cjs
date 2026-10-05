@@ -15,7 +15,11 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
 (async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{
  const page=await b.newPage({viewport:{width:390,height:844},serviceWorkers:'block'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  let recherches=[],offres=[];const ecrit={recherches:[],produits:[],majProduits:[],liens:[]};
- await page.route(/open(food|beauty|products)facts\.org/,route=>route.fulfill({json:{products:[],count:0}}));
+ // Les bases ouvertes : rien par nom ; par code-barres, Open Products Facts connaît l'Albal.
+ await page.route(/open(food|beauty|products)facts\.org/,route=>{const u=route.request().url();
+  if(u.includes('openproductsfacts')&&u.includes('/product/3560070000002'))return route.fulfill({json:{status:1,product:{product_name:'Papier cuisson Albal',categories_tags:['en:baking-paper']}}});
+  if(u.includes('/product/'))return route.fulfill({status:404,json:{status:0}});
+  return route.fulfill({json:{products:[],count:0}});});
  await page.route('https://qmymwicsgilhoihtfdjm.supabase.co/**',async route=>{const req=route.request(),url=decodeURIComponent(req.url().replace(/\+/g,'%20')),m=req.method();let data=[];
   if(url.includes('/auth/v1/user'))data=user;else if(url.includes('/auth/v1/token'))data=session;
   else if(url.includes('/rest/v1/recherches_drive')){
@@ -67,8 +71,12 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
  const comparer=page.getByRole('button',{name:'Comparer les 3 produits cochés'});await comparer.scrollIntoViewIfNeeded();
  await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd3-resultats.png'});
  await comparer.click();
- // 4. Comparatif : un choix par drive ; un 2e choix Carrefour remplace le 1er.
+ // 4. Comparatif : il s'adapte au produit (contenance en mètres, prix au mètre), cite la fiche ouverte et en tire l'essentiel.
  await page.getByText('Choisis un produit par drive, ou un seul pour les deux.',{exact:true}).waitFor();
+ await page.getByText('Prix au mètre',{exact:true}).waitFor();await page.getByText('0,17 €/m',{exact:true}).waitFor();
+ await page.getByText('Open Products Facts',{exact:true}).waitFor({timeout:15000});
+ await page.getByText('Le moins cher au mètre : Papier cuisson Repère 8 m, 0,17 €/m, 42 % de moins que le plus cher.',{exact:true}).waitFor();
+ // Un choix par drive ; un 2e choix Carrefour remplace le 1er.
  await page.getByRole('button',{name:'Choisir Papier cuisson sulfurisé Carrefour 8 m pour Carrefour'}).click();
  await page.getByRole('button',{name:'Choisir Papier cuisson Albal 10 m pour Carrefour'}).click();
  if(await page.getByRole('button',{name:'Retirer le choix de Papier cuisson sulfurisé Carrefour 8 m pour Carrefour'}).count())throw Error('Deux choix Carrefour');
