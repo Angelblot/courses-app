@@ -11,8 +11,8 @@ export function widgetProducts(state: Etat, products: Product[], recipes: Recipe
   // Le widget propose les références : une alternative vit sous la sienne.
   return references(products).map(p => ({
     id: p.id, name: p.name, imageURL: p.image_url, inList: inList.has(p.id),
-    // Siri reconnaît aussi le produit à ses phrases retenues et à son type.
-    synonyms: [...new Set([...(p.phrases_siri ?? []), ...(p.product_type ? [p.product_type] : [])])],
+    // Siri reconnaît aussi le produit à ses phrases retenues et à son type, sauf type retiré.
+    synonyms: [...new Set([...(p.phrases_siri ?? []), ...(p.product_type && !p.siri_sans_type ? [p.product_type] : [])])],
     detail: p.volume_ml ? (p.volume_ml >= 1000 ? `${p.volume_ml / 1000} L` : `${p.volume_ml} ml`)
       : p.grammage_g ? (p.grammage_g >= 1000 ? `${p.grammage_g / 1000} kg` : `${p.grammage_g} g`)
       : p.unit || '1 article',

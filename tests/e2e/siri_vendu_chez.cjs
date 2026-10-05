@@ -42,7 +42,7 @@ const dossier=process.env.CAPTURES||'/tmp';
  await page.screenshot({path:dossier+'/fs2-drive.png'});
  await page.getByRole('radio',{name:'Carrefour seulement'}).click();
  await page.getByRole('button',{name:'Vendu chez : Carrefour seulement. Modifier'}).waitFor();
- if(JSON.stringify(ecritures.at(-1))!==JSON.stringify({id:'lotus',vendu_chez:'carrefour'}))throw Error('Bad drive '+JSON.stringify(ecritures));
+ if(JSON.stringify(ecritures.at(-1))!==JSON.stringify({id:'lotus',vendu_chez:'carrefour',lieu_achat:null}))throw Error('Bad drive '+JSON.stringify(ecritures));
  // Une phrase déjà prise passe d'un produit à l'autre.
  await siri.click();await page.getByLabel('Nouvelle phrase pour Siri').fill('PQ');
  await btn('Ajouter cette phrase').click();
@@ -52,5 +52,13 @@ const dossier=process.env.CAPTURES||'/tmp';
  await page.waitForTimeout(300);await page.screenshot({path:dossier+'/fs2-siri.png'});
  await btn('Retirer « lotus »').click();await page.waitForTimeout(500);
  if(JSON.stringify(ecritures.at(-1))!==JSON.stringify({id:'lotus',phrases_siri:['pq']}))throw Error('Bad remove '+JSON.stringify(ecritures.at(-1)));
+ // Le type, reconnu d'office, se retire aussi, puis se rétablit ; le type du produit ne change pas.
+ await btn('Retirer « papier toilette »').click();
+ await page.getByText('« papier toilette » n’est plus reconnu.',{exact:true}).waitFor();
+ if(JSON.stringify(ecritures.at(-1))!==JSON.stringify({id:'lotus',siri_sans_type:true}))throw Error('Bad type remove '+JSON.stringify(ecritures.at(-1)));
+ await page.waitForTimeout(300);await page.screenshot({path:dossier+'/fs2-siri-sans-type.png'});
+ await btn('Rétablir « papier toilette »').click();
+ await page.getByText('Reconnu tout seul, d’après le type',{exact:true}).waitFor();
+ if(JSON.stringify(ecritures.at(-1))!==JSON.stringify({id:'lotus',siri_sans_type:false}))throw Error('Bad type restore '+JSON.stringify(ecritures.at(-1)));
  if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true,ecritures:ecritures.length}));
  }catch(e){console.error(e);process.exitCode=1}finally{await b.close()}})();

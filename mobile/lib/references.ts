@@ -11,6 +11,8 @@ export type ProduitClasse = {
  alternatives?: string[] | null; grammage_g?: number | null; volume_ml?: number | null;
  /** Phrases dites à Siri qui désignent ce produit (« PQ »), retenues au fil des ratés. */
  phrases_siri?: string[] | null;
+ /** Siri ne reconnaît plus ce produit à son type : la personne l'a retiré. */
+ siri_sans_type?: boolean | null;
  /** Drive choisi à la main ; null = déduit de la marque. */
  vendu_chez?: VenduChez | null;
 };
@@ -77,7 +79,7 @@ export function referencePourNom<P extends ProduitClasse>(nom: string, produits:
  if (retenu) return referenceDe(retenu.id, produits);
  const type = normalizeProductType(nom);
  if (!type) return undefined;
- return references(produits).find(p => p.product_type === type || normalizeProductType(p.name) === type);
+ return references(produits).find(p => !p.siri_sans_type && (p.product_type === type || normalizeProductType(p.name) === type));
 }
 
 /**

@@ -70,3 +70,12 @@ test('vendu chez : le choix manuel l\'emporte sur la marque', () => {
  assert.equal(enseigneExclusive({ ...reflets, vendu_chez: 'leclerc' }), 'leclerc');
  assert.equal(enseigneExclusive({ ...reflets, vendu_chez: null }), 'carrefour');
 });
+
+test('Siri : un type retiré ne désigne plus le produit, ses phrases si', () => {
+ const mayo = { id: 'm', name: 'Mayonnaise', brand: null, product_type: 'condiment', alternatives: [], phrases_siri: ['mayonnaise'] };
+ assert.equal(referencePourNom('condiment', [mayo])?.id, 'm');
+ const sans = { ...mayo, siri_sans_type: true };
+ assert.equal(referencePourNom('condiment', [sans]), undefined);
+ assert.equal(referencePourNom('ketchup', [sans]), undefined);
+ assert.equal(referencePourNom('mayonnaise', [sans])?.id, 'm');
+});

@@ -32,16 +32,18 @@ const ETATS: Record<Exclude<EtatDrive, 'hors'>, { titre: string; detail: (d: Ens
  * ouvre une feuille du bas.
  */
 export function ReglagesProduit({ produit, produits, onChange }: { produit: Product; produits: Product[]; onChange?: () => void }) {
-  const [phrases, setPhrases] = useState(produit.phrases_siri ?? []);
+  const [phrases, setPhrases] = useState(produit.phrases_siri ?? []), [sansType, setSansType] = useState(!!produit.siri_sans_type);
   const [vendu, setVendu] = useState<VenduChez | null>(produit.vendu_chez ?? null), [lieu, setLieu] = useState<string | null>(produit.lieu_achat ?? null);
-  useEffect(() => { setPhrases(produit.phrases_siri ?? []); setVendu(produit.vendu_chez ?? null); setLieu(produit.lieu_achat ?? null); }, [produit.id]);
+  useEffect(() => { setPhrases(produit.phrases_siri ?? []); setSansType(!!produit.siri_sans_type); setVendu(produit.vendu_chez ?? null); setLieu(produit.lieu_achat ?? null); }, [produit.id]);
   const [ouvert, setOuvert] = useState<'siri' | 'drive' | 'liens' | null>(null);
   const liens = useLiens(produit.id);
   const reel = { ...produit, vendu_chez: vendu };
   const faits = liens.faits.get(produit.id);
   const aucun = !liens.chargement && categorieLiens(reel, faits) === 'aucun';
   const deduit: VenduChez = enseigneDeduite(produit) ?? 'partout';
-  const auto = produit.product_type && !phrases.some(x => phraseSiri(x) === phraseSiri(produit.product_type!)) ? produit.product_type : null;
+  // Le type, reconnu d'office ; une phrase identique le remplace dans la liste.
+  const type = produit.product_type && !phrases.some(x => phraseSiri(x) === phraseSiri(produit.product_type!)) ? produit.product_type : null;
+  const auto = sansType ? null : type;
   const resume = [auto, ...phrases].filter(Boolean).join(', ');
 
   return <>
@@ -53,8 +55,8 @@ export function ReglagesProduit({ produit, produits, onChange }: { produit: Prod
     </View>
     <FeuilleLiens visible={ouvert === 'liens'} onFermer={() => setOuvert(null)} produit={reel} etats={DRIVES_LIENS.map(d => ({ drive: d, etat: etatDrive(reel, d, faits) }))}
       erreur={liens.erreur} onChange={() => { void liens.recharger(); }} onAilleurs={() => setOuvert('drive')} />
-    <FeuilleSiri visible={ouvert === 'siri'} onFermer={() => setOuvert(null)} produit={produit} produits={produits} auto={auto}
-      phrases={phrases} onPhrases={p => { setPhrases(p); onChange?.(); }} />
+    <FeuilleSiri visible={ouvert === 'siri'} onFermer={() => setOuvert(null)} produit={produit} produits={produits} type={type} sansType={sansType}
+      onSansType={v => { setSansType(v); onChange?.(); }} phrases={phrases} onPhrases={p => { setPhrases(p); onChange?.(); }} />
     <FeuilleDrive visible={ouvert === 'drive'} onFermer={() => setOuvert(null)} produit={produit} deduit={deduit} vendu={vendu} lieu={lieu}
       onVendu={(v, l) => { setVendu(v); setLieu(l); onChange?.(); }} />
   </>;
@@ -125,10 +127,13 @@ function Panneau({ titre, onFermer, children }: { titre: string; onFermer: () =>
   </View>;
 }
 
-function FeuilleSiri({ visible, onFermer, produit, produits, auto, phrases, onPhrases }: {
-  visible: boolean; onFermer: () => void; produit: Product; produits: Product[]; auto: string | null;
+function FeuilleSiri({ visible, onFermer, produit, produits, type, sansType, onSansType, phrases, onPhrases }: {
+  visible: boolean; onFermer: () => void; produit: Product; produits: Product[];
+  /** Le type du produit, que Siri reconnaît d'office sauf s'il est retiré. */
+  type: string | null; sansType: boolean; onSansType: (v: boolean) => void;
   phrases: string[]; onPhrases: (p: string[]) => void;
 }) {
+  const auto = sansType ? null : type;
   const [texte, setTexte] = useState(''), [erreur, setErreur] = useState<string | null>(null), [note, setNote] = useState<string | null>(null);
   useEffect(() => { if (visible) { setTexte(''); setErreur(null); setNote(null); } }, [visible]);
   const ajouter = async () => {
@@ -149,17 +154,30 @@ function FeuilleSiri({ visible, onFermer, produit, produits, auto, phrases, onPh
     if (!r.ok) { setErreur(r.erreur ?? null); return; }
     setErreur(null); setNote(null); onPhrases(suite);
   };
+  // Retirer le type ne change que Siri : recettes et suggestions le gardent.
+  const basculerType = async (sans: boolean) => {
+    const r = await enregistrerReglages([{ id: produit.id, siri_sans_type: sans }]);
+    if (!r.ok) { setErreur(r.erreur ?? null); return; }
+    setErreur(null); setNote(null); onSansType(sans);
+  };
   return <Feuille visible={visible} onFermer={onFermer} nom="Quand tu dis à Siri" clavier>
     <Panneau titre="Quand tu dis à Siri" onFermer={onFermer}>
       <Text style={[ui.detail, s.marge]}>Siri ajoute ce produit à ta liste quand tu dis :</Text>
       <View style={s.liste}>
-        {auto && <View style={[s.phrase, s.separee]}><Text style={s.phraseTexte}>{auto}</Text><Text style={ui.detail}>reconnu tout seul</Text></View>}
+        {auto && <View style={[s.phrase, { paddingVertical: 8 }, phrases.length > 0 && s.separee]}>
+          <View style={{ flex: 1 }}><Text style={s.phraseTexte}>{auto}</Text><Text style={ui.detail}>Reconnu tout seul, d’après le type</Text></View>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Retirer « ${auto} »`} onPress={() => { void basculerType(true); }} hitSlop={4} style={s.retirer}><Feather name="x" size={16} color={colors.textMuted} /></Pressable>
+        </View>}
         {phrases.map((x, i) => <View key={x} style={[s.phrase, i < phrases.length - 1 && s.separee]}>
           <Text style={s.phraseTexte}>{x}</Text>
           <Pressable accessibilityRole="button" accessibilityLabel={`Retirer « ${x} »`} onPress={() => { void retirer(x); }} hitSlop={4} style={s.retirer}><Feather name="x" size={16} color={colors.textMuted} /></Pressable>
         </View>)}
         {!auto && !phrases.length && <View style={s.phrase}><Text style={ui.detail}>Aucune phrase pour l’instant.</Text></View>}
       </View>
+      {sansType && !!type && <View style={[s.retire, s.marge]}>
+        <Text style={[ui.detail, { flex: 1, marginTop: 0 }]}>« {type} » n’est plus reconnu.</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Rétablir « ${type} »`} onPress={() => { void basculerType(false); }} hitSlop={8} style={s.retablir}><Text style={ui.link}>Rétablir</Text></Pressable>
+      </View>}
       <TextInput style={ui.input} value={texte} onChangeText={setTexte} placeholder="Une autre phrase, par exemple « PQ »" accessibilityLabel="Nouvelle phrase pour Siri"
         returnKeyType="done" onSubmitEditing={() => { void ajouter(); }} autoCapitalize="none" />
       {!!note && <Text accessibilityLiveRegion="polite" style={[ui.detail, s.marge]}>{note}</Text>}
@@ -238,6 +256,8 @@ const s = StyleSheet.create({
   liste: { backgroundColor: colors.surface, borderRadius: 14, paddingHorizontal: 14 },
   phrase: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48, gap: 8 },
   phraseTexte: { fontSize: 15, fontWeight: '600', color: colors.text, flexShrink: 1 },
+  retire: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  retablir: { minHeight: 44, justifyContent: 'center' },
   retirer: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -10 },
   choix: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, paddingHorizontal: 4 },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.traitControle },
