@@ -88,3 +88,28 @@ test('la recherche par nom se limite aux produits vendus en France', async () =>
   await chercher('intima');
   assert.match(url, /tagtype_0=countries&tag_contains_0=contains&tag_0=france/);
 });
+
+test('recherche multi-bases : Open Food Facts d’abord, puis les bases sœurs marquées, sans doublon', async () => {
+  const { creerRechercheMultiBases } = await import('./openfoodfacts.ts');
+  const fiche = (ean, name) => ({ ean13: ean, name, brand: null, imageUrl: null, grammageG: null, volumeMl: null, productType: null, categoryKey: null, nutriscore: null });
+  const chercher = creerRechercheMultiBases({
+    principale: async () => ({ etat: 'trouve', fiches: [fiche('1', 'Pâte brisée')] }),
+    soeurs: [
+      { nom: 'Open Beauty Facts', chercher: async () => ({ etat: 'vide' }) },
+      { nom: 'Open Products Facts', chercher: async () => ({ etat: 'trouve', fiches: [fiche('1', 'Doublon'), fiche('2', 'Papier sulfurisé')] }) },
+    ],
+  });
+  const r = await chercher('papier sulfurise');
+  assert.deepEqual(r.fiches.map(f => [f.name, f.origine]), [['Pâte brisée', undefined], ['Papier sulfurisé', 'Open Products Facts']]);
+});
+
+test('recherche multi-bases : seule une base sœur trouve, ou personne ne répond', async () => {
+  const { creerRechercheMultiBases } = await import('./openfoodfacts.ts');
+  const gel = { ean13: '3', name: 'Gel intime', brand: null, imageUrl: null, grammageG: null, volumeMl: null, productType: null, categoryKey: null, nutriscore: null };
+  const trouve = creerRechercheMultiBases({ principale: async () => ({ etat: 'vide' }),
+    soeurs: [{ nom: 'Open Beauty Facts', chercher: async () => ({ etat: 'trouve', fiches: [gel] }) }] });
+  assert.equal((await trouve('gel intime')).fiches[0].origine, 'Open Beauty Facts');
+  const panne = creerRechercheMultiBases({ principale: async () => ({ etat: 'indisponible', raison: 'reseau' }),
+    soeurs: [{ nom: 'Open Beauty Facts', chercher: async () => ({ etat: 'indisponible', raison: 'reseau' }) }] });
+  assert.deepEqual(await panne('gel intime'), { etat: 'indisponible', raison: 'reseau' });
+});

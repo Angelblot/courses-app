@@ -246,6 +246,7 @@ export type OptionsRechercheNom = {
 
 /** Cache borné et reprises limitées : pas de recherche à chaque frappe. */
 export function creerRechercheParNom({
+  base = 'https://world.openfoodfacts.org',
   requeteHttp = (...args: Parameters<typeof fetch>) => fetch(...args),
   maintenant = Date.now,
   delaiTentative = 12_000,
@@ -276,7 +277,7 @@ export function creerRechercheParNom({
       const timer = setTimeout(terminer, ms);
       global.signal.addEventListener('abort', terminer, { once: true });
     });
-    const url = 'https://world.openfoodfacts.org/cgi/search.pl'
+    const url = `${base}/cgi/search.pl`
       + `?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1`
       // Produits vendus en France : sans ce filtre, « Intima » remonte des
       // lingettes italiennes et des lessives portugaises.
@@ -335,4 +336,32 @@ export function creerRechercheParNom({
   };
 }
 
-export const rechercherParNom = creerRechercheParNom();
+/**
+ * Cherche un nom sur Open Food Facts et, en parallèle, sur Open Beauty Facts
+ * et Open Products Facts : « gel intime » et « papier sulfurisé » ne sont pas
+ * de l'alimentaire. Les fiches d'Open Food Facts viennent d'abord ; une base
+ * sœur en panne ou vide ne change rien au verdict d'Open Food Facts.
+ */
+export function creerRechercheMultiBases({
+  principale = creerRechercheParNom(),
+  soeurs = [
+    { nom: 'Open Beauty Facts', chercher: creerRechercheParNom({ base: 'https://world.openbeautyfacts.org' }) },
+    { nom: 'Open Products Facts', chercher: creerRechercheParNom({ base: 'https://world.openproductsfacts.org' }) },
+  ],
+  parSoeur = 6,
+} = {}) {
+  return async (requete: string, options: OptionsRechercheNom = {}): Promise<ResultatRechercheNom> => {
+    // Une seule base annonce ses tentatives : la progression affichée reste lisible.
+    const [off, ...autres] = await Promise.all([
+      principale(requete, options),
+      ...soeurs.map(b => b.chercher(requete, { signal: options.signal })),
+    ]);
+    const vus = new Set<string>(), fiches: FicheProduit[] = [];
+    const garder = (f: FicheProduit) => { if (f.ean13 && vus.has(f.ean13)) return; if (f.ean13) vus.add(f.ean13); fiches.push(f); };
+    if (off.etat === 'trouve') off.fiches.forEach(garder);
+    autres.forEach((r, i) => { if (r.etat === 'trouve') r.fiches.slice(0, parSoeur).forEach(f => garder({ ...f, origine: soeurs[i].nom })); });
+    return fiches.length ? { etat: 'trouve', fiches } : off;
+  };
+}
+
+export const rechercherParNom = creerRechercheMultiBases();
