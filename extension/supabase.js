@@ -166,3 +166,17 @@ export async function enregistrerOffres(lignes) {
     body: JSON.stringify(lignes),
   });
 }
+
+/** Recherches demandées depuis l'app et pas encore faites (ou interrompues). */
+export async function recherchesAFaire() {
+  return appel('recherches_drive?statut=in.(en_attente,en_cours,verification)&select=id,drive,requete,ean13,statut,demandee_le&order=demandee_le.asc');
+}
+
+/** Avance une recherche : en cours, faite, vide, vérification ou échec. */
+export async function majRecherche(id, champs) {
+  return appel(`recherches_drive?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify(champs),
+  });
+}

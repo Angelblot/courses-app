@@ -102,9 +102,11 @@ export type LigneComparatif = [string, string, (c: FicheProduit, i: number) => R
  * le tableau défile de côté. `avant` ajoute des lignes en tête (le prix,
  * par exemple), avec leurs propres gagnants ; `pied` une action par colonne.
  */
-export function TableauComparatif({ colonnes, avant = [], meilleursAvant = {}, pied }: {
+export function TableauComparatif({ colonnes, avant = [], meilleursAvant = {}, pied, enAvant = [0] }: {
   colonnes: FicheProduit[]; avant?: LigneComparatif[]; meilleursAvant?: Record<string, number[]>;
   pied?: (c: FicheProduit, i: number) => ReactNode;
+  /** Colonnes teintées : la référence de l'ordre d'essai, ou les produits choisis. */
+  enAvant?: number[];
 }) {
   const m = { ...meilleurs(colonnes.map(c => ({ nutriscore: c.nutriscore, details: c.details ?? null }))), ...meilleursAvant };
   const vert = (cle: string, i: number) => m[cle]?.includes(i);
@@ -119,14 +121,21 @@ export function TableauComparatif({ colonnes, avant = [], meilleursAvant = {}, p
     ['sel', 'Sel', c => <Text style={s.cellule}>{g(c.details?.sel ?? null)}</Text>],
     ['allergenes', 'Allergènes', c => <Text style={[s.cellule, { fontSize: 11 }]}>{c.details ? c.details.allergenes.join(', ') || 'aucun' : '—'}</Text>],
   ];
+  // Une ligne vide pour tous (Nutri-Score d'un papier cuisson) n'apprend rien : on la retire.
+  const connu: Record<string, (c: FicheProduit) => boolean> = {
+    nutriscore: c => !!c.nutriscore, ecoscore: c => !!c.details?.ecoscore, nova: c => c.details?.nova != null,
+    kcal: c => c.details?.kcal != null, gras: c => c.details?.gras != null, satures: c => c.details?.satures != null,
+    sucres: c => c.details?.sucres != null, sel: c => c.details?.sel != null, allergenes: c => !!c.details,
+  };
+  const visibles = lignes.filter(([cle]) => !connu[cle] || colonnes.some(connu[cle]));
   const large = colonnes.length > 3, col = large ? s.colonneFixe : null;
   const tableau = <View style={[s.comparatif, large && { marginHorizontal: 0 }]}>
-    <View style={s.ligneComp}><View style={s.libelleComp} />{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, i === 0 && s.colonneMoi]}><Photo name={c.name} url={c.imageUrl} style={s.mini52} /><Text style={s.nomComp} numberOfLines={3}>{c.name}</Text></View>)}</View>
-    {lignes.map(([cle, libelle, rendu]) => <View key={cle} style={s.ligneComp}>
+    <View style={s.ligneComp}><View style={s.libelleComp} />{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, enAvant.includes(i) && s.colonneMoi]}><Photo name={c.name} url={c.imageUrl} style={s.mini52} /><Text style={s.nomComp} numberOfLines={3}>{c.name}</Text></View>)}</View>
+    {visibles.map(([cle, libelle, rendu]) => <View key={cle} style={s.ligneComp}>
       <Text style={s.libelleComp}>{libelle}</Text>
-      {colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, i === 0 && s.colonneMoi, vert(cle, i) && s.mieux]}>{rendu(c, i)}</View>)}
+      {colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, enAvant.includes(i) && s.colonneMoi, vert(cle, i) && s.mieux]}>{rendu(c, i)}</View>)}
     </View>)}
-    {pied && <View style={[s.ligneComp, { borderBottomWidth: 0 }]}><View style={s.libelleComp} />{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, i === 0 && s.colonneMoi]}>{pied(c, i)}</View>)}</View>}
+    {pied && <View style={[s.ligneComp, { borderBottomWidth: 0 }]}><View style={s.libelleComp} />{colonnes.map((c, i) => <View key={c.ean13} style={[s.colonne, col, enAvant.includes(i) && s.colonneMoi]}>{pied(c, i)}</View>)}</View>}
   </View>;
   return large ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12 }}>{tableau}</ScrollView> : tableau;
 }

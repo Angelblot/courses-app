@@ -44,6 +44,8 @@ type Props = {
   scan?: boolean;
   /** Verbe annoncé sur chaque résultat (« Ajouter », « Choisir »). */
   verbe?: string;
+  /** Sous les résultats, dans le défilement : la recherche sur les drives. */
+  apres?: ReactNode;
 };
 
 const MAX_CATALOGUE = 8;
@@ -75,7 +77,7 @@ function useHauteurClavier() {
  * après une pause de frappe. « Ajouter « x » sans produit » reste collé en
  * bas, au-dessus du clavier.
  */
-export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un ingrédient', sansProduit = true, suggestions = [], exclure = [], requeteInitiale = '', proches = [], entete, pied, scan = Platform.OS !== 'web', verbe = 'Ajouter' }: Props) {
+export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un ingrédient', sansProduit = true, suggestions = [], exclure = [], requeteInitiale = '', proches = [], entete, pied, scan = Platform.OS !== 'web', verbe = 'Ajouter', apres }: Props) {
   const { produits, recharger } = useProducts();
   const insets = useSafeAreaInsets(), clavier = useHauteurClavier();
   const [requete, setRequete] = useState(requeteInitiale), [focus, setFocus] = useState(false), [scanner, setScanner] = useState(false);
@@ -155,6 +157,7 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
             return <ApercuOffre key={f.ean13} largeur={largeur} fiche={f} onChoisir={() => { void choisirFiche(f); }} onVoir={() => setDetail(f)}>{rang}</ApercuOffre>;
           })}
         </>}
+        {apres}
         {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { paddingHorizontal: 16 }]}>{erreur}</Text>}
       </ScrollView>
 

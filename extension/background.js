@@ -17,7 +17,9 @@ import { pageAgent } from './content/page-agent.js';
 import {
   travauxEnAttente, travauxAbandonnes, revendiquer,
   progresser, terminer, equivalencesDe, enregistrerEquivalence, enregistrerOffres,
+  recherchesAFaire, majRecherche,
 } from './supabase.js';
+import { fileDeRecherches, pauseEntreRecherches, adresseRecherche, issueRecherche } from './lib/recherches.js';
 import { strategie, indexer } from './lib/equivalences.js';
 import { offresDepuisReleve } from './lib/offres.js';
 import { candidats, RAISONS_SUIVANT } from './lib/alternatives.js';
@@ -57,7 +59,9 @@ async function rafraichirPastille() {
     return;
   }
   const premier = r.data?.[0];
-  const n = premier ? (premier.items?.length ?? 0) : 0;
+  let n = premier ? (premier.items?.length ?? 0) : 0;
+  // Sans liste à remplir, la pastille compte les recherches demandées.
+  if (!n) { const rech = await recherchesAFaire(); n = rech.ok ? (rech.data?.length ?? 0) : 0; }
   await chrome.action.setBadgeText({ text: n > 0 ? String(n) : '' });
   await chrome.action.setBadgeBackgroundColor({ color: '#2D6A4F' });
 }
@@ -590,6 +594,120 @@ async function diagnose(site) {
   return result;
 }
 
+// --- Recherches demandées depuis l'app ---
+
+const CLE_RECHERCHES = 'courses_recherches';
+
+async function etatRecherches() {
+  const s = await chrome.storage.local.get(CLE_RECHERCHES);
+  return s[CLE_RECHERCHES] ?? null;
+}
+
+async function majEtatRecherches(patch) {
+  const suite = { ...((await etatRecherches()) ?? {}), ...patch };
+  await chrome.storage.local.set({ [CLE_RECHERCHES]: suite });
+  chrome.runtime.sendMessage({ type: 'recherches', etat: suite }).catch(() => {});
+  return suite;
+}
+
+/**
+ * L'onglet où chercher sur ce drive : un onglet déjà ouvert sur le site, où
+ * l'utilisateur est connecté et a choisi son magasin, sinon un nouvel onglet.
+ * Chez E.Leclerc, sans magasin dans l'adresse, la recherche ne vise rien.
+ */
+async function ongletDuDrive(cfg) {
+  const onglets = await chrome.tabs.query({});
+  let tab = onglets.find((t) => { try { return Boolean(t.url) && cfg.hostPattern.test(new URL(t.url).hostname); } catch { return false; } });
+  if (!tab) {
+    tab = await chrome.tabs.create({ url: cfg.origin, active: true });
+    await waitForTab(tab.id);
+    tab = await chrome.tabs.get(tab.id);
+  }
+  let baseOrigin = null;
+  try {
+    const u = new URL(tab.url);
+    const segment = cfg.storePathPattern ? (u.pathname.match(cfg.storePathPattern)?.[0] ?? '') : '';
+    baseOrigin = cfg.storePathPattern && !segment ? null : u.origin + segment;
+  } catch { baseOrigin = null; }
+  return { tabId: tab.id, baseOrigin };
+}
+
+/**
+ * Lance les recherches en attente, sur clic de l'utilisateur seulement : le
+ * popup les annonce, rien ne part tout seul. Une recherche interrompue par une
+ * vérification est refaite au lancement suivant.
+ */
+async function lancerRecherches() {
+  if ((await etatRecherches())?.statut === 'en_cours') throw new Error('Recherches déjà en cours');
+  if ((await getState())?.status === 'running') throw new Error('Un remplissage de panier est en cours, attends sa fin');
+  const r = await recherchesAFaire();
+  if (!r.ok) throw new Error(r.deconnecte ? 'Session expirée, reconnecte-toi' : 'Base injoignable, réessaie');
+  const file = fileDeRecherches(r.data);
+  const total = file.reduce((n, g) => n + g.recherches.length, 0);
+  if (!total) return { total: 0 };
+  await majEtatRecherches({ statut: 'en_cours', total, fait: 0, journal: [], drive: file[0].drive, message: null });
+  faireRecherches(file);
+  return { total };
+}
+
+async function pauseRecherches() {
+  await majEtatRecherches({ statut: 'pause', message: 'En pause. Relance pour continuer.' });
+  return { ok: true };
+}
+
+async function faireRecherches(file) {
+  let fait = 0;
+  for (const groupe of file) {
+    const cfg = SITES[groupe.drive];
+    const { tabId, baseOrigin } = await ongletDuDrive(cfg);
+    if (cfg.storePathPattern && !baseOrigin) {
+      await majEtatRecherches({ statut: 'pause', message: `Choisis ton magasin ${cfg.label} dans l'onglet, puis relance.` });
+      return;
+    }
+    await majEtatRecherches({ drive: groupe.drive });
+    for (const rech of groupe.recherches) {
+      const etat = await etatRecherches();
+      if (etat?.statut !== 'en_cours') return;
+      await majRecherche(rech.id, { statut: 'en_cours' });
+      const item = { name: rech.requete, quantity: 1, ean: rech.ean13 ?? null };
+      let compte = { ok: false, reason: 'no_results' };
+      // Un code-barres ouvre la fiche Carrefour sans recherche ni ambiguïté.
+      if (rech.ean13 && cfg.productUrlTemplate) {
+        await naviguer(tabId, cfg.productUrlTemplate.replace('{ean}', rech.ean13));
+        compte = await runAgent(tabId, cfg, item, 'releve');
+      }
+      if (!compte.ok && compte.reason !== 'challenge') {
+        await naviguer(tabId, adresseRecherche(cfg, baseOrigin, rech.requete));
+        compte = await runAgent(tabId, cfg, item, 'releve');
+      }
+      let lignes = compte.ok ? offresDepuisReleve(compte.releve, { drive: groupe.drive, recherche: rech.requete, rechercheId: rech.id }) : [];
+      if (lignes.length && !(await enregistrerOffres(lignes)).ok) lignes = [];
+      const statut = issueRecherche(compte, lignes.length);
+      await majRecherche(rech.id, { statut, resultats: lignes.length, faite_le: statut === 'verification' ? null : new Date().toISOString() });
+      if (statut === 'verification') {
+        await majEtatRecherches({ statut: 'pause', message: `Vérification demandée sur ${cfg.label}. Résous-la dans l'onglet, puis relance.` });
+        chrome.notifications.create({ type: 'basic', iconUrl: 'icon-128.png', title: 'Vérification demandée',
+          message: `${cfg.label} demande une vérification. Résous-la dans l'onglet, puis relance les recherches.` });
+        return;
+      }
+      fait += 1;
+      const journal = [...(etat.journal ?? []), { requete: rech.requete, drive: groupe.drive, statut, n: lignes.length }].slice(-30);
+      await majEtatRecherches({ fait, journal });
+      await sleep(pauseEntreRecherches());
+    }
+  }
+  await majEtatRecherches({ statut: 'fini', message: null });
+  chrome.notifications.create({ type: 'basic', iconUrl: 'icon-128.png', title: 'Recherches terminées',
+    message: `${fait} recherche${fait > 1 ? 's' : ''} faite${fait > 1 ? 's' : ''} : les résultats sont dans l'application.` });
+  await rafraichirPastille();
+}
+
+/** Pour le popup : l'état de la séance et le nombre de recherches en attente. */
+async function recherchesPourPopup() {
+  const r = await recherchesAFaire();
+  return { etat: await etatRecherches(), aFaire: r.ok ? (r.data?.length ?? 0) : 0 };
+}
+
 // --- Messages venant du popup ---
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   const handlers = {
@@ -601,6 +719,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     diagnose: () => diagnose(msg.site),
     travaux: travauxRelevables,
     demarrerTravail: () => demarrerTravail(msg.jobId),
+    recherches: recherchesPourPopup,
+    lancerRecherches,
+    pauseRecherches,
   };
   const handler = handlers[msg.type];
   if (!handler) return false;

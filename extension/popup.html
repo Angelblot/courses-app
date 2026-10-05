@@ -35,6 +35,19 @@
       <button id="remplir" class="btn">Remplir le panier</button>
     </section>
 
+    <section id="recherches" class="panel" hidden>
+      <p id="recherches-resume" class="hint"></p>
+      <div id="recherches-progression" class="progress" hidden>
+        <div id="recherches-barre" class="progress__bar"></div>
+      </div>
+      <p id="recherches-message" class="hint"></p>
+      <ul id="recherches-journal" class="log"></ul>
+      <div class="row">
+        <button id="recherches-lancer" class="btn">Lancer les recherches</button>
+        <button id="recherches-pause" class="btn btn--ghost" hidden>Pause</button>
+      </div>
+    </section>
+
     <section id="idle" class="panel">
       <p class="hint">
         Saisie manuelle — elle reste disponible même sans connexion, et

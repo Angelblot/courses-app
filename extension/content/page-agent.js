@@ -262,6 +262,22 @@ export function pageAgent(cfg, item, mode) {
     return m ? m[1] : null;
   }
 
+  /**
+   * Lit une fiche produit sans rien cliquer : une recherche par code-barres
+   * demandée depuis l'app. Sans titre, la fiche n'existe pas sur ce drive.
+   */
+  function lireFiche() {
+    const pp = cfg.productPage || {};
+    const label = textOf(queryFirst(document, pp.title || ['h1']));
+    if (!label) return { ok: false, reason: 'product_unavailable', message: 'Fiche introuvable sur ce drive' };
+    const prix = textOf(queryFirst(document, pp.price || [])).slice(0, 40);
+    const image = document.querySelector('meta[property="og:image"]')?.getAttribute('content') ?? '';
+    return {
+      ok: true, reason: 'releve',
+      releve: [{ label: label.slice(0, 200), href: location.href, ean: eanFromUrl(location.href), prix, texte: prix, image, nutri: '' }],
+    };
+  }
+
   /** Ajoute au panier depuis une fiche produit (pas une liste de résultats). */
   async function addFromProductPage() {
     const pp = cfg.productPage || {};
@@ -559,7 +575,7 @@ export function pageAgent(cfg, item, mode) {
 
     // Accès direct à une fiche : aucune recherche, donc aucune ambiguïté.
     if (productPageRe && productPageRe.test(location.href)) {
-      return addFromProductPage();
+      return mode === 'releve' ? lireFiche() : addFromProductPage();
     }
 
     const { selector: cardSelector, elements: cards } = await waitForCards();
@@ -596,6 +612,9 @@ export function pageAgent(cfg, item, mode) {
           : '',
       };
     });
+
+    // Recherche demandée depuis l'app : on lit les résultats, on ne clique rien.
+    if (mode === 'releve') return { ok: true, reason: 'releve', releve };
 
     // Choix explicite de l'utilisateur après une ambiguïté : on cible le
     // libellé retenu et on n'évalue plus rien — il n'y a plus rien à décider.

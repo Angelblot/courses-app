@@ -8,6 +8,7 @@ import type { LigneMaison } from '../lib/liste-maison';
 import { produitsProches, type Manque } from '../lib/session-courses';
 import { sources } from './Manques';
 import { SelecteurIngredient } from './SelecteurIngredient';
+import { RechercheDrives } from './RechercheDrives';
 import { Photo, ui } from './MaisonUI';
 import { colors } from '../lib/theme';
 
@@ -33,15 +34,19 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
 
  return <Modal visible={visible && !!courant} animationType="slide" presentationStyle="pageSheet" onRequestClose={onFermer}>
   {courant?.type === 'manque'
-   ? <PreciserManque key={courant.key} titre={titre} progression={progression} lineKey={courant.key} manque={courant.manque} products={products} onFermer={onFermer} onRetrait={onRetrait} toast={toast} />
+   ? <PreciserManque key={courant.key} titre={titre} progression={progression} lineKey={courant.key} manque={courant.manque} products={products} onFermer={onFermer} onRetrait={onRetrait} toast={toast}
+     autres={manques.filter(([k]) => k !== courant.key).map(([, m]) => m.name)} />
    : courant?.type === 'doublon'
     ? <GarderUn key={courant.doublon.id} titre={titre} progression={progression} doublon={courant.doublon} products={products} onFermer={onFermer} onRetrait={onRetrait} toast={toast} />
     : null}
  </Modal>;
 }
 
-/** Un manque : la recherche commune, et en bas « garder sans produit » ou « retirer ». */
-function PreciserManque({ titre, progression, lineKey, manque, products, onFermer, onRetrait, toast }: { titre: string; progression: ReactNode; lineKey: string; manque: Manque; products: Product[]; onFermer: () => void; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode }) {
+/**
+ * Un manque : la recherche commune, puis « Chercher sur les drives » par
+ * l'extension (CD), et en bas « garder sans produit » ou « retirer ».
+ */
+function PreciserManque({ titre, progression, lineKey, manque, products, onFermer, onRetrait, toast, autres }: { titre: string; progression: ReactNode; lineKey: string; manque: Manque; products: Product[]; onFermer: () => void; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode; autres: string[] }) {
  const w = useWizard();
  const id = lineKey.startsWith('produit:') ? lineKey.slice(8) : undefined, extra = w.extras.find(x => `extra:${x.id}` === lineKey);
  const qty = id ? w.quotidienQty[id] ?? 1 : extra?.quantity ?? 1, nom = extra?.name ?? manque.name;
@@ -69,7 +74,8 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
   <Text style={s.explication}>Sans produit, l’extension cherche « {nom} » sur le drive.</Text>
  </View>;
  return <SelecteurIngredient titre={titre} verbe="Choisir" sansProduit={false} requeteInitiale={nom} proches={produitsProches(nom, products)} entete={entete} pied={pied}
-  onFermer={onFermer} onChoisir={c => { if (c.product_id) w.validerManque(lineKey, qty, c.product_id); }} />;
+  onFermer={onFermer} onChoisir={c => { if (c.product_id) w.validerManque(lineKey, qty, c.product_id); }}
+  apres={<RechercheDrives requete={nom} autres={autres} onGarde={productId => w.validerManque(lineKey, qty, productId)} />} />;
 }
 
 /** Un doublon possible (DB1) : « Garder celui-ci » sous chaque photo ; l'autre est retiré, annulable. */

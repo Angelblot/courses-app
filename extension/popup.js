@@ -188,6 +188,7 @@ async function relireCompte() {
     return;
   }
   if (res?.ok) rendreTravaux(res.data);
+  await relireRecherches();
 }
 
 $('connexion').addEventListener('click', async () => {
@@ -245,11 +246,57 @@ $('diagnose').addEventListener('click', async () => {
   $('diag').textContent = JSON.stringify(res?.data ?? res, null, 2);
 });
 
+const LIBELLE_STATUT = { faite: 'trouvés', vide: 'rien trouvé', echec: 'échec', verification: 'vérification' };
+
+/**
+ * Les recherches demandées depuis l'app : combien attendent, l'avancement de
+ * la séance, et ce que chacune a donné. Rien ne part sans « Lancer ».
+ */
+function rendreRecherches(donnees) {
+  const etat = donnees?.etat ?? null, aFaire = donnees?.aFaire ?? 0;
+  const enCours = etat?.statut === 'en_cours';
+  $('recherches').hidden = !enCours && !aFaire && !etat?.journal?.length;
+  if ($('recherches').hidden) return;
+  $('recherches-resume').textContent = enCours
+    ? `Recherches demandées · ${etat.fait ?? 0} sur ${etat.total ?? 0} — sur ${LIBELLE_DRIVE[etat.drive] ?? etat.drive}, une toutes les 8 à 15 secondes.`
+    : aFaire
+      ? `${aFaire} recherche${aFaire > 1 ? 's' : ''} demandée${aFaire > 1 ? 's' : ''} depuis l'application, sur Carrefour puis E.Leclerc.`
+      : 'Recherches terminées : les résultats sont dans l\'application.';
+  $('recherches-progression').hidden = !enCours;
+  $('recherches-barre').style.width = enCours && etat.total ? `${Math.round(((etat.fait ?? 0) / etat.total) * 100)}%` : '0%';
+  $('recherches-message').textContent = etat?.message ?? (enCours ? '' : 'Si le drive demande une vérification, l\'extension s\'arrête et te rend la main.');
+  $('recherches-lancer').hidden = enCours || !aFaire;
+  $('recherches-lancer').textContent = etat?.statut === 'pause' ? 'Relancer les recherches' : 'Lancer les recherches';
+  $('recherches-pause').hidden = !enCours;
+  $('recherches-journal').innerHTML = '';
+  for (const j of [...(etat?.journal ?? [])].reverse().slice(0, 12)) {
+    const li = document.createElement('li');
+    li.className = j.statut === 'faite' ? 'log__item log__item--ok' : 'log__item log__item--ko';
+    li.textContent = `${j.requete} · ${LIBELLE_DRIVE[j.drive] ?? j.drive} — ${j.statut === 'faite' ? `${j.n} ${LIBELLE_STATUT.faite}` : LIBELLE_STATUT[j.statut] ?? j.statut}`;
+    $('recherches-journal').appendChild(li);
+  }
+}
+
+async function relireRecherches() {
+  const res = await send({ type: 'recherches' });
+  if (res?.ok) rendreRecherches(res.data);
+}
+
+$('recherches-lancer').addEventListener('click', async () => {
+  $('recherches-lancer').disabled = true;
+  const res = await send({ type: 'lancerRecherches' });
+  $('recherches-lancer').disabled = false;
+  if (!res?.ok) $('recherches-message').textContent = `Échec : ${res?.error ?? 'inconnu'}`;
+  await relireRecherches();
+});
+$('recherches-pause').addEventListener('click', async () => { await send({ type: 'pauseRecherches' }); await relireRecherches(); });
+
 $('resume').addEventListener('click', () => send({ type: 'resume' }));
 $('stop').addEventListener('click', () => send({ type: 'stop' }));
 
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type === 'state') render(msg.state);
+  if (msg?.type === 'recherches') relireRecherches();
 });
 
 detectSite();

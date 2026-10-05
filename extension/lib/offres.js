@@ -72,7 +72,7 @@ export function prixAuKilo(prix, contenance) {
  * Les lignes à enregistrer pour une recherche : une par carte lue, avec ce
  * qu'on en comprend. `choisi` marque le produit mis au panier.
  */
-export function offresDepuisReleve(releve, { drive, recherche, productId = null, jobId = null, choisi = null }) {
+export function offresDepuisReleve(releve, { drive, recherche, productId = null, jobId = null, choisi = null, rechercheId = null }) {
   if (!Array.isArray(releve)) return [];
   const vu = new Set();
   return releve.flatMap((c, rang) => {
@@ -87,6 +87,8 @@ export function offresDepuisReleve(releve, { drive, recherche, productId = null,
     const unitaire = lirePrixUnitaire(texte) ?? prixAuKilo(prix, contenance);
     return [{
       drive, recherche: String(recherche).slice(0, 200), product_id: productId, cart_job_id: jobId,
+      // Une recherche demandée depuis l'app : ses offres y reviennent.
+      ...(rechercheId ? { recherche_id: rechercheId } : {}),
       libelle, marque: c.marque ? String(c.marque).slice(0, 80) : null,
       ean13: c.ean && /^\d{8,14}$/.test(c.ean) ? c.ean : null,
       url: c.href ? String(c.href).slice(0, 500) : null,

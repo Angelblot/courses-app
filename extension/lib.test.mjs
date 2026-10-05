@@ -102,3 +102,35 @@ test('une fiche Leclerc mémorisée se reconnaît à son adresse, pas une recher
   assert.ok(!r.test('https://fd3-courses.leclercdrive.fr/magasin-093401-093401-Le-Cres-Montpellier/recherche.aspx?TexteRecherche=somersby'));
   assert.equal(SITES_FICHE.leclerc.productPage.addButton[0], 'a.aWCRS310_Add_Produit_Fiche');
 });
+
+import { fileDeRecherches, pauseEntreRecherches, adresseRecherche, issueRecherche } from './lib/recherches.js';
+
+test('recherches : Carrefour puis E.Leclerc, les plus anciennes d’abord, sans les faites', () => {
+  const file = fileDeRecherches([
+    { id: 'l1', drive: 'leclerc', statut: 'en_attente', demandee_le: '2026-10-05T10:00:00Z' },
+    { id: 'c2', drive: 'carrefour', statut: 'en_attente', demandee_le: '2026-10-05T10:05:00Z' },
+    { id: 'c1', drive: 'carrefour', statut: 'verification', demandee_le: '2026-10-05T09:00:00Z' },
+    { id: 'c0', drive: 'carrefour', statut: 'faite', demandee_le: '2026-10-05T08:00:00Z' },
+  ]);
+  assert.deepEqual(file.map((g) => [g.drive, g.recherches.map((r) => r.id)]), [['carrefour', ['c1', 'c2']], ['leclerc', ['l1']]]);
+  assert.deepEqual(fileDeRecherches([]), []);
+});
+
+test('recherches : une pause humaine de 8 à 15 secondes', () => {
+  assert.equal(pauseEntreRecherches(0), 8000);
+  assert.equal(pauseEntreRecherches(1), 15000);
+  assert.equal(pauseEntreRecherches(2), 15000);
+  assert.equal(pauseEntreRecherches('x'), 8000);
+});
+
+test('recherches : l’adresse suit le magasin Leclerc, et la recherche Carrefour sinon', () => {
+  assert.equal(adresseRecherche({ searchUrl: 'https://www.carrefour.fr/s?q={q}' }, null, 'papier sulfurisé'), 'https://www.carrefour.fr/s?q=papier%20sulfuris%C3%A9');
+  assert.equal(adresseRecherche({ searchUrl: 'x', searchPath: '/recherche.aspx?TexteRecherche={q}' }, 'https://fd3.leclercdrive.fr/magasin-1', 'gel'), 'https://fd3.leclercdrive.fr/magasin-1/recherche.aspx?TexteRecherche=gel');
+});
+
+test('recherches : une vérification rend la main, des offres font une recherche faite', () => {
+  assert.equal(issueRecherche({ ok: false, reason: 'challenge' }, 0), 'verification');
+  assert.equal(issueRecherche({ ok: true, reason: 'releve' }, 7), 'faite');
+  assert.equal(issueRecherche({ ok: false, reason: 'no_results' }, 0), 'vide');
+  assert.equal(issueRecherche({ ok: false, reason: 'inject_failed' }, 0), 'echec');
+});
