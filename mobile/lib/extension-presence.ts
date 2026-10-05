@@ -36,7 +36,7 @@ export function lireExtension(ligne: LignePresence | null, maintenant = Date.now
   if (ligne.activite === 'recherches' || ligne.activite === 'remplissage') {
     return { etat: ligne.activite, fait: d.fait ?? 0, total: d.total ?? 0, drive: d.drive ?? null, requete: d.requete ?? null };
   }
-  if (ligne.activite === 'pause') return { etat: 'pause', message: d.message || 'Une action t’attend sur l’ordinateur.' };
+  if (ligne.activite === 'pause') return { etat: 'pause', message: d.message || 'Une action t’attend sur ton ordinateur.' };
   return { etat: 'prete', auto: d.auto !== false };
 }
 
@@ -47,12 +47,12 @@ export function lireExtension(ligne: LignePresence | null, maintenant = Date.now
 export function texteExtension(e: EtatExtension, attendu: 'recherches' | 'remplissage'): { titre: string; consigne: string } {
   const bouton = attendu === 'recherches' ? '« Lancer les recherches »' : '« Remplir le panier »';
   switch (e.etat) {
-    case 'jamais': return { titre: 'Extension pas encore vue', consigne: 'Installe l’extension Courses dans Chrome sur l’ordinateur, et connecte-toi avec ce compte.' };
-    case 'absente': return { titre: 'Ordinateur pas vu', consigne: `Dernier signe de l’extension ${e.depuis}. Ouvre Chrome sur l’ordinateur.` };
+    case 'jamais': return { titre: 'Extension pas encore vue', consigne: 'Installe l’extension Courses dans Chrome sur ton ordinateur, et connecte-toi avec ce compte.' };
+    case 'absente': return { titre: 'Ordinateur pas vu', consigne: `Dernier signe de l’extension ${e.depuis}. Ouvre Chrome sur ton ordinateur.` };
     case 'prete': return attendu === 'recherches' && e.auto
       ? { titre: 'Chrome est ouvert', consigne: 'Les recherches partent d’elles-mêmes dans les 30 secondes.' }
       : { titre: 'Chrome est ouvert', consigne: `Dans l’extension, clique sur ${bouton}.` };
-    case 'pause': return { titre: 'Une action t’attend sur l’ordinateur', consigne: e.message };
+    case 'pause': return { titre: 'Une action t’attend', consigne: e.message };
     default: {
       const ou = e.drive ? ` sur ${NOMS[e.drive] ?? e.drive}` : '';
       if (e.etat === 'recherches') return { titre: `Recherche en cours · ${e.fait} sur ${e.total}`, consigne: e.requete ? `« ${e.requete} »${ou}, à rythme humain.` : `${ou.trim() || 'Sur tes drives'}, à rythme humain.` };

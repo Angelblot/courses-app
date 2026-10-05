@@ -11,7 +11,7 @@ import { colors } from '../lib/theme';
 const NOTES: Record<string, string> = { a: colors.nutriA, b: colors.nutriB, c: colors.nutriC, d: colors.nutriD, e: colors.nutriE };
 const NOVA = ['', colors.nutriA, colors.nutriB, colors.nutriD, colors.nutriE];
 const NIVEAU: Record<Niveau, string> = { low: colors.nutriA, moderate: colors.nutriC, high: colors.nutriE };
-const g = (v: number | null, u = 'g') => (v == null ? '—' : `${String(v).replace('.', ',')} ${u}`);
+const g = (v: number | null, u = 'g') => (v == null ? 'n.c.' : `${String(v).replace('.', ',')} ${u}`);
 const contenance = (f: FicheProduit) => f.volumeMl ? (f.volumeMl >= 1000 ? `${String(f.volumeMl / 1000).replace('.', ',')} L` : `${f.volumeMl} ml`) : f.grammageG ? `${f.grammageG} g` : null;
 
 /** Score en pastille de couleur : Nutri-Score, NOVA, Eco-Score. */
@@ -67,7 +67,7 @@ function Contenu({ fiche, proches, onChoisir, onFermer }: { fiche: FicheProduit 
         {d ? <>
           <Text style={s.section}>Pour 100 g</Text>
           <View style={s.tableau}>
-            <Rang libelle="Énergie" valeur={d.kcal != null ? `${d.kcal} kcal` : '—'} />
+            <Rang libelle="Énergie" valeur={d.kcal != null ? `${d.kcal} kcal` : 'n.c.'} />
             <Rang libelle="Matières grasses" valeur={g(d.gras)} niveau={d.niveaux.gras} />
             <Rang libelle="dont saturées" valeur={g(d.satures)} niveau={d.niveaux.satures} />
             <Rang libelle="Sucres" valeur={g(d.sucres)} niveau={d.niveaux.sucres} />
@@ -111,15 +111,15 @@ export function TableauComparatif({ colonnes, avant = [], meilleursAvant = {}, p
   const m = { ...meilleurs(colonnes.map(c => ({ nutriscore: c.nutriscore, details: c.details ?? null }))), ...meilleursAvant };
   const vert = (cle: string, i: number) => m[cle]?.includes(i);
   const lignes: LigneComparatif[] = [...avant,
-    ['nutriscore', 'Nutri-Score', c => c.nutriscore ? <PastilleNutri note={c.nutriscore} /> : <Text style={s.cellule}>—</Text>],
-    ['ecoscore', 'Eco-Score', c => c.details?.ecoscore ? <Text style={[s.mini, { backgroundColor: NOTES[c.details.ecoscore] }]}>{c.details.ecoscore.toUpperCase()}</Text> : <Text style={s.cellule}>—</Text>],
-    ['nova', 'NOVA', c => <Text style={s.cellule}>{c.details?.nova ?? '—'}</Text>],
-    ['kcal', 'Énergie', c => <Text style={s.cellule}>{c.details?.kcal != null ? `${c.details.kcal} kcal` : '—'}</Text>],
+    ['nutriscore', 'Nutri-Score', c => c.nutriscore ? <PastilleNutri note={c.nutriscore} /> : <Text style={s.cellule}>n.c.</Text>],
+    ['ecoscore', 'Eco-Score', c => c.details?.ecoscore ? <Text style={[s.mini, { backgroundColor: NOTES[c.details.ecoscore] }]}>{c.details.ecoscore.toUpperCase()}</Text> : <Text style={s.cellule}>n.c.</Text>],
+    ['nova', 'NOVA', c => <Text style={s.cellule}>{c.details?.nova ?? 'n.c.'}</Text>],
+    ['kcal', 'Énergie', c => <Text style={s.cellule}>{c.details?.kcal != null ? `${c.details.kcal} kcal` : 'n.c.'}</Text>],
     ['gras', 'Gras', c => <Text style={s.cellule}>{g(c.details?.gras ?? null)}</Text>],
     ['satures', 'Saturés', c => <Text style={s.cellule}>{g(c.details?.satures ?? null)}</Text>],
     ['sucres', 'Sucres', c => <Text style={s.cellule}>{g(c.details?.sucres ?? null)}</Text>],
     ['sel', 'Sel', c => <Text style={s.cellule}>{g(c.details?.sel ?? null)}</Text>],
-    ['allergenes', 'Allergènes', c => <Text style={[s.cellule, { fontSize: 11 }]}>{c.details ? c.details.allergenes.join(', ') || 'aucun' : '—'}</Text>],
+    ['allergenes', 'Allergènes', c => <Text style={[s.cellule, { fontSize: 11 }]}>{c.details ? c.details.allergenes.join(', ') || 'aucun' : 'n.c.'}</Text>],
   ];
   // Une ligne vide pour tous (Nutri-Score d'un papier cuisson) n'apprend rien : on la retire.
   const connu: Record<string, (c: FicheProduit) => boolean> = {

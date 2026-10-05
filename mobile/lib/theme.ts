@@ -28,7 +28,8 @@ export const colors = {
   // Bouton désactivé : gris neutre, sans la teinte verte. À 50 % d'opacité,
   // le vert plein devenait un sauge qu'on prenait pour un bouton secondaire.
   off: '#ECEEE9',
-  offText: '#6B7266',
+  // 4,5:1 sur off : le libellé d'un bouton désactivé sert souvent de consigne.
+  offText: '#636A5E',
   // Ce qui attend un geste sans être une erreur : un manque noté à la main.
   attention: '#C9A227',
   attentionSoft: '#FBF1D3',

@@ -15,7 +15,7 @@ test('extension : jamais vue, absente au-delà de trois minutes, prête sinon', 
 test('extension : une séance qui avance, et la pause qui attend une main', () => {
   assert.deepEqual(lireExtension(ligne('recherches', 0, { fait: 3, total: 34, drive: 'carrefour', requete: 'Gel intime' }), T),
     { etat: 'recherches', fait: 3, total: 34, drive: 'carrefour', requete: 'Gel intime' });
-  assert.deepEqual(lireExtension(ligne('pause', 1, {}), T), { etat: 'pause', message: 'Une action t’attend sur l’ordinateur.' });
+  assert.deepEqual(lireExtension(ligne('pause', 1, {}), T), { etat: 'pause', message: 'Une action t’attend sur ton ordinateur.' });
 });
 
 test('extension : la consigne dit quel bouton cliquer selon ce qui est confié', () => {

@@ -1,4 +1,5 @@
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { AccessibilityInfo, ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { texteExtension, type EtatExtension as Etat } from '../lib/extension-presence.ts';
 import { colors } from '../lib/theme';
@@ -9,8 +10,11 @@ import { colors } from '../lib/theme';
  * seul change le bouton à cliquer dans l'extension.
  */
 export function EtatExtension({ etat, attendu, compact = false }: { etat: Etat | null; attendu: 'recherches' | 'remplissage'; compact?: boolean }) {
-  if (!etat) return null;
-  const { titre, consigne } = texteExtension(etat, attendu);
+  const textes = etat ? texteExtension(etat, attendu) : null;
+  // VoiceOver n'a pas de région live : on annonce les changements d'état (pas chaque pas de l'avancement).
+  useEffect(() => { if (Platform.OS === 'ios' && textes && etat?.etat !== 'jamais') AccessibilityInfo.announceForAccessibility(`${textes.titre}. ${textes.consigne}`); }, [etat?.etat]);
+  if (!etat || !textes) return null;
+  const { titre, consigne } = textes;
   const avance = etat.etat === 'recherches' || etat.etat === 'remplissage';
   const ton = etat.etat === 'pause' ? 'attention' : etat.etat === 'absente' || etat.etat === 'jamais' ? 'eteint' : 'actif';
   const part = avance && etat.total ? Math.min(1, etat.fait / etat.total) : 0;

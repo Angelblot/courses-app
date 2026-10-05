@@ -20,7 +20,7 @@ export function useCommandes(cle?: unknown) {
         .order('vu_le', { ascending: false }).limit(5000),
     ]);
     if (f.error || t.error || o.error) { console.error('[commandes]', f.error ?? t.error ?? o.error); setErreur('Impossible de charger tes commandes. Réessaie.'); }
-    else { setErreur(null); setCommandes(toutesCommandes(commandesDesFactures(f.data ?? []), commandesDesPaniers(t.data ?? [], o.data ?? []))); }
+    else { setErreur(null); setCommandes(toutesCommandes(commandesDesFactures(f.data ?? []), commandesDesPaniers(Array.isArray(t.data) ? t.data : [], Array.isArray(o.data) ? o.data : []))); }
     setChargement(false);
   }, []);
   useEffect(() => { void recharger(); }, [recharger, cle]);

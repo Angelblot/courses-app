@@ -196,7 +196,7 @@ const s = StyleSheet.create({
   plusContour: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.accent },
   vide: { fontSize: 14, color: colors.textMuted, paddingHorizontal: 16, paddingVertical: 8 },
   attente: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  pied: { position: 'absolute', left: 0, right: 0, paddingHorizontal: 16, paddingTop: 10, backgroundColor: colors.bg },
+  pied: { position: 'absolute', left: 0, right: 0, paddingHorizontal: 16, paddingTop: 10, backgroundColor: colors.bg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   sansProduit: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.accent },
   sansProduitTitre: { fontSize: 15, fontWeight: '600', color: colors.accent },
 });

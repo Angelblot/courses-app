@@ -44,12 +44,12 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
  await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd1-encart.png'});
  await chercher.click();
  // 2. Envoyée : une recherche par drive, l'état de chacun, et « Tout envoyer » pour l'autre point.
- await page.getByText('Recherche envoyée',{exact:true}).waitFor();
+ await page.getByText('Recherche en file',{exact:true}).waitFor();
  const deux=JSON.stringify(ecrit.recherches.map(r=>[r.drive,r.requete]));
  if(deux!==JSON.stringify([['carrefour','Papier sulfurisé'],['leclerc','Papier sulfurisé']]))throw Error('Mauvaises recherches '+deux);
- if(await page.getByText('pas encore lancée',{exact:true}).count()!==2)throw Error('États des drives absents');
- await btn('Chercher aussi les 1 autres points sur les drives').click();
- await page.getByText('Les autres sont envoyés aussi',{exact:true}).waitFor();
+ if(await page.getByText('en file',{exact:true}).count()!==1)throw Error('État des drives absent');
+ await btn('Chercher aussi l’autre point sur les drives').click();
+ await page.getByText('L’autre point est en file aussi',{exact:true}).waitFor();
  if(ecrit.recherches.length!==4||ecrit.recherches[3].requete!=='Gel intime')throw Error('Lot mal envoyé '+JSON.stringify(ecrit.recherches));
  // Le pied dit où en est l'extension (vue il y a un instant, prête) et propose de passer au suivant.
  await page.getByText('Chrome est ouvert',{exact:true}).waitFor();
@@ -72,15 +72,15 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
  await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd3-resultats.png'});
  await comparer.click();
  // 4. Comparatif : il s'adapte au produit (contenance en mètres, prix au mètre), cite la fiche ouverte et en tire l'essentiel.
- await page.getByText('Choisis un produit par drive, ou un seul pour les deux.',{exact:true}).waitFor();
+ await page.getByText('Garde un produit par drive, ou un seul pour les deux. Un 2ᵉ sur le même drive remplace le 1er.',{exact:true}).waitFor();
  await page.getByText('Prix au mètre',{exact:true}).waitFor();await page.getByText('0,17 €/m',{exact:true}).waitFor();
- await page.getByText('Open Products Facts',{exact:true}).waitFor({timeout:15000});
- await page.getByText('Le moins cher au mètre : Papier cuisson Repère 8 m, 0,17 €/m, 42 % de moins que le plus cher.',{exact:true}).waitFor();
+ await page.getByText(/Repères : Open Products Facts\./).waitFor({timeout:15000});
+ await page.getByText('Le moins cher au mètre : Papier cuisson Repère 8 m, 0,17 €/m, 42\u00a0% de moins que le plus cher.',{exact:true}).waitFor();
  // Un choix par drive ; un 2e choix Carrefour remplace le 1er.
- await page.getByRole('button',{name:'Choisir Papier cuisson sulfurisé Carrefour 8 m pour Carrefour'}).click();
- await page.getByRole('button',{name:'Choisir Papier cuisson Albal 10 m pour Carrefour'}).click();
- if(await page.getByRole('button',{name:'Retirer le choix de Papier cuisson sulfurisé Carrefour 8 m pour Carrefour'}).count())throw Error('Deux choix Carrefour');
- await page.getByRole('button',{name:'Choisir Papier cuisson Repère 8 m pour E.Leclerc'}).click();
+ await page.getByRole('button',{name:'Garder Papier cuisson sulfurisé Carrefour 8 m pour Carrefour'}).click();
+ await page.getByRole('button',{name:'Garder Papier cuisson Albal 10 m pour Carrefour'}).click();
+ if(await page.getByRole('button',{name:'Ne plus garder Papier cuisson sulfurisé Carrefour 8 m pour Carrefour'}).count())throw Error('Deux choix Carrefour');
+ await page.getByRole('button',{name:'Garder Papier cuisson Repère 8 m pour E.Leclerc'}).click();
  await btn('Garder ces 2 produits').waitFor();
  await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd4-comparer.png'});
  await btn('Garder ces 2 produits').click();

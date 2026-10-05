@@ -22,7 +22,7 @@ test('recherche drive : les phases du parcours', () => {
 
 test('recherche drive : la ligne d’état de chaque drive', () => {
   assert.equal(libelleStatut(undefined), 'pas demandée');
-  assert.equal(libelleStatut(rech('a', 'carrefour', 'en_attente', '1')), 'pas encore lancée');
+  assert.equal(libelleStatut(rech('a', 'carrefour', 'en_attente', '1')), 'en file');
   assert.equal(libelleStatut(rech('a', 'carrefour', 'faite', '1', 1)), '1 trouvé');
   assert.equal(libelleStatut(rech('a', 'carrefour', 'faite', '1', 7)), '7 trouvés');
   assert.equal(libelleStatut(rech('a', 'leclerc', 'vide', '1')), 'rien trouvé');

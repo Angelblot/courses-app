@@ -54,7 +54,7 @@ export function phase(recherches: RechercheDrive[], offres: OffreRelevee[]): 'au
 export function libelleStatut(r: RechercheDrive | undefined): string {
   if (!r) return 'pas demandée';
   switch (r.statut) {
-    case 'en_attente': return 'pas encore lancée';
+    case 'en_attente': return 'en file';
     case 'en_cours': return 'recherche en cours…';
     case 'verification': return 'vérification à faire dans Chrome';
     case 'faite': return `${r.resultats ?? 0} trouvé${(r.resultats ?? 0) > 1 ? 's' : ''}`;

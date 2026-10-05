@@ -28,6 +28,7 @@ export default function Envoye() {
  const { travail } = useSuiviTravail(id ?? null);
  // L'ordinateur vu d'ici : est-il là, et que fait l'extension ? (synchronisation dans les deux sens)
  const extension = useExtension();
+ const chromeOuvert = extension?.etat === 'prete';
  const total = Number(n) || 0, noms = (drives ?? '').split(',').filter(Boolean).map(d => NOMS[d] ?? d);
  const [envoyee, prise, remplie] = etapesEnvoi(travail?.status);
  // L'heure d'envoi vient de la feuille d'envoi ; à défaut, l'heure d'arrivée ici.
@@ -46,7 +47,11 @@ export default function Envoye() {
  const etapes: { etat: EtapeEnvoi; titre: string; detail: string; aide?: boolean; attente?: boolean }[] = [
   { etat: envoyee, titre: 'Liste envoyée', detail: `${total} produit${total > 1 ? 's' : ''}, à ${heure}` },
   // Tant que l'ordinateur n'a rien relevé, on attend calmement : il est peut-être éteint.
-  { etat: prise, titre: prise === 'fait' ? 'Ton ordinateur a pris la liste' : 'En attente de ton ordinateur', detail: prise === 'fait' ? 'L’extension Chrome l’a relevée.' : 'Ouvre Chrome quand tu veux : l’extension la relèvera.', aide: prise === 'encours', attente: prise === 'encours' },
+  // L'étape dit ce que l'extension voit : Chrome ouvert, ordinateur pas vu depuis…, ou rien de connu.
+  { etat: prise, titre: prise === 'fait' ? 'Ton ordinateur a pris la liste' : chromeOuvert ? 'Chrome est ouvert' : 'En attente de ton ordinateur',
+   detail: prise === 'fait' ? 'L’extension Chrome l’a relevée.' : chromeOuvert ? 'Dans l’extension, clique sur « Remplir le panier ».'
+    : extension?.etat === 'absente' ? `Dernier signe ${extension.depuis}. Ouvre Chrome quand tu veux : l’extension la relèvera.` : 'Ouvre Chrome quand tu veux : l’extension la relèvera.',
+   aide: prise === 'encours' && !chromeOuvert, attente: prise === 'encours' && !chromeOuvert },
   { etat: remplie, titre: remplie === 'fait' ? 'Panier rempli' : 'Remplir le panier', detail: remplie === 'avenir' ? 'Tu vérifies puis paies sur le site du drive.' : travail ? resume(travail) : '' },
  ];
  return <SafeAreaView style={ui.screen}>
@@ -67,7 +72,8 @@ export default function Envoye() {
      {t.aide && <Pressable accessibilityRole="button" onPress={() => { void Share.share({ message: CONSIGNES_EXTENSION }); }} style={e.aide}><Text style={ui.link}>Elle n’est pas installée ?</Text></Pressable>}
     </View>)}
    </View>}
-   {!plusieurs && remplie !== 'fait' && remplie !== 'erreur' && <EtatExtension etat={extension} attendu="remplissage" />}
+   {/* Le bandeau ne double pas l'étape : il ne montre que l'avancement en direct ou une main attendue. */}
+   {!plusieurs && (extension?.etat === 'remplissage' || extension?.etat === 'pause') && <EtatExtension etat={extension} attendu="remplissage" />}
    {plusieurs && <VerdictDrives comparaison={comparerDrives(commande!)} introuvables={introuvables}
     historique={commande!.drives.map(d => { const h = comparerHistorique(commande!, commandes, d); return { drive: d, ecart: h.ecart, communs: h.communs }; })}
     onDrive={d => router.push({ pathname: '/commandes/[id]', params: { id: commande!.id, drive: d } })} />}

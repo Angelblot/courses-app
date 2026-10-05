@@ -36,7 +36,7 @@ export function analyser(colonnes: ColonneAnalyse[], unite: Unite | null): strin
     const i = unitaires[0], c = colonnes[i];
     const max = Math.max(...colonnes.flatMap(x => (x.prixUnite != null ? [x.prixUnite] : [])));
     const ecart = Math.round((1 - c.prixUnite! / max) * 100);
-    phrases.push(`${libellePrixUnitaire(unite).replace('Prix', 'Le moins cher')} : ${nomCourt(c.nom)}, ${prixUnitaireLisible(c.prixUnite!, unite)}${ecart >= 5 ? `, ${ecart} % de moins que le plus cher` : ''}.`);
+    phrases.push(`${libellePrixUnitaire(unite).replace('Prix', 'Le moins cher')} : ${nomCourt(c.nom)}, ${prixUnitaireLisible(c.prixUnite!, unite)}${ecart >= 5 ? `, ${ecart}\u00a0% de moins que le plus cher` : ''}.`);
     const moinsChere = plusPetits(colonnes.map(x => x.prix));
     if (moinsChere.length === 1 && moinsChere[0] !== i && colonnes[moinsChere[0]].prixUnite != null) {
       phrases.push(`${nomCourt(colonnes[moinsChere[0]].nom)} coûte moins à l’achat, mais revient plus cher ${libellePrixUnitaire(unite).replace('Prix ', '')}.`);
@@ -54,7 +54,7 @@ export function analyser(colonnes: ColonneAnalyse[], unite: Unite | null): strin
   const nova = plusPetits(colonnes.map(c => c.nova));
   if (nova.length === 1) phrases.push(`Le moins transformé : ${nomCourt(colonnes[nova[0]].nom)} (NOVA ${colonnes[nova[0]].nova}).`);
   const promo = colonnes.find(c => c.promotion);
-  if (promo) phrases.push(`En promotion : ${nomCourt(promo.nom)}, ${promo.promotion}.`);
+  if (promo) phrases.push(`En promotion : ${nomCourt(promo.nom)}, ${promo.promotion!.replace(/ %/g, '\u00a0%')}.`);
   const absent = colonnes.find(c => !c.disponible);
   if (absent) phrases.push(`Indisponible au drive : ${nomCourt(absent.nom)}.`);
   return phrases.slice(0, 4);

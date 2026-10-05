@@ -6,7 +6,7 @@ const col = (nom, prix, prixUnite, extra = {}) => ({ nom, prix, prixUnite, nutri
 
 test('analyse : le moins cher à mesure égale, et de combien', () => {
   const p = analyser([col('CARREFOUR Papier cuisson 15 m CARREFOUR', 1.79, 0.119), col('Papier Repère 8 m', 1.39, 0.174), col('Albal 10 m', 1.95, 0.195)], 'm');
-  assert.equal(p[0], 'Le moins cher au mètre : CARREFOUR Papier cuisson 15 m, 0,12 €/m, 39 % de moins que le plus cher.');
+  assert.equal(p[0], 'Le moins cher au mètre : CARREFOUR Papier cuisson 15 m, 0,12 €/m, 39\u00a0% de moins que le plus cher.');
   // Le moins cher à l'achat n'est pas le moins cher au mètre : on le dit.
   assert.equal(p[1], 'Papier Repère 8 m coûte moins à l’achat, mais revient plus cher au mètre.');
 });
@@ -18,7 +18,7 @@ test('analyse : sans mesure commune, le prix seul et une mise en garde', () => {
 
 test('analyse : Nutri-Score, NOVA, promotion et indisponibilité quand ils départagent', () => {
   const p = analyser([col('Yaourt A', 2, 4, { nutriscore: 'a', nova: 1 }), col('Yaourt B', 2, 4, { nutriscore: 'c', nova: 4, promotion: '-30 % le 2e', disponible: false })], 'g');
-  assert.deepEqual(p, ['Meilleur Nutri-Score : Yaourt A (A).', 'Le moins transformé : Yaourt A (NOVA 1).', 'En promotion : Yaourt B, -30 % le 2e.', 'Indisponible au drive : Yaourt B.']);
+  assert.deepEqual(p, ['Meilleur Nutri-Score : Yaourt A (A).', 'Le moins transformé : Yaourt A (NOVA 1).', 'En promotion : Yaourt B, -30\u00a0% le 2e.', 'Indisponible au drive : Yaourt B.']);
 });
 
 test('analyse : utilitaires', () => {
