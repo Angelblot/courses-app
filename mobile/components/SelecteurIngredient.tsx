@@ -26,6 +26,9 @@ type Props = {
   onFermer: () => void;
   /** Titre de la feuille (« Ajouter un ingrédient » par défaut). */
   titre?: string;
+  /** Préciser : le chevron « point précédent ». Absent : pas de chevron ; null : premier point, chevron grisé. */
+  onPrecedent?: (() => void) | null;
+  libellePrecedent?: string;
   /** « Ajouter « x » sans produit » : faux pour une alternative, qui doit être un produit. */
   sansProduit?: boolean;
   /** Produits proposés avant la frappe, sous « Même type dans tes produits ». */
@@ -79,7 +82,7 @@ function useHauteurClavier() {
  * après une pause de frappe. « Ajouter « x » sans produit » reste collé en
  * bas, au-dessus du clavier.
  */
-export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un ingrédient', sansProduit = true, suggestions = [], exclure = [], requeteInitiale = '', proches = [], entete, pied, scan = Platform.OS !== 'web', verbe = 'Ajouter', apres, basesOuvertes = true }: Props) {
+export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un ingrédient', sansProduit = true, suggestions = [], exclure = [], requeteInitiale = '', proches = [], entete, pied, scan = Platform.OS !== 'web', verbe = 'Ajouter', apres, basesOuvertes = true, onPrecedent, libellePrecedent }: Props) {
   const { produits, recharger } = useProducts();
   const insets = useSafeAreaInsets(), clavier = useHauteurClavier();
   const [requete, setRequete] = useState(requeteInitiale), [focus, setFocus] = useState(false), [scanner, setScanner] = useState(false);
@@ -126,7 +129,8 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
   return (
     <View style={s.feuille} onLayout={e => setLargeur(e.nativeEvent.layout.width)}>
       <View style={s.entete}>
-        <Text style={s.titre} accessibilityRole="header" numberOfLines={1}>{titre}</Text>
+        {onPrecedent !== undefined && <Precedent onPress={onPrecedent} libelle={libellePrecedent} />}
+        <Text style={[s.titre, onPrecedent !== undefined && { flex: 1 }]} accessibilityRole="header" numberOfLines={1}>{titre}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} style={s.fermer}><View style={s.fermerRond}><Feather name="x" size={18} color={colors.text} /></View></Pressable>
       </View>
       {entete}
@@ -180,11 +184,20 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
   );
 }
 
+/** Le chevron qui ramène au point d'avant dans Préciser ; grisé au premier. */
+export function Precedent({ onPress, libelle = 'Point précédent' }: { onPress: (() => void) | null; libelle?: string }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={libelle} accessibilityState={{ disabled: !onPress }} disabled={!onPress} onPress={onPress ?? undefined}
+    style={({ pressed }) => [s.precedent, pressed && { opacity: .7 }]}>
+    <View style={[s.fermerRond, !onPress && { backgroundColor: 'transparent', opacity: .45 }]}><Feather name="chevron-left" size={20} color={onPress ? colors.text : colors.traitControle} /></View>
+  </Pressable>;
+}
+
 const s = StyleSheet.create({
   feuille: { flex: 1, backgroundColor: colors.bg },
   entete: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 16, paddingRight: 8, paddingTop: 12, paddingBottom: 8 },
   titre: { fontSize: 20, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
   fermer: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  precedent: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: -6, marginRight: 2 },
   fermerRond: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.off, alignItems: 'center', justifyContent: 'center' },
   champ: { marginHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.traitControle, backgroundColor: colors.surface },
   champActif: { borderWidth: 2, borderColor: colors.accent },

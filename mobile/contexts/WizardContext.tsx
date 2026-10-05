@@ -1,4 +1,4 @@
-import { abandonner, cleDistinct, etapeDeReprise, manquesDuBrouillon, restaurerHabitude, type InstantaneHabitude, type Manque, type SessionStep } from '../lib/session-courses';
+import { abandonner, cleDistinct, etapeDeReprise, manquesDuBrouillon, restaurerHabitude, rouvrirManque as rouvrir, type InstantaneHabitude, type Manque, type SessionStep } from '../lib/session-courses';
 import { retenirFrequent, type Frequent } from '../lib/extras-frequents';
 import { WidgetSync } from '../components/WidgetSync';
 import { importerAjouts } from '../lib/widget-products';
@@ -59,6 +59,10 @@ type Contexte = Etat & {
   demarrerSession: () => void;
   allerEtape: (etape: SessionStep) => void;
   validerManque: (key: string, quantity: number, productId?: string) => void;
+  /** Défait le règlement d'un manque, depuis l'état d'avant (« Changer » dans Préciser). */
+  rouvrirManque: (key: string, avant: Etat, productId?: string) => void;
+  /** Oublie une paire déclarée distincte : le doublon se repose. */
+  oublierDistinct: (a: string, b: string) => void;
   accepterDoublon: (id: string) => void;
   declarerDistinct: (a: string, b: string) => void;
   pret: boolean; sauvegardeErreur: string | null;
@@ -273,6 +277,8 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   const retenirEnvoi = useCallback((id?: string) => setEtat(e => ({ ...e, envoiEnDoute: id })), []);
   const allerEtape = useCallback((sessionEtape: SessionStep) => setEtat(e => ({ ...e, sessionEtape })), []);
   const declarerDistinct = useCallback((a: string, b: string) => setEtat(e => ({ ...e, distincts: [...(e.distincts ?? []), cleDistinct(a, b)] })), []);
+  const rouvrirManque = useCallback((key: string, avant: Etat, productId?: string) => setEtat(e => rouvrir(e, avant, key, productId)), []);
+  const oublierDistinct = useCallback((a: string, b: string) => setEtat(e => ({ ...e, distincts: (e.distincts ?? []).filter(d => d !== cleDistinct(a, b)) })), []);
   const accepterDoublon = useCallback((id: string) => setEtat(e=>({...e,doublonsValides:[...(e.doublonsValides??[]),id]})),[]);
   const validerManque = useCallback((key: string, quantity: number, productId?: string) => setEtat(e => {
     const qty = Math.max(1, Math.round(quantity));
@@ -305,12 +311,12 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   }, []);
 
   const valeur = useMemo<Contexte>(() => ({
-    ...etat, demarrerSession, allerEtape, validerManque, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes,
+    ...etat, demarrerSession, allerEtape, validerManque, rouvrirManque, oublierDistinct, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes,
     toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser, retenirEnvoi,
     abandonnerSession, abandonEnAttente: avantAbandon !== null, annulerAbandon, oublierAbandon, voirReprise, annulerRepriseRappels, actualiserAjouts, compte: userId,
   }), [
-    etat, demarrerSession, allerEtape, validerManque, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
+    etat, demarrerSession, allerEtape, validerManque, rouvrirManque, oublierDistinct, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
     ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser, retenirEnvoi,
     abandonnerSession, avantAbandon, annulerAbandon, oublierAbandon, voirReprise, annulerRepriseRappels, actualiserAjouts, userId,
   ]);

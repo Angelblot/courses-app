@@ -139,3 +139,31 @@ export function produitsProches<P extends { name: string; product_type?: string 
   return mots.some(m => n.some(x => x.startsWith(m) || m.startsWith(x) && x.length >= 4));
  }).slice(0, max);
 }
+
+/**
+ * Défait le règlement d'un manque (« Changer » dans Préciser) : remet, depuis
+ * l'état d'avant, les seules clés que `validerManque` a touchées pour ce
+ * point. Ce qui a été réglé depuis sur d'autres points reste en place.
+ */
+export function rouvrirManque(e: Etat, avant: Etat, key: string, productId?: string): Etat {
+ const cible = productId ? `produit:${productId}` : key;
+ const remettre = <T,>(table: Record<string, T>, source: Record<string, T>, cles: string[]) => {
+  const t = { ...table };
+  for (const k of cles) { if (k in source) t[k] = source[k]; else delete t[k]; }
+  return t;
+ };
+ const lignes = [key, cible], ids = [productId, key.startsWith('produit:') ? key.slice(8) : null].filter((x): x is string => !!x);
+ const extraAvant = avant.extras.find(x => `extra:${x.id}` === key);
+ const extras = key.startsWith('extra:')
+  ? extraAvant ? [...e.extras.filter(x => x.id !== extraAvant.id), extraAvant] : e.extras.filter(x => `extra:${x.id}` !== key)
+  : e.extras;
+ return {
+  ...e,
+  manques: remettre(manquesDuBrouillon(e), manquesDuBrouillon(avant), lignes),
+  quotidien: remettre(e.quotidien, avant.quotidien, ids),
+  quotidienQty: remettre(e.quotidienQty, avant.quotidienQty, ids),
+  ligneQuantites: remettre(e.ligneQuantites, avant.ligneQuantites, lignes),
+  lignePossedees: remettre(e.lignePossedees, avant.lignePossedees, lignes),
+  extras,
+ };
+}
