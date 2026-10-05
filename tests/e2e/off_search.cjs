@@ -1,5 +1,6 @@
 const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
+const PORT=process.env.PORT||'8082';
 const user={id:'11111111-1111-4111-8111-111111111111',aud:'authenticated',role:'authenticated',email:'demo@example.test'};
 const token=['eyJhbGciOiJIUzI1NiJ9',Buffer.from(JSON.stringify({sub:user.id,exp:Math.floor(Date.now()/1000)+36000,role:'authenticated'})).toString('base64url'),'demo'].join('.');
 const session={access_token:token,refresh_token:'demo',expires_in:36000,expires_at:Math.floor(Date.now()/1000)+36000,token_type:'bearer',user};
@@ -16,16 +17,19 @@ const session={access_token:token,refresh_token:'demo',expires_in:36000,expires_
    if(q==='biscuits'&&appels[q]===1)return route.fulfill({status:503,body:'maintenance'});
    return route.fulfill({json:{products:[{code:'1234567890123',product_name:`Produit ${q}`,brands:'Test'}]}}).catch(()=>{});
   });
-  await page.goto('http://localhost:8084/ajout');const input=page.getByRole('textbox',{name:'Produit manquant'});
-  await input.fill('biscuits');await input.press('Enter');
+  await page.goto(`http://localhost:${PORT}/ajout`);const input=page.getByRole('textbox',{name:'Produit manquant'});
+  // Entrée note le manque tel quel : la recherche part du bouton dédié.
+  const chercher=q=>page.getByRole('button',{name:`Chercher « ${q} » sur Open Food Facts`,exact:true}).click();
+  await input.fill('biscuits');await chercher('biscuits');
   await page.getByText('Produit biscuits',{exact:true}).waitFor();assert.equal(appels.biscuits,2);assert.equal(await input.evaluate(e=>document.activeElement===e),false);
-  await input.fill('ancien');await input.press('Enter');await staleStarted;
-  await input.fill('biscuits');releaseStale();await input.press('Enter');await page.getByText('Produit biscuits',{exact:true}).waitFor();
+  await input.fill('ancien');await chercher('ancien');await staleStarted;
+  await input.fill('biscuits');releaseStale();await chercher('biscuits');await page.getByText('Produit biscuits',{exact:true}).waitFor();
   assert.equal(appels.biscuits,2);assert.equal(await page.getByText('Produit ancien',{exact:true}).count(),0);
-  await page.goto('http://localhost:8084/recettes/nouvelle');await page.getByRole('button',{name:'Ajouter un ingrédient',exact:true}).click();
-  const ingredient=page.getByPlaceholder('Lardons, crème, spaghetti…');await ingredient.fill('creme');await ingredient.press('Enter');await page.getByText('Produit creme',{exact:true}).waitFor();
+  await page.goto(`http://localhost:${PORT}/nouvelle-recette`);await page.getByRole('button',{name:'Ajouter un ingrédient',exact:true}).click();
+  const ingredient=page.getByPlaceholder('Lardons, crème, spaghetti…');// La recherche d'ingrédient part seule, après une courte pause de frappe.
+  await ingredient.fill('creme');await page.getByText('Produit creme',{exact:true}).waitFor();
   await ingredient.fill('tomates');assert.equal(await page.getByText('Produit creme',{exact:true}).count(),0);
-  await ingredient.press('Enter');await page.getByText('Produit tomates',{exact:true}).waitFor();
+  await page.getByText('Produit tomates',{exact:true}).waitFor();
   assert.deepEqual(errors,[]);console.log('PASS: automatic 503 retry, keyboard blur, cached results, stale response suppression, ingredient search reset');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});
