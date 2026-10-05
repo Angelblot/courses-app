@@ -4,7 +4,8 @@ import { SafeAreaProvider, SafeAreaView, initialWindowMetrics, useSafeAreaInsets
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
-import { lookupEan, type FicheProduit } from '../lib/openfoodfacts.ts';
+import { type FicheProduit } from '../lib/openfoodfacts.ts';
+import { chercherCodeBarres } from '../stores/code-barres';
 import { colors } from '../lib/theme';
 
 /**
@@ -23,10 +24,10 @@ export function ScanRapide({ visible, onFermer, onFiche }: { visible: boolean; o
     if (verrou.current) return;
     verrou.current = true; setLecture(true); setMessage(null);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const r = await lookupEan(data);
+    const r = await chercherCodeBarres(data);
     setLecture(false);
     if (r.etat === 'trouve') { onFiche(r.fiche); return; }
-    setMessage(r.etat === 'inconnu' ? 'Ce code-barres n’est pas sur Open Food Facts. Cherche le produit par son nom.' : 'Connexion indisponible. Réessaie dans un instant.');
+    setMessage(r.etat === 'inconnu' ? 'Ce code-barres n’est ni sur Open Food Facts ni dans ce que tes drives ont montré. Cherche le produit par son nom.' : 'Connexion indisponible. Réessaie dans un instant.');
   };
 
   // La modale plein écran a sa propre fenêtre : sans fournisseur, les marges

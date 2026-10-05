@@ -25,6 +25,11 @@ export type FicheProduit = {
   nutriscore: NoteNutri | null;
   /** Repères nutritionnels, scores et allergènes, quand Open Food Facts les a (appui long sur un résultat). */
   details?: Details;
+  /**
+   * D'où vient la fiche quand ce n'est pas Open Food Facts : « Open Beauty
+   * Facts », ou « Vu chez Carrefour · 12 sept. · 3,49 € ». Affichée au scan.
+   */
+  origine?: string;
 };
 
 type OffData = OffNutrition & {
@@ -128,7 +133,17 @@ export function mapOffProduct(ean: string, data: OffData): FicheProduit | null {
   };
 }
 
-const URL_OFF = 'https://world.openfoodfacts.org/api/v2/product';
+/**
+ * Les bases ouvertes interrogées pour un code-barres, dans l'ordre. Open Food
+ * Facts n'a que l'alimentaire : l'hygiène et les cosmétiques (gel intime,
+ * dentifrice) sont sur Open Beauty Facts, l'entretien et la maison sur Open
+ * Products Facts. Même API, même format de réponse.
+ */
+const BASES = [
+  { url: 'https://world.openfoodfacts.org/api/v2/product', nom: null },
+  { url: 'https://world.openbeautyfacts.org/api/v2/product', nom: 'Open Beauty Facts' },
+  { url: 'https://world.openproductsfacts.org/api/v2/product', nom: 'Open Products Facts' },
+] as const;
 const CHAMPS = `product_name,brands,image_url,product_quantity,categories_tags,nutriscore_grade,${CHAMPS_DETAILS}`;
 
 // Délai avant d'abandonner la requête. La source Python (enrich_ean.py) pose
@@ -160,12 +175,28 @@ export type ResultatRecherche =
   | { etat: 'inconnu' }
   | { etat: 'hors_ligne' };
 
-/** Interroge Open Food Facts pour un code-barres. Voir `ResultatRecherche`. */
+/**
+ * Interroge Open Food Facts pour un code-barres, puis, s'il ne le connaît pas,
+ * Open Beauty Facts et Open Products Facts en parallèle. Voir `ResultatRecherche`.
+ *
+ * Seul Open Food Facts décide de `hors_ligne` : s'il est injoignable, le
+ * réseau l'est sans doute aussi. Une base sœur en panne compte pour
+ * `inconnu` : elle n'est qu'un recours, pas une raison de mettre en attente.
+ */
 export async function lookupEan(ean: string): Promise<ResultatRecherche> {
+  const premier = await interrogerBase(BASES[0].url, ean);
+  if (premier.etat !== 'inconnu') return premier;
+  const recours = await Promise.all(BASES.slice(1).map(async b => ({ b, r: await interrogerBase(b.url, ean) })));
+  const trouve = recours.find(x => x.r.etat === 'trouve');
+  if (trouve?.r.etat === 'trouve') return { etat: 'trouve', fiche: { ...trouve.r.fiche, origine: trouve.b.nom ?? undefined } };
+  return { etat: 'inconnu' };
+}
+
+async function interrogerBase(base: string, ean: string): Promise<ResultatRecherche> {
   const controleur = new AbortController();
   const minuteur = setTimeout(() => controleur.abort(), DELAI_MS);
   try {
-    const reponse = await fetch(`${URL_OFF}/${ean}.json?fields=${CHAMPS}`, {
+    const reponse = await fetch(`${base}/${ean}.json?fields=${CHAMPS}`, {
       headers: { 'User-Agent': 'courses-app/1.0 (usage familial)' },
       signal: controleur.signal,
     });
@@ -247,6 +278,9 @@ export function creerRechercheParNom({
     });
     const url = 'https://world.openfoodfacts.org/cgi/search.pl'
       + `?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1`
+      // Produits vendus en France : sans ce filtre, « Intima » remonte des
+      // lingettes italiennes et des lessives portugaises.
+      + '&tagtype_0=countries&tag_contains_0=contains&tag_0=france'
       + `&page_size=12&fields=${CHAMPS},code`;
     try {
       for (let tentative = 1; tentative <= 3 && !global.signal.aborted; tentative++) {

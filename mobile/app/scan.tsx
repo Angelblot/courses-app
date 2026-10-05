@@ -6,7 +6,8 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FicheScannee } from '../components/FicheScannee';
-import { lookupEan, type FicheProduit, type ResultatRecherche } from '../lib/openfoodfacts.ts';
+import { type FicheProduit, type ResultatRecherche } from '../lib/openfoodfacts.ts';
+import { chercherCodeBarres } from '../stores/code-barres';
 import { normalizeProductType } from '../lib/typology.ts';
 import type { CleRayon } from '../lib/rayons.ts';
 import { fileScan } from '../stores/queue.ts';
@@ -79,7 +80,7 @@ export default function Scan() {
       setEan(data);
       setChargement(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const r = await lookupEan(data);
+      const r = await chercherCodeBarres(data);
       setResultat(r);
       setRayon(r.etat === 'trouve' ? (r.fiche.categoryKey ?? 'autre') : 'autre');
       setChargement(false);
@@ -190,7 +191,7 @@ export default function Scan() {
           // avant l'insertion, plutôt que d'entrer définitivement l'EAN
           // en guise de nom.
           if (f.name === f.ean13) {
-            const trouve = await lookupEan(f.ean13);
+            const trouve = await chercherCodeBarres(f.ean13);
             if (trouve.etat === 'trouve') {
               aInserer = trouve.fiche;
             } else if (trouve.etat === 'hors_ligne') {

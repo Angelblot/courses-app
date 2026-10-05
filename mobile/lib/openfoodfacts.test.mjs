@@ -179,3 +179,30 @@ test('mapOffProduct applique la contenance du lot', () => {
   const f = mapOffProduct('3661112052256', { product_name: 'Allumettes de jambon Tradilège 2x75g', product_quantity: 75 });
   assert.equal(f.grammageG, 150);
 });
+
+test('lookupEan : inconnu d’Open Food Facts, le code est cherché sur Open Beauty Facts et Open Products Facts', async () => {
+  const { lookupEan } = await import('./openfoodfacts.ts');
+  const reel = globalThis.fetch;
+  const absent = () => new Response(JSON.stringify({ status: 0 }), { status: 404 });
+  try {
+    const appels = [];
+    globalThis.fetch = async u => { appels.push(new URL(u).host);
+      return u.includes('openbeautyfacts') ? new Response(JSON.stringify({ status: 1, product: { product_name: 'Gel intime', product_quantity: 250 } }), { status: 200 }) : absent(); };
+    const r = await lookupEan('3401560000000');
+    assert.equal(r.etat, 'trouve');
+    assert.equal(r.fiche.name, 'Gel intime');
+    assert.equal(r.fiche.origine, 'Open Beauty Facts');
+    assert.deepEqual(appels.sort(), ['world.openbeautyfacts.org', 'world.openfoodfacts.org', 'world.openproductsfacts.org']);
+    // Une base sœur en panne n'est qu'un recours manqué : inconnu, pas hors ligne.
+    globalThis.fetch = async u => u.includes('openbeautyfacts') ? new Response('', { status: 503 }) : absent();
+    assert.deepEqual(await lookupEan('3401560000000'), { etat: 'inconnu' });
+    // Open Food Facts trouvé : ni recours ni mention d'origine.
+    appels.length = 0;
+    globalThis.fetch = async u => { appels.push(u); return new Response(JSON.stringify({ status: 1, product: { product_name: 'Avocat' } }), { status: 200 }); };
+    const off = await lookupEan('3000001037576');
+    assert.equal(off.fiche.origine, undefined);
+    assert.equal(appels.length, 1);
+  } finally {
+    globalThis.fetch = reel;
+  }
+});

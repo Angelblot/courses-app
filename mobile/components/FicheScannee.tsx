@@ -70,6 +70,7 @@ export function FicheScannee({
               <Text style={s.detail}>
                 {[fiche.brand, contenance].filter(Boolean).join(' · ') || ean}
               </Text>
+              {!!fiche.origine && <Text style={s.detail} numberOfLines={1}>{fiche.origine}</Text>}
             </View>
           </View>
 
@@ -136,7 +137,7 @@ export function FicheScannee({
           <Text style={s.detail}>
             {horsLigne
               ? `Impossible de joindre Open Food Facts pour le code ${ean}. Ajoute le produit à la main, il entrera quand même dans ton catalogue.`
-              : `Open Food Facts ne connaît pas le code ${ean}. Ajoute-le à la main : il entrera quand même dans ton catalogue.`}
+              : `Ni Open Food Facts ni tes drives ne connaissent le code ${ean}. Ajoute-le à la main : il entrera quand même dans ton catalogue.`}
           </Text>
 
           <Text style={s.label}>Nom du produit</Text>

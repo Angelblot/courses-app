@@ -81,3 +81,10 @@ test('annuler pendant la pause empêche une nouvelle requête', async () => {
   const chercher=creerRechercheParNom({...config,pause:100,requeteHttp:async()=>{appels++;setTimeout(()=>controleur.abort(),5);return new Response('',{status:503});}});
   assert.equal((await chercher('biscuits',{signal:controleur.signal})).etat,'annule');assert.equal(appels,1);
 });
+
+test('la recherche par nom se limite aux produits vendus en France', async () => {
+  let url = '';
+  const chercher = creerRechercheParNom({ ...config, requeteHttp: async u => { url = u; return succes(); } });
+  await chercher('intima');
+  assert.match(url, /tagtype_0=countries&tag_contains_0=contains&tag_0=france/);
+});
