@@ -228,10 +228,27 @@ async function runAgent(tabId, cfg, item, mode) {
     }
 
     // En exécution : un cadre a agi, les autres n'ont rien trouvé.
-    return answers.find((a) => a.ok) ?? answers.find((a) => a.reason !== 'no_results') ?? answers[0];
+    const retenu = answers.find((a) => a.ok) ?? answers.find((a) => a.reason !== 'no_results') ?? answers[0];
+    // Quand aucun cadre n'aboutit, ce que chacun a vu, pour comprendre un drive muet.
+    return retenu.ok ? retenu : { ...retenu, cadres: answers.map(resumeCadre) };
   } catch (e) {
     return { ok: false, reason: 'inject_failed', message: String(e).slice(0, 200) };
   }
+}
+
+/** Ce qu'un cadre a vu, en peu d'octets : de quoi expliquer un « rien trouvé ». */
+function resumeCadre(a) {
+  const d = a.diagnostic ?? {};
+  return {
+    raison: a.reason ?? null,
+    url: String(d.url ?? '').slice(0, 160),
+    titre: String(d.title ?? '').slice(0, 80),
+    etat: d.state ?? null,
+    cartes: d.cardSelectors ?? null,
+    iframes: d.exploration?.iframes ?? null,
+    elements: d.exploration?.elements ?? null,
+    classes: d.exploration?.classesProbables?.slice(0, 6) ?? null,
+  };
 }
 
 /** Motifs d'échec d'un accès direct qui justifient un repli sur la recherche. */
@@ -828,7 +845,10 @@ async function faireRecherches(file, { auto = false } = {}) {
       let lignes = compte.ok ? offresDepuisReleve(compte.releve, { drive: groupe.drive, recherche: rech.requete, rechercheId: rech.id }) : [];
       if (lignes.length && !(await enregistrerOffres(lignes)).ok) lignes = [];
       const statut = issueRecherche(compte, lignes.length);
-      await majRecherche(rech.id, { statut, resultats: lignes.length, faite_le: statut === 'verification' ? null : new Date().toISOString() });
+      await majRecherche(rech.id, {
+        statut, resultats: lignes.length, faite_le: statut === 'verification' ? null : new Date().toISOString(),
+        diagnostic: lignes.length ? null : { raison: compte.reason ?? null, message: String(compte.message ?? '').slice(0, 200), cadres: compte.cadres ?? null },
+      });
       if (statut === 'verification') {
         // L'onglet d'arrière-plan passe devant : c'est là que la vérification se résout.
         if (auto) await chrome.tabs.update(tabId, { active: true }).catch(() => {});

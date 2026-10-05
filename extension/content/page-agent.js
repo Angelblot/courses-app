@@ -383,14 +383,27 @@ export function pageAgent(cfg, item, mode) {
     return false;
   }
 
+  /** Le document du cadre et ceux des iframes de même origine qu'il contient. */
+  function documentsLisibles() {
+    const docs = [document];
+    for (const f of document.querySelectorAll('iframe, frame')) {
+      try { if (f.contentDocument?.body) docs.push(f.contentDocument); } catch { /* autre origine */ }
+    }
+    return docs;
+  }
+
   /**
    * Attend que des cartes produit apparaissent (rendu asynchrone fréquent).
    */
   async function waitForCards(timeoutMs = 12000) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const { selector, elements } = queryFirstList(document, cfg.cards);
-      if (elements.length) return { selector, elements };
+      // Le document, puis les iframes de même origine : une iframe de
+      // résultats créée après l'injection n'a pas reçu son propre agent.
+      for (const doc of documentsLisibles()) {
+        const { selector, elements } = queryFirstList(doc, cfg.cards);
+        if (elements.length) return { selector, elements };
+      }
       await sleep(400);
     }
     return { selector: null, elements: [] };
