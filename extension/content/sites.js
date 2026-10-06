@@ -24,7 +24,9 @@ export const SITES = {
     origin: 'https://www.carrefour.fr',
     hostPattern: /(^|\.)carrefour\.fr$/,
     // Recherche produit. {q} est remplacé par la requête encodée.
-    searchUrl: 'https://www.carrefour.fr/s?q={q}',
+    // noRedirect=1 : sans lui, certains mots (« chèvre ») renvoient vers une
+    // page filtrée sur un rayon, qui finit en page d'erreur dans Chrome.
+    searchUrl: 'https://www.carrefour.fr/s?q={q}&noRedirect=1',
     // Bannière cookies — on refuse (choix le plus protecteur).
     cookieReject: [
       '#onetrust-reject-all-handler',
