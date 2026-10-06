@@ -190,6 +190,20 @@ export function pageAgent(cfg, item, mode) {
   const complete = (card) => Boolean(card.querySelector('img[src]')) || /\d\s*€/.test(textOf(card));
 
   /**
+   * Le nom d'un produit sur sa carte : le plus complet des titres trouvés.
+   * Certaines cartes Carrefour n'ont que la marque (« PELICAN ») dans le
+   * premier titre ; le nom entier est alors dans un autre titre, ou dans le
+   * texte de l'image et du lien.
+   */
+  function nomDeCarte(card) {
+    const candidats = [
+      ...cfg.title.flatMap((sel) => queryAll(card, sel).map(textOf)),
+      ...[...card.querySelectorAll('img[alt], a[title], a[aria-label]')].map((e) => e.getAttribute('alt') || e.getAttribute('title') || e.getAttribute('aria-label') || ''),
+    ].map((t) => (t || '').replace(/\s+/g, ' ').trim()).filter((t) => t && t.length <= 200);
+    return candidats.sort((a, b) => b.length - a.length)[0] || textOf(card);
+  }
+
+  /**
    * Fait défiler la page par petits pas, à rythme de lecture, pour que les
    * produits dessinés à la demande (E.Leclerc) s'affichent, puis remonte.
    */
@@ -646,7 +660,8 @@ export function pageAgent(cfg, item, mode) {
     let lues = cards, chargement = null;
     if (mode === 'releve') {
       const avant = cards.filter(complete).length;
-      if (avant < Math.min(cards.length, MAX_RELEVE)) {
+      // Un onglet caché ne dessine rien : défiler n'y sert qu'à perdre du temps.
+      if (avant < Math.min(cards.length, MAX_RELEVE) && document.visibilityState === 'visible') {
         await defiler(() => queryFirstList(document, [cardSelector]).elements.filter(complete).length >= MAX_RELEVE);
         lues = queryFirstList(document, [cardSelector]).elements;
         if (!lues.length) lues = cards;
@@ -665,7 +680,7 @@ export function pageAgent(cfg, item, mode) {
       let adresse = '';
       try { adresse = lien ? new URL(lien, location.origin).href : ''; } catch { adresse = ''; }
       return {
-        label: (textOf(queryFirst(card, cfg.title)) || textOf(card)).slice(0, 200),
+        label: nomDeCarte(card).slice(0, 200),
         href: adresse,
         ean: eanFromUrl(lien),
         prix: textOf(queryFirst(card, cfg.price)).slice(0, 40),

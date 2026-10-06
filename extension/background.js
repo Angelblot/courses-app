@@ -236,25 +236,6 @@ async function runAgent(tabId, cfg, item, mode) {
   }
 }
 
-/**
- * Relit la page de résultats avec l'onglet au premier plan, puis rend la main
- * à l'onglet d'avant. Un onglet caché ne dessine rien : chez E.Leclerc, seuls
- * les premiers produits ont alors photo et prix. Aucune page de plus n'est
- * chargée, seulement les produits que le site affiche en défilant.
- */
-async function releveVisible(tabId, cfg, item) {
-  const tab = await chrome.tabs.get(tabId).catch(() => null);
-  if (!tab || tab.active) return null;
-  const [precedent] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
-  await chrome.tabs.update(tabId, { active: true }).catch(() => {});
-  try {
-    await sleep(800);
-    return await runAgent(tabId, cfg, item, 'releve');
-  } finally {
-    if (precedent && precedent.id !== tabId) await chrome.tabs.update(precedent.id, { active: true }).catch(() => {});
-  }
-}
-
 /** Ce qu'un cadre a vu, en peu d'octets : de quoi expliquer un « rien trouvé ». */
 function resumeCadre(a) {
   const d = a.diagnostic ?? {};
@@ -861,12 +842,6 @@ async function faireRecherches(file, { auto = false } = {}) {
       if (!compte.ok && compte.reason !== 'challenge') {
         await naviguer(tabId, adresseRecherche(cfg, baseOrigin, rech.requete));
         compte = await runAgent(tabId, cfg, item, 'releve');
-      }
-      // Des produits restés vides (E.Leclerc ne les dessine qu'à l'écran) : l'onglet passe devant le temps du défilement.
-      const ch = compte.ok ? compte.chargement : null;
-      if (ch && ch.completesApres < Math.min(ch.cartes, 60)) {
-        const vu = await releveVisible(tabId, cfg, item);
-        if (vu?.ok && (vu.chargement?.completesApres ?? 0) > ch.completesApres) compte = vu;
       }
       let lignes = compte.ok ? offresDepuisReleve(compte.releve, { drive: groupe.drive, recherche: rech.requete, rechercheId: rech.id }) : [];
       // Une recherche refaite remplace ses offres au lieu de les doubler.
