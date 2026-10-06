@@ -33,19 +33,19 @@ const etat={quotidien:{},quotidienQty:{},ligneQuantites:{},lignePossedees:{},sel
  await page.waitForTimeout(500);await page.screenshot({path:dossier+'/pp1-point2.png'});
  // Retour au point réglé : son résumé, sans rien rouvrir.
  await page.getByRole('button',{name:/^(Point précédent|Revenir à «)/}).click();
- await texte('Déjà réglé').waitFor();await texte('« Antikal »').waitFor();await texte('Préciser · 1 sur 3').waitFor();
+ await texte('Réglé').waitFor();await texte('« Antikal »').waitFor();await texte('Préciser · 1 sur 3').waitFor();
  await texte('sans produit, cherché par son nom').waitFor();
  await page.waitForTimeout(400);await page.screenshot({path:dossier+'/pp2-regle.png'});
  // Continuer ramène à la tête de file.
- await btn('Continuer au point 2, « Sel regenerant »').click();await texte('« Sel regenerant »').waitFor();
+ await btn('Valider, point suivant : 2, « Sel regenerant »').click();await texte('« Sel regenerant »').waitFor();
  // Retirer, revenir, changer : la ligne revient et le point se rouvre.
  await btn('Retirer Sel regenerant de ta liste').click();
  await texte('Préciser · 3 sur 3').waitFor();await texte('« Javel »').waitFor();
- await page.getByRole('button',{name:/^(Point précédent|Revenir à «)/}).click();await texte('Déjà réglé').waitFor();await texte('Retiré').waitFor();
+ await page.getByRole('button',{name:/^(Point précédent|Revenir à «)/}).click();await texte('Réglé').waitFor();await texte('Retiré').waitFor();
  await page.getByRole('button',{name:/^(Point précédent|Revenir à «)/}).click();await texte('« Antikal »').waitFor();await texte('Préciser · 1 sur 3').waitFor();
- await btn('Changer « Antikal »').click();
+ await btn('Modifier « Antikal »').click();
  await texte('« Antikal »').waitFor();await garder('Antikal').waitFor();
- if(await texte('Déjà réglé').count())throw Error('Antikal pas rouvert');
+ if(await texte('Réglé').count())throw Error('Antikal pas rouvert');
  await page.waitForTimeout(500);await page.screenshot({path:dossier+'/pp3-rouvert.png'});
  // Régler à nouveau : on repart vers le premier point ouvert (Sel est retiré, Javel reste).
  await garder('Antikal').click();await texte('« Javel »').waitFor();await texte('Préciser · 3 sur 3').waitFor();
@@ -55,10 +55,10 @@ const etat={quotidien:{},quotidienQty:{},ligneQuantites:{},lignePossedees:{},sel
  await texte('Retiré de ta liste').waitFor();
  await page.waitForTimeout(500);await page.screenshot({path:dossier+'/pp4-fin.png'});
  await page.getByRole('button',{name:/^Revoir « Javel »/}).click();
- await texte('Déjà réglé').waitFor();await texte('« Javel »').waitFor();
- await btn('Voir le récapitulatif').click();await texte('Tout est réglé').waitFor();
- await page.getByRole('button',{name:/^Revenir à « Javel »/}).click();await texte('Déjà réglé').waitFor();
- await btn('Voir le récapitulatif').click();await btn('Terminer').click();
+ await texte('Réglé').waitFor();await texte('« Javel »').waitFor();
+ await btn('Valider, revenir au récapitulatif').click();await texte('Tout est réglé').waitFor();
+ await page.getByRole('button',{name:/^Revenir à « Javel »/}).click();await texte('Réglé').waitFor();
+ await btn('Valider, revenir au récapitulatif').click();await btn('Terminer').click();
  await texte('Tout est réglé').waitFor({state:'detached'});
  if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true}));
  }catch(e){console.error(e);await page?.screenshot({path:dossier+'/pp-erreur.png'}).catch(()=>{});process.exitCode=1}finally{await b.close()}})();

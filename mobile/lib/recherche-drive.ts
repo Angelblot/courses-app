@@ -26,6 +26,12 @@ export type OffreRelevee = {
   promotion: string | null; disponible: boolean; rang: number | null; vu_le: string;
   /** Le texte utile de la fiche sur le drive, lu par l'extension pour comparer. */
   fiche_texte?: string | null;
+  /** Un de tes produits, reconnu dans cette offre : le garder le réutilise, sans doublon. */
+  produit_id?: string;
+  /** Tiré de ton historique, absent des derniers résultats : il n'y a pas de vraie offre derrière. */
+  historique?: boolean;
+  /** « Acheté 3 fois · dernier le 12 sept. » : ce que l'historique en dit. */
+  histoire?: string;
 };
 
 const EN_ATTENTE: StatutRecherche[] = ['en_attente', 'en_cours', 'verification'];

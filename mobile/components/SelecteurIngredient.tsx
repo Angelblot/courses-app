@@ -29,6 +29,8 @@ type Props = {
   /** Préciser : le chevron « point précédent ». Absent : pas de chevron ; null : premier point, chevron grisé. */
   onPrecedent?: (() => void) | null;
   libellePrecedent?: string;
+  /** false : ni champ ni listes de ton catalogue (Préciser, où tes produits vivent dans les onglets des drives). */
+  catalogue?: boolean;
   /** « Ajouter « x » sans produit » : faux pour une alternative, qui doit être un produit. */
   sansProduit?: boolean;
   /** Produits proposés avant la frappe, sous « Même type dans tes produits ». */
@@ -82,7 +84,7 @@ function useHauteurClavier() {
  * après une pause de frappe. « Ajouter « x » sans produit » reste collé en
  * bas, au-dessus du clavier.
  */
-export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un ingrédient', sansProduit = true, suggestions = [], exclure = [], requeteInitiale = '', proches = [], entete, pied, scan = Platform.OS !== 'web', verbe = 'Ajouter', apres, basesOuvertes = true, onPrecedent, libellePrecedent }: Props) {
+export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un ingrédient', sansProduit = true, suggestions = [], exclure = [], requeteInitiale = '', proches = [], entete, pied, scan = Platform.OS !== 'web', verbe = 'Ajouter', apres, basesOuvertes = true, onPrecedent, libellePrecedent, catalogue = true }: Props) {
   const { produits, recharger } = useProducts();
   const insets = useSafeAreaInsets(), clavier = useHauteurClavier();
   const [requete, setRequete] = useState(requeteInitiale), [focus, setFocus] = useState(false), [scanner, setScanner] = useState(false);
@@ -134,15 +136,16 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
         <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onFermer} style={s.fermer}><View style={s.fermerRond}><Feather name="x" size={18} color={colors.text} /></View></Pressable>
       </View>
       {entete}
-      <View style={[s.champ, focus && s.champActif]}>
+      {catalogue && <View style={[s.champ, focus && s.champActif]}>
         <Feather name="search" size={18} color={colors.textMuted} />
         <TextInput style={[s.saisie, sansCadreWeb]} value={requete} onChangeText={t => { setRequete(t); setErreur(null); }} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
           returnKeyType="search" placeholder="Lardons, crème, spaghetti…" placeholderTextColor={colors.textMuted} accessibilityLabel="Chercher un produit" autoFocus={!requeteInitiale} autoCorrect={false} />
         {!!requete && <Pressable accessibilityRole="button" accessibilityLabel="Effacer la recherche" onPress={() => setRequete('')} style={s.effacer}><Feather name="x-circle" size={18} color={colors.textMuted} /></Pressable>}
         {scan && <Pressable accessibilityRole="button" accessibilityLabel="Scanner un code-barres" onPress={() => { Keyboard.dismiss(); setScanner(true); }} style={s.scan}><Feather name="maximize" size={18} color={colors.accent} /></Pressable>}
-      </View>
+      </View>}
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: (pied ? hautPied + 16 : sansProduit ? 140 : 24) + clavier }} keyboardShouldPersistTaps="handled">
+        {catalogue && <>
         {prochesVus.length > 0 && <><Text style={s.section}>Proches dans tes produits</Text>
           {prochesVus.map(p => ligne(`proche-${p.id}`, p.name, [p.brand, contenance(p.grammage_g, p.volume_ml)].filter(Boolean).join(' · ') || null, p.image_url, p.nutriscore, true, () => onChoisir(depuisProduit(p))))}</>}
         {memeType.length > 0 && <><Text style={s.section}>Même type dans tes produits</Text>
@@ -165,6 +168,7 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
             // Appui long : l'aperçu natif sur iPhone (FD2), la fiche complète ailleurs.
             return <ApercuOffre key={f.ean13} largeur={largeur} fiche={f} onChoisir={() => { void choisirFiche(f); }} onVoir={() => setDetail(f)}>{rang}</ApercuOffre>;
           })}
+        </>}
         </>}
         {apres}
         {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { paddingHorizontal: 16 }]}>{erreur}</Text>}

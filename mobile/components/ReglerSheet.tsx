@@ -6,7 +6,7 @@ import { useWizard } from '../contexts/WizardContext';
 import { useProducts, type Product } from '../stores/products';
 import { garderOffres } from '../stores/recherches-drive';
 import type { LigneMaison } from '../lib/liste-maison';
-import { produitsProches, type Manque } from '../lib/session-courses';
+import type { Manque } from '../lib/session-courses';
 import { sources } from './Manques';
 import { Precedent, SelecteurIngredient } from './SelecteurIngredient';
 import { RechercheDrives, Recapitulatif, type Comparaison } from './RechercheDrives';
@@ -21,9 +21,13 @@ import { colors } from '../lib/theme';
 type Doublon = { id: string; a: LigneMaison; b: LigneMaison };
 type Point = { type: 'manque'; key: string; manque: Manque } | { type: 'doublon'; doublon: Doublon };
 /** Ce qui a été décidé pour un point, en lignes « qui : quoi », pour le revoir. */
-type Resume = { qui: string; quoi: string; vide?: boolean }[];
-type Regle = { nom: string; type: Point['type']; resume: Resume; annuler: () => void };
-type OnRegle = (resume: Resume, annuler: () => void) => void;
+type Resume = {
+ qui: string; quoi: string; vide?: boolean;
+ /** Le produit retenu pour une enseigne : de quoi le montrer en carte quand on revoit le point. */
+ produit?: { nom: string; image: string | null; prix: string | null; unite: string | null; histoire: string | null };
+}[];
+type Regle = { nom: string; type: Point['type']; resume: Resume; annuler: () => void; choix?: ChoixOffres };
+type OnRegle = (resume: Resume, annuler: () => void, choix?: ChoixOffres) => void;
 
 /**
  * « Préciser » au bilan (variante PR1) : un manque ou un doublon à la fois,
@@ -41,6 +45,8 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
  const [parcours, setParcours] = useState<string[]>([]);
  const [regles, setRegles] = useState<Record<string, Regle>>({});
  const [focus, setFocus] = useState<string | null>(null);
+ // « Modifier » rouvre un point avec les produits qu'il avait retenus, déjà cochés.
+ const [reprises, setReprises] = useState<Record<string, ChoixOffres>>({});
  const cle = (p: Point) => p.type === 'manque' ? p.key : p.doublon.id;
  const tous: Point[] = [...manques.map(([key, manque]) => ({ type: 'manque' as const, key, manque })), ...doublons.map(doublon => ({ type: 'doublon' as const, doublon }))];
  const points = [...tous.filter(p => !reportes.includes(cle(p))), ...reportes.flatMap(k => tous.filter(p => cle(p) === k))];
@@ -56,7 +62,7 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
 
  useEffect(() => { if (visible && !focus && cleTete) setParcours(p => visiter(p, cleTete)); }, [visible, focus, cleTete]);
  // Une nouvelle ouverture repart de zéro : les réglages d'avant sont dans la liste.
- useEffect(() => { if (!visible) { setParcours([]); setRegles({}); setFocus(null); } }, [visible]);
+ useEffect(() => { if (!visible) { setParcours([]); setRegles({}); setFocus(null); setReprises({}); } }, [visible]);
 
  // La file entière, dans l'ordre de visite : « 3 sur 19 » ne bouge pas quand un point est réglé.
  const ordre = [...parcours, ...points.map(cle).filter(k => !parcours.includes(k))];
@@ -78,8 +84,10 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
   if (visible && affiche) AccessibilityInfo.announceForAccessibility(`${titre}. ${nomDe(affiche)}${focusRegle ? ', déjà réglé' : ''}`);
   else if (visible && fin) AccessibilityInfo.announceForAccessibility('Tout est réglé');
  }, [visible, affiche, !!focusRegle, fin]);
- const regle = (k: string, nom: string, type: Point['type']): OnRegle => (resume, annuler) => {
-  setRegles(r => ({ ...r, [k]: { nom, type, resume, annuler } }));
+ const regle = (k: string, nom: string, type: Point['type']): OnRegle => (resume, annuler, choix) => {
+  setRegles(r => ({ ...r, [k]: { nom, type, resume, annuler, choix } }));
+  // Réglé à nouveau : l'ancien choix ne reviendra plus pré-coché.
+  setReprises(x => { if (!(k in x)) return x; const { [k]: _, ...reste } = x; return reste; });
   setFocus(null);
  };
 
@@ -90,11 +98,12 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
    ? <PointRegle titre={titre} progression={progression} regle={focusRegle} onFermer={onFermer} onPrecedent={onPrecedent}
      suite={cleTete ? { rang: rangDans(parcours, cleTete), nom: nomDe(cleTete) } : null} libellePrecedent={libellePrecedent}
      onContinuer={() => setFocus(null)}
-     onChanger={() => { focusRegle.annuler(); setRegles(r => { const { [focus]: _, ...reste } = r; return reste; }); }} />
+     onChanger={() => { focusRegle.annuler(); const choix = focusRegle.choix; if (choix) setReprises(x => ({ ...x, [focus]: choix }));
+      setRegles(r => { const { [focus]: _, ...reste } = r; return reste; }); }} />
    : courant?.type === 'manque'
    ? <PreciserManque key={courant.key} titre={titre} progression={progression} lineKey={courant.key} manque={courant.manque} products={products} onFermer={onFermer} onRetrait={onRetrait} toast={toast}
      autres={manques.filter(([k]) => k !== courant.key).map(([, m]) => m.name)} onPrecedent={onPrecedent} libellePrecedent={libellePrecedent}
-     onRegle={regle(courant.key, courant.manque.name, 'manque')}
+     onRegle={regle(courant.key, courant.manque.name, 'manque')} choixInitial={reprises[courant.key]}
      onPasser={points.length > 1 ? () => { setFocus(null); setReportes(r => [...r.filter(k => k !== courant.key), courant.key]); } : undefined} />
    : courant?.type === 'doublon'
     ? <GarderUn key={courant.doublon.id} titre={titre} progression={progression} doublon={courant.doublon} products={products} onFermer={onFermer} onRetrait={onRetrait} toast={toast}
@@ -158,32 +167,44 @@ function ToutRegle({ progression, points, onFermer, onPrecedent, libellePreceden
  */
 function PointRegle({ titre, progression, regle, onFermer, onPrecedent, libellePrecedent, suite, onContinuer, onChanger }: { titre: string; progression: ReactNode; regle: Regle; onFermer: () => void; onPrecedent: (() => void) | null; libellePrecedent: string; suite: { rang: number; nom: string } | null; onContinuer: () => void; onChanger: () => void }) {
  const insets = useSafeAreaInsets();
+ // Des produits retenus par enseigne : une carte chacune. Sinon (gardé sans produit, retiré, doublon), une ligne.
+ const parEnseigne = regle.resume.some(l => l.produit), retenus = regle.resume.filter(l => l.produit).length;
  return <SafeAreaView edges={['top']} style={s.ecran}>
   <Entete titre={titre} onFermer={onFermer} onPrecedent={onPrecedent} libellePrecedent={libellePrecedent} />
-  <View style={{ gap: 10, paddingBottom: 10 }}>
-   {progression}
-   <View style={s.heros}>
-    <View style={s.statutRegle} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Feather name="check" size={24} color={colors.accentContrast} /></View>
-    <View style={{ flex: 1, gap: 2 }}><Text style={s.nom} numberOfLines={2}>« {regle.nom} »</Text><Text style={s.dejaRegle}>Déjà réglé</Text></View>
+  {progression}
+  <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 16, gap: 12 }}>
+   <View style={{ paddingHorizontal: 4, gap: 2 }}>
+    <Text style={s.nomRegle} accessibilityRole="header" numberOfLines={2}>« {regle.nom} »</Text>
+    <Text style={s.dejaRegle}>{parEnseigne ? `Réglé · ${retenus} produit${retenus > 1 ? 's' : ''} retenu${retenus > 1 ? 's' : ''}` : 'Réglé'}</Text>
    </View>
-  </View>
-  <View style={{ paddingHorizontal: 16, gap: 10, flex: 1 }}>
-   <View style={s.carteRegle} accessible accessibilityLabel={regle.resume.map(l => `${l.qui} : ${l.quoi}`).join('. ')}>
+   {parEnseigne ? regle.resume.map((l, i) => <View key={i} style={s.carteEnseigne} accessible
+    accessibilityLabel={l.produit ? `${l.qui} : ${l.produit.nom}, ${[l.produit.prix, l.produit.unite, l.produit.histoire].filter(Boolean).join(', ')}` : `${l.qui} : aucun produit choisi`}>
+    <Text style={s.enseigne}>{l.qui}</Text>
+    {l.produit ? <View style={s.produitRetenu}>
+     <Photo name={l.produit.nom} url={l.produit.image} style={s.photoRetenu} />
+     <View style={{ flex: 1, gap: 3 }}>
+      <Text style={ui.productName} numberOfLines={2}>{l.produit.nom}</Text>
+      {!!l.produit.histoire && <Text style={s.histoireRetenu} numberOfLines={2}>{l.produit.histoire}</Text>}
+     </View>
+     <View style={{ alignItems: 'flex-end', gap: 2 }}>
+      <Text style={s.prixRetenu}>{l.produit.prix ?? 'n.c.'}</Text>
+      {!!l.produit.unite && <Text style={[ui.detail, { marginTop: 0 }]}>{l.produit.unite}</Text>}
+     </View>
+    </View> : <Text style={[ui.detail, { marginTop: 0 }]}>Aucun produit choisi : l’extension cherchera « {regle.nom} » par son nom.</Text>}
+   </View>)
+   : <View style={s.carteRegle} accessible accessibilityLabel={regle.resume.map(l => `${l.qui} : ${l.quoi}`).join('. ')}>
     {regle.resume.map((l, i) => <View key={i} style={[s.ligneRegle, i > 0 && s.ligneRegleTrait]}>
      <Text style={s.qui}>{l.qui}</Text>
      <Text style={[s.quoi, l.vide && { color: colors.textMuted, fontWeight: '400' }]} numberOfLines={2}>{l.quoi}</Text>
     </View>)}
-   </View>
-   <Text style={[s.explication, { textAlign: 'left', paddingHorizontal: 4 }]}>{regle.type === 'manque'
-    ? '« Changer » rouvre ce point. Les résultats des drives sont gardés : rien n’est recherché à nouveau.'
-    : '« Changer » remet les deux lignes, pour trancher autrement.'}</Text>
-  </View>
-  <View style={[s.basDoublon, { paddingBottom: 12 + insets.bottom }]}>
-   <Pressable accessibilityRole="button" accessibilityLabel={suite ? `Continuer au point ${suite.rang}, « ${suite.nom} »` : 'Voir le récapitulatif'} onPress={onContinuer} style={({ pressed }) => [s.valider, pressed && { opacity: .85 }]}>
-    <Text style={s.validerTexte}>{suite ? `Continuer au point ${suite.rang}` : 'Voir le récapitulatif'}</Text>
+   </View>}
+  </ScrollView>
+  <View style={[s.piedRegle, { paddingBottom: 12 + insets.bottom }]}>
+   <Pressable accessibilityRole="button" accessibilityLabel={`Modifier « ${regle.nom} »`} onPress={onChanger} style={({ pressed }) => [s.modifier, pressed && { opacity: .7 }]}>
+    <Text style={s.garderNomTexte}>Modifier</Text>
    </Pressable>
-   <Pressable accessibilityRole="button" accessibilityLabel={`Changer « ${regle.nom} »`} onPress={onChanger} style={({ pressed }) => [s.lienPied, pressed && { opacity: .6 }]}>
-    <Text style={s.lienPiedTexte}>Changer</Text>
+   <Pressable accessibilityRole="button" accessibilityLabel={suite ? `Valider, point suivant : ${suite.rang}, « ${suite.nom} »` : 'Valider, revenir au récapitulatif'} onPress={onContinuer} style={({ pressed }) => [s.valider, { flex: 1.6 }, pressed && { opacity: .85 }]}>
+    <Text style={s.validerTexte}>{suite ? 'Valider, point suivant' : 'Valider'}</Text>
    </Pressable>
   </View>
  </SafeAreaView>;
@@ -195,12 +216,13 @@ function PointRegle({ titre, progression, regle, onFermer, onPrecedent, libelleP
  * pied récapitule et valide ; rien ne passe au point suivant avant « Valider ».
  * Sinon, en bas, « garder sans produit » ou « retirer ».
  */
-function PreciserManque({ titre, progression, lineKey, manque, products, onFermer, onRetrait, toast, autres, onPasser, onPrecedent, libellePrecedent, onRegle }: { titre: string; progression: ReactNode; lineKey: string; manque: Manque; products: Product[]; onFermer: () => void; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode; autres: string[]; onPasser?: () => void; onPrecedent: (() => void) | null; libellePrecedent: string; onRegle: OnRegle }) {
+function PreciserManque({ titre, progression, lineKey, manque, products, onFermer, onRetrait, toast, autres, onPasser, onPrecedent, libellePrecedent, onRegle, choixInitial }: { titre: string; progression: ReactNode; lineKey: string; manque: Manque; products: Product[]; onFermer: () => void; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode; autres: string[]; onPasser?: () => void; onPrecedent: (() => void) | null; libellePrecedent: string; onRegle: OnRegle; choixInitial?: ChoixOffres }) {
  const w = useWizard(), extension = useExtension();
  const [etape, setEtape] = useState<ReturnType<typeof Phase>>('aucune');
  const { recharger } = useProducts();
- const [choix, setChoix] = useState<ChoixOffres>({}), [occupe, setOccupe] = useState(false), [erreur, setErreur] = useState<string | null>(null);
+ const [choix, setChoix] = useState<ChoixOffres>(choixInitial ?? {}), [occupe, setOccupe] = useState(false), [erreur, setErreur] = useState<string | null>(null);
  const [comparaison, setComparaison] = useState<Comparaison>(null);
+ const [nombres, setNombres] = useState<Record<'carrefour' | 'leclerc', number>>({ carrefour: 0, leclerc: 0 });
  // Valider : chaque produit choisi rejoint « Mes produits », relié à son drive ; le point est réglé.
  const valider = async (offres: OffreRelevee[]) => {
   if (!offres.length || occupe) return;
@@ -215,8 +237,10 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
   setComparaison(null);
   const productId = r.productId;
   onRegle(DRIVES_RECHERCHE.map(d => { const o = offres.find(x => x.drive === d);
-   return o ? { qui: NOMS_DRIVE[d], quoi: `${nomCourt(o.libelle)} · ${prixLisible(o.prix) ?? 'n.c.'}` } : { qui: NOMS_DRIVE[d], quoi: 'non choisi', vide: true }; }),
-   () => avant.rouvrirManque(lineKey, avant, productId));
+   return o ? { qui: NOMS_DRIVE[d], quoi: `${nomCourt(o.libelle)} · ${prixLisible(o.prix) ?? 'n.c.'}`,
+    produit: { nom: o.libelle, image: o.image_url, prix: prixLisible(o.prix), unite: o.prix_unitaire != null && o.unite_prix ? prixLisible(o.prix_unitaire, o.unite_prix) : null, histoire: o.histoire ?? null } }
+    : { qui: NOMS_DRIVE[d], quoi: 'non choisi', vide: true }; }),
+   () => avant.rouvrirManque(lineKey, avant, productId), Object.fromEntries(offres.map(o => [o.drive, o])) as ChoixOffres);
   w.validerManque(lineKey, qty, productId);
  };
  const choisies = [choix.carrefour, choix.leclerc].filter((o): o is OffreRelevee => !!o);
@@ -253,9 +277,13 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
   {toast}
   <Recapitulatif choix={choix} />
   {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { textAlign: 'center' }]}>{erreur}</Text>}
-  <Pressable accessibilityRole="button" disabled={!choisies.length || occupe} onPress={() => { void valider(choisies); }} style={[s.valider, (!choisies.length || occupe) && s.validerInactif]}>
-   {occupe ? <ActivityIndicator color={colors.accentContrast} /> : <Text style={[s.validerTexte, !choisies.length && { color: colors.offText }]}>{choisies.length === 2 ? 'Valider les 2 produits' : choisies.length === 1 ? 'Valider ce seul produit' : 'Choisis un produit'}</Text>}
-  </Pressable>
+  {/* Une enseigne encore à choisir alors qu'elle a des produits : valider sans elle reste possible, sans y pousser. */}
+  {(() => { const manquante = choisies.length === 1 ? DRIVES_RECHERCHE.find(d => !choix[d] && nombres[d] > 0) : undefined;
+   return <Pressable accessibilityRole="button" disabled={!choisies.length || occupe} onPress={() => { void valider(choisies); }}
+    style={[manquante ? s.garderNom : s.valider, manquante && { flex: 0 }, (!choisies.length || occupe) && s.validerInactif]}>
+    {occupe ? <ActivityIndicator color={manquante ? colors.accent : colors.accentContrast} /> : <Text style={[manquante ? s.garderNomTexte : s.validerTexte, !choisies.length && { color: colors.offText }]}>
+     {choisies.length === 2 ? 'Valider les 2 produits' : manquante ? `Valider sans ${NOMS_DRIVE[manquante]}` : choisies.length === 1 ? 'Valider ce seul produit' : 'Choisis un produit'}</Text>}
+   </Pressable>; })()}
   <View style={s.liensPied}>
    <Pressable accessibilityRole="button" accessibilityLabel={`Garder « ${nom} » sans produit. L’extension le cherchera par son nom.`} onPress={garderSansProduit} hitSlop={6} style={s.lienPied}><Text style={s.lienPiedTexte}>Garder sans produit</Text></Pressable>
    <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${nom} de ta liste`} onPress={retirer} hitSlop={6} style={s.lienPied}><Text style={[s.lienPiedTexte, { color: colors.danger }]}>Retirer</Text></Pressable>
@@ -285,13 +313,13 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
    </Pressable>
   </View>
  </View>;
- return <SelecteurIngredient titre={titre} verbe="Choisir" sansProduit={false} requeteInitiale={nom} proches={produitsProches(nom, products)} entete={entete} pied={pied}
+ return <SelecteurIngredient titre={titre} verbe="Choisir" sansProduit={false} requeteInitiale={nom} catalogue={false} entete={entete} pied={pied}
   onFermer={onFermer} onPrecedent={occupe ? null : onPrecedent} libellePrecedent={libellePrecedent}
   onChoisir={c => { const productId = c.product_id; if (!productId) return;
    onRegle([{ qui: 'Produit', quoi: c.name }], () => w.rouvrirManque(lineKey, w, productId)); w.validerManque(lineKey, qty, productId); }}
   basesOuvertes={false}
   apres={<RechercheDrives requete={nom} autres={autres} onPhase={setEtape} choix={choix} onChoix={c => { setChoix(c); setErreur(null); }}
-   onValider={o => { void valider(o); }} occupe={occupe} erreurValider={erreur} comparaison={comparaison} onComparaison={setComparaison} />} />;
+   onValider={o => { void valider(o); }} occupe={occupe} erreurValider={erreur} comparaison={comparaison} onComparaison={setComparaison} onNombres={setNombres} />} />;
 }
 
 /** Un doublon possible (DB1) : « Garder celui-ci » sous chaque photo ; l'autre est retiré, annulable. */
@@ -343,6 +371,15 @@ const s = StyleSheet.create({
  recapLigne: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, paddingHorizontal: 14, paddingVertical: 10 },
  piedFin: { backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
  statutRegle: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+ nomRegle: { fontSize: 22, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
+ carteEnseigne: { backgroundColor: colors.surface, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
+ enseigne: { fontSize: 12, fontWeight: '700', letterSpacing: .5, color: colors.textMuted, textTransform: 'uppercase' },
+ produitRetenu: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+ photoRetenu: { width: 64, height: 64, borderRadius: 12 },
+ histoireRetenu: { fontSize: 12, fontWeight: '600', color: colors.accent },
+ prixRetenu: { fontSize: 16, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+ piedRegle: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+ modifier: { flex: 1, minHeight: 50, borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
  dejaRegle: { fontSize: 13, fontWeight: '600', color: colors.accent },
  qui: { fontSize: 15, fontWeight: '600', color: colors.text },
  quoi: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, textAlign: 'right' },

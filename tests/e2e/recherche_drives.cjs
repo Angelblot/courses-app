@@ -116,7 +116,7 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
  await btn('Fermer').last().click();await page.waitForTimeout(600);
  await page.getByText('4 produits cochés',{exact:true}).waitFor();
  await btn('Annuler').click();
- await page.getByText('Papier cuisson Repère 8 m · 1,39 €',{exact:true}).waitFor();
+ await page.getByText('Papier cuisson Repère 8 m',{exact:true}).last().waitFor();await page.getByText('1,39 €',{exact:true}).last().waitFor();
  await btn('Valider les 2 produits').click();
  // 5. Deux produits, chacun réservé à son drive, l'un alternative de l'autre ; le point suivant arrive.
  await page.getByText('« Gel intime »',{exact:true}).waitFor({timeout:20000});

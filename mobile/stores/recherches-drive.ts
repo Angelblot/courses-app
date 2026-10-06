@@ -98,9 +98,16 @@ export async function garderOffres(choisies: OffreRelevee[], requete: string): P
   if (!plan.length) return { ok: false, erreur: 'Choisis au moins un produit.' };
   const erreur = 'Impossible d’ajouter ce produit. Réessaie.';
   const ids: string[] = [];
-  for (const { offre, venduChez } of plan) {
-    let id: string | null = null;
-    if (offre.ean13) {
+  // Ton même produit retenu chez les deux enseignes : il est vendu aux deux, pas réservé à l'une.
+  const parProduit = new Map<string, number>();
+  for (const { offre } of plan) if (offre.produit_id) parProduit.set(offre.produit_id, (parProduit.get(offre.produit_id) ?? 0) + 1);
+  for (const { offre, venduChez: prevu } of plan) {
+    const venduChez = offre.produit_id && (parProduit.get(offre.produit_id) ?? 0) > 1 ? null : prevu;
+    // Un de tes produits, reconnu dans l'offre : on le réutilise tel quel.
+    let id: string | null = offre.produit_id ?? null;
+    if (id) {
+      if (venduChez) await supabase.from('products').update({ vendu_chez: venduChez }).eq('id', id);
+    } else if (offre.ean13) {
       const { data } = await supabase.from('products').select('id').eq('ean13', offre.ean13).maybeSingle();
       id = data?.id ?? null;
     }
@@ -112,10 +119,12 @@ export async function garderOffres(choisies: OffreRelevee[], requete: string): P
       }).select('id').single();
       if (error || !data) { console.error('[garderOffres]', error); return { ok: false, erreur }; }
       id = data.id as string;
-    } else if (venduChez) {
+    } else if (venduChez && !offre.produit_id) {
       await supabase.from('products').update({ vendu_chez: venduChez }).eq('id', id);
     }
     ids.push(id);
+    // Tiré de ton historique, sans offre relevée : le lien déjà connu reste tel quel.
+    if (offre.historique) continue;
     // Le lien au drive : la fiche Carrefour (son adresse porte l'EAN) ou le
     // libellé exact, seule voie sûre chez E.Leclerc.
     const { error: e2 } = await supabase.from('product_equivalents').upsert({
@@ -126,7 +135,10 @@ export async function garderOffres(choisies: OffreRelevee[], requete: string): P
     if (e2) console.error('[garderOffres] lien au drive', e2);
   }
   if (ids.length > 1) {
-    const { error } = await supabase.from('products').update({ alternatives: ids.slice(1) }).eq('id', ids[0]);
+    // Les alternatives déjà retenues pour ce produit restent : on y ajoute les nouvelles.
+    const { data: avant } = await supabase.from('products').select('alternatives').eq('id', ids[0]).maybeSingle();
+    const alternatives = [...new Set([...(((avant?.alternatives as string[] | null) ?? [])), ...ids.slice(1)])].filter(x => x !== ids[0]);
+    const { error } = await supabase.from('products').update({ alternatives }).eq('id', ids[0]);
     if (error) console.error('[garderOffres] alternatives', error);
   }
   return { ok: true, productId: ids[0] };
@@ -138,7 +150,8 @@ export async function garderOffres(choisies: OffreRelevee[], requete: string): P
  * fiches Carrefour ont une adresse ; une lecture déjà demandée ne se répète pas.
  */
 export async function demanderFiches(offres: OffreRelevee[], dejaEnCours: string[]): Promise<{ ok: boolean }> {
-  const candidates = offres.filter(o => o.drive === 'carrefour' && o.url && !o.fiche_texte && !dejaEnCours.includes(o.id));
+  // Une ligne tirée de l'historique n'est pas une offre relevée : pas de fiche à lire.
+  const candidates = offres.filter(o => o.drive === 'carrefour' && o.url && !o.fiche_texte && !o.historique && !dejaEnCours.includes(o.id));
   if (!candidates.length) return { ok: true };
   // Une fiche déjà lue sans rien d'utile, ou en cours, ne se redemande pas.
   const { data: deja } = await supabase.from('recherches_drive').select('offre_id').eq('type', 'fiche').in('offre_id', candidates.map(o => o.id));
