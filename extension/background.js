@@ -843,6 +843,16 @@ async function faireRecherches(file, { auto = false } = {}) {
         await naviguer(tabId, adresseRecherche(cfg, baseOrigin, rech.requete));
         compte = await runAgent(tabId, cfg, item, 'releve');
       }
+      // Page d'erreur de Chrome (redirection qui échoue) : on note où, puis on retente une fois sans accents.
+      let urlErreur = null;
+      if (compte.reason === 'inject_failed' && /error page/i.test(compte.message ?? '')) {
+        urlErreur = (await chrome.tabs.get(tabId).catch(() => null))?.url ?? null;
+        const sansAccents = rech.requete.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (sansAccents !== rech.requete) {
+          await naviguer(tabId, adresseRecherche(cfg, baseOrigin, sansAccents));
+          compte = await runAgent(tabId, cfg, item, 'releve');
+        }
+      }
       let lignes = compte.ok ? offresDepuisReleve(compte.releve, { drive: groupe.drive, recherche: rech.requete, rechercheId: rech.id }) : [];
       // Une recherche refaite remplace ses offres au lieu de les doubler.
       if (compte.ok) await effacerOffresRecherche(rech.id);
@@ -851,8 +861,8 @@ async function faireRecherches(file, { auto = false } = {}) {
       await majRecherche(rech.id, {
         statut, resultats: lignes.length, faite_le: statut === 'verification' ? null : new Date().toISOString(),
         diagnostic: lignes.length
-          ? { chargement: compte.chargement ?? null, echantillon: (compte.releve ?? []).slice(0, 4).map((c) => ({ label: c.label, prix: c.prix, image: Boolean(c.image), href: String(c.href ?? '').slice(0, 120), cls: c.cls, texte: String(c.texte ?? '').slice(0, 300) })) }
-          : { raison: compte.reason ?? null, message: String(compte.message ?? '').slice(0, 200), cadres: compte.cadres ?? null },
+          ? { urlErreur, chargement: compte.chargement ?? null, echantillon: (compte.releve ?? []).slice(0, 4).map((c) => ({ label: c.label, prix: c.prix, image: Boolean(c.image), href: String(c.href ?? '').slice(0, 120), cls: c.cls, texte: String(c.texte ?? '').slice(0, 300) })) }
+          : { urlErreur, raison: compte.reason ?? null, message: String(compte.message ?? '').slice(0, 200), cadres: compte.cadres ?? null },
       });
       if (statut === 'verification') {
         // L'onglet d'arrière-plan passe devant : c'est là que la vérification se résout.
