@@ -10,7 +10,7 @@ import type { LigneMaison } from '../lib/liste-maison';
 import type { Manque } from '../lib/session-courses';
 import { sources } from './Manques';
 import { Precedent, SelecteurIngredient } from './SelecteurIngredient';
-import { RechercheDrives, Recapitulatif, type Affinage, type Comparaison } from './RechercheDrives';
+import { RechercheDrives, type Affinage, type Comparaison } from './RechercheDrives';
 import { FeuilleType } from './FeuilleType';
 import { EtatExtension } from './EtatExtension';
 import { useExtension } from '../stores/extension';
@@ -324,15 +324,27 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
  // Des résultats : le pied récapitule le choix par enseigne et valide ; garder sans produit et retirer restent à portée.
  : etape === 'resultats' ? <View style={{ gap: 8 }}>
   {toast}
-  <Recapitulatif choix={choix} />
-  {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { textAlign: 'center' }]}>{erreur}</Text>}
-  {/* Une enseigne encore à choisir alors qu'elle a des produits : valider sans elle reste possible, sans y pousser. */}
-  {(() => { const manquante = choisies.length === 1 ? DRIVES_RECHERCHE.find(d => !choix[d] && nombres[d] > 0) : undefined;
-   return <Pressable accessibilityRole="button" disabled={!choisies.length || occupe} onPress={() => { void valider(choisies); }}
-    style={[manquante ? s.garderNom : s.valider, manquante && { flex: 0 }, (!choisies.length || occupe) && s.validerInactif]}>
-    {occupe ? <ActivityIndicator color={manquante ? colors.accent : colors.accentContrast} /> : <Text style={[manquante ? s.garderNomTexte : s.validerTexte, !choisies.length && { color: colors.offText }]}>
-     {choisies.length === 2 ? 'Valider les 2 produits' : manquante ? `Valider sans ${NOMS_DRIVE[manquante]}` : choisies.length === 1 ? 'Valider ce seul produit' : 'Choisis un produit'}</Text>}
-   </Pressable>; })()}
+  {/* Variante C validée : où l'on en est (« 1 produit sur 2 ») et Comparer, puis Valider en pleine largeur. */}
+  {(() => { const enseignes = DRIVES_RECHERCHE.filter(d => nombres[d] > 0 || !!choix[d]), total = Math.max(1, enseignes.length);
+   const manquante = enseignes.find(d => !choix[d]), n = choisies.length;
+   const reste = !n ? (total > 1 ? 'Choisis un produit par enseigne' : 'Choisis ton produit') : manquante ? `${NOMS_DRIVE[manquante]} reste à choisir` : 'Tout est choisi';
+   return <>
+    <View style={s.avancement}>
+     <View style={{ flex: 1 }} accessible accessibilityLabel={`${n} produit${n > 1 ? 's' : ''} sur ${total}. ${reste}`}>
+      <Text style={s.avancementTitre}>{n} produit{n > 1 ? 's' : ''} sur {total}</Text>
+      <Text style={[ui.detail, { marginTop: 0 }]}>{reste}</Text>
+     </View>
+     {nombres.carrefour + nombres.leclerc >= 2 && <Pressable accessibilityRole="button" accessibilityLabel="Comparer des produits" accessibilityHint="Coche ensuite les produits à comparer, d’une enseigne ou des deux"
+      disabled={occupe} accessibilityState={{ disabled: occupe }} onPress={() => setComparaison({ coches: DRIVES_RECHERCHE.flatMap(d => (choix[d] ? [choix[d]!.id] : [])), ouvert: false })} style={({ pressed }) => [s.comparerPied, (pressed || occupe) && { opacity: .6 }]}>
+      <Feather name="columns" size={15} color={colors.accent} /><Text style={s.comparerPiedTexte}>Comparer</Text>
+     </Pressable>}
+    </View>
+    {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { textAlign: 'center' }]}>{erreur}</Text>}
+    <Pressable accessibilityRole="button" accessibilityLabel={occupe ? 'Validation en cours' : undefined} disabled={!n || occupe} onPress={() => { void valider(choisies); }} style={[s.valider, (!n || occupe) && s.validerInactif]}>
+     {occupe ? <ActivityIndicator color={colors.accentContrast} /> : <Text style={[s.validerTexte, !n && { color: colors.offText }]}>
+      {!n ? 'Choisis un produit' : !manquante ? (n > 1 ? `Valider les ${n} produits` : 'Valider ce produit') : `Valider sans ${NOMS_DRIVE[manquante]}`}</Text>}
+    </Pressable>
+   </>; })()}
   <View style={s.liensPied}>
    <Pressable accessibilityRole="button" accessibilityLabel={`Garder « ${nom} » sans produit. L’extension le cherchera par son nom.`} onPress={garderSansProduit} hitSlop={6} style={s.lienPied}><Text style={s.lienPiedTexte}>Garder sans produit</Text></Pressable>
    <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${nom} de ta liste`} onPress={retirer} hitSlop={6} style={s.lienPied}><Text style={[s.lienPiedTexte, { color: colors.danger }]}>Retirer</Text></Pressable>
@@ -446,6 +458,10 @@ const s = StyleSheet.create({
  type: { maxWidth: 140, minHeight: 44, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1.5, borderColor: colors.accent, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 4 },
  typeActif: { backgroundColor: colors.accent },
  typeTexte: { flexShrink: 1, fontSize: 14, fontWeight: '600', color: colors.accent },
+ avancement: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+ avancementTitre: { fontSize: 15, fontWeight: '700', color: colors.text },
+ comparerPied: { minHeight: 44, paddingHorizontal: 14, borderRadius: 22, backgroundColor: colors.accentSoft, flexDirection: 'row', alignItems: 'center', gap: 6 },
+ comparerPiedTexte: { fontSize: 14, fontWeight: '600', color: colors.accent },
  dejaRegle: { fontSize: 13, fontWeight: '600', color: colors.accent },
  qui: { fontSize: 15, fontWeight: '600', color: colors.text },
  quoi: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, textAlign: 'right' },

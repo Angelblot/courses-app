@@ -265,10 +265,6 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
     </View>}
     <View style={s.sousEntete}>
       <Text style={s.consigne}>{consigne}</Text>
-      {!enComparaison && offres.length >= 2 && <Pressable accessibilityRole="button" accessibilityLabel="Comparer des produits" accessibilityHint="Coche ensuite les produits à comparer, d’une enseigne ou des deux"
-        hitSlop={4} onPress={() => onComparaison({ coches: DRIVES_RECHERCHE.flatMap(d => (choix[d] ? [choix[d]!.id] : [])), ouvert: false })} style={({ pressed }) => [s.comparer, pressed && { opacity: .8 }]}>
-        <Feather name="columns" size={15} color={colors.accent} /><Text style={s.comparerTexte}>Comparer</Text>
-      </Pressable>}
     </View>
     {connus.length > 0 && <>
       <Text style={s.sectionConnus} accessibilityRole="header">Déjà acheté ici</Text>
@@ -440,8 +436,6 @@ const s = StyleSheet.create({
   lienDiscret: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
   entete: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 36 },
   section: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
-  comparer: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: colors.accentSoft },
-  comparerTexte: { fontSize: 14, fontWeight: '600', color: colors.accent },
   sousEntete: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 4 },
   drive: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, color: colors.textMuted },
   quand: { fontSize: 12, color: colors.textMuted },
