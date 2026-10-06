@@ -16,7 +16,9 @@ let recherches=[R('rc','carrefour','Bières','faite'),R('rl','leclerc','Bières'
 const offres=[offre('c1','rc','carrefour',0,'LEFFE Bière Blonde D\'Abbaye 6,6% LEFFE',5.99),offre('c2','rc','carrefour',1,'LA CHARNUE Bière IPA 5,5% LA CHARNUE',2.15),offre('c3','rc','carrefour',2,'HEINEKEN Bière Blonde 5% HEINEKEN',4.49),
  offre('c4','rc','carrefour',3,'LEFFE Bière Ruby 5% LEFFE',4.2),offre('c5','rc','carrefour',4,'HOEGAARDEN Bière Blanche 4,9% HOEGAARDEN',4.9),
  offre('l1','rl','leclerc',0,'Bière Desperados Pack de 6x33cl',7.99),offre('l2','rl','leclerc',1,'Bière blanche Hilbörg 4,5%vol. - 6x25cl',3.2),
- offre('ci1','rci','carrefour',0,'LA CHARNUE Bière IPA 5,5% LA CHARNUE',2.15),offre('ci2','rci','carrefour',1,'BREWDOG Punk IPA 5,4% BREWDOG',6.95),offre('ci3','rci','carrefour',2,'BRASSERIE DU MONT BLANC Bière IPA BRASSERIE DU MONT BLANC',5.49)];
+ offre('ci1','rci','carrefour',0,'LA CHARNUE Bière IPA 5,5% LA CHARNUE',2.15),offre('ci2','rci','carrefour',1,'BREWDOG Punk IPA 5,4% BREWDOG',6.95),offre('ci3','rci','carrefour',2,'BRASSERIE DU MONT BLANC Bière IPA BRASSERIE DU MONT BLANC',5.49),
+ // Ce qu'un drive renvoie faute de mieux : à écarter.
+ offre('ci4','rci','carrefour',3,'Escalope de poulet Le Gaulois 240g',4.25)];
 (async()=>{const b=await chromium.launch({channel:'chrome',headless:true});let page;try{
  page=await b.newPage({viewport:{width:390,height:844},serviceWorkers:'block'});const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const demandes=[];
@@ -56,6 +58,7 @@ const offres=[offre('c1','rc','carrefour',0,'LEFFE Bière Blonde D\'Abbaye 6,6% 
  // Filtre instantané, et les IPA de la recherche préparée chez Carrefour.
  await page.getByRole('radio',{name:/^BREWDOG Punk IPA/}).waitFor({timeout:15000});
  if(await page.getByRole('radio',{name:/^LEFFE Bière Blonde/}).count())throw Error('Filtre absent');
+ if(await page.getByRole('radio',{name:/^Escalope de poulet/}).count())throw Error('Produit hors sujet affiché');
  await texte('Nouveau').first().waitFor();
  // E.Leclerc n'avait pas d'IPA : la recherche approfondie part là seulement, avec son indicateur.
  await texte('On cherche d’autres « Bière IPA »').waitFor({timeout:15000});

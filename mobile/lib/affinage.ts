@@ -84,6 +84,16 @@ const joli = (t: string) => t.toLowerCase().replace(/(^|[\s'’-])([a-zà-ÿ])/g
 export type Suggestion = { nom: string; n: number };
 
 /**
+ * Le libellé parle-t-il de l'article ? Un de ses mots commence par un mot du
+ * nom cherché (« Brie de Meaux » pour « Brie »). Sert à écarter ce qu'un drive
+ * renvoie faute de mieux (du poulet pour « Brie Fromager »).
+ */
+export function parleDe(libelle: string, requete: string): boolean {
+  const racines = mots(requete).filter(r => !VIDES.has(r)), m = mots(libelle);
+  return racines.some(r => m.some(x => x.startsWith(r) || (r.startsWith(x) && x.length >= 4)));
+}
+
+/**
  * Types et marques à proposer pour un article, d'après les offres trouvées.
  * Les types de la famille viennent d'abord, même absents des résultats : c'est
  * ce qui fait apparaître « IPA » quand le drive n'en montre qu'une. Seules les
@@ -91,7 +101,7 @@ export type Suggestion = { nom: string; n: number };
  */
 export function suggestions(requete: string, offres: { libelle: string; marque?: string | null }[], max = 6): { types: Suggestion[]; marques: Suggestion[] } {
   const racines = mots(requete);
-  const pertinentes = offres.filter(o => { const m = mots(o.libelle); return racines.some(r => m.some(x => x.startsWith(r) || r.startsWith(x) && x.length >= 4)); });
+  const pertinentes = offres.filter(o => parleDe(o.libelle, requete));
   const compte = (t: string) => pertinentes.filter(o => correspond(o.libelle, t)).length;
   // Les marques, d'abord : elles ne doivent pas passer pour des types.
   const parMarque = new Map<string, number>();

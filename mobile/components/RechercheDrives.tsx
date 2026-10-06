@@ -14,7 +14,7 @@ import { useProducts } from '../stores/products';
 import { useDejaAchete } from '../stores/deja-achete';
 import { dejaAchetes, type Connu } from '../lib/deja-achete.ts';
 import { normaliserNom, produitsProches } from '../lib/session-courses.ts';
-import { correspond, requeteAffinee, suggestions, type Suggestion } from '../lib/affinage.ts';
+import { correspond, parleDe, requeteAffinee, suggestions, type Suggestion } from '../lib/affinage.ts';
 import { FicheOffre, TableauComparatif, type LigneComparatif } from './FicheOffre';
 import { Photo, ui } from './MaisonUI';
 import { colors } from '../lib/theme';
@@ -87,7 +87,8 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
   // Le produit déjà choisi reste visible, même s'il n'est pas du type choisi.
   const filtrees = filtre ? offresBase.filter(o => correspond(o.libelle, filtre) || DRIVES_RECHERCHE.some(d => choix[d]?.id === o.id)) : offresBase;
   const vues = new Set(filtrees.map(cleOffre));
-  const nouvelles = filtre ? approfondie.offres.filter(o => !vues.has(cleOffre(o))).map(o => ({ ...o, approfondie: true, rang: 1000 + (o.rang ?? 0) })) : [];
+  // La recherche approfondie ne garde que ce qui parle de l'article : un drive sans réponse précise renvoie n'importe quoi.
+  const nouvelles = filtre ? approfondie.offres.filter(o => !vues.has(cleOffre(o)) && (parleDe(o.libelle, requete) || correspond(o.libelle, filtre))).map(o => ({ ...o, approfondie: true, rang: 1000 + (o.rang ?? 0) })) : [];
   const offres = [...filtrees, ...nouvelles];
   const dernieresAff = dernieresParDrive(approfondie.recherches);
   const enCoursAff = (d: DriveRecherche) => !!filtre && !!dernieresAff[d] && estEnAttente(dernieresAff[d]!.statut);

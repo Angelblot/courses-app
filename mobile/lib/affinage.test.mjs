@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { famille, requeteAffinee, correspond, marqueDe, suggestions } from './affinage.ts';
+import { famille, requeteAffinee, correspond, marqueDe, suggestions, parleDe } from './affinage.ts';
 
 const bieres = ['PELFORTH Bière Blonde 5,8% PELFORTH', 'BUD Bière Blonde 5% BUD', 'LEFFE Bière Blonde D\'Abbaye 6,6% LEFFE', 'LEFFE Bière Ruby 5% LEFFE',
   'HOEGAARDEN Bière Blanche 4,9% HOEGAARDEN', 'LA CHARNUE Bière IPA 5,5% LA CHARNUE', 'TOURTEL TWIST Bière Aromatisée Jus de Mangue Sans Alcool TOURTEL TWIST',
@@ -46,4 +46,11 @@ test('sans famille connue, les mots qui reviennent dans les libellés', () => {
   const { types } = suggestions('Gressin', ['FLORELLI Gressins Sésame FLORELLI', 'Gressins au sésame Florelli - 250g', 'CIRO Gressins au Romarin CIRO', 'FLORELLI Gressins Romarin FLORELLI', 'Gressins Tokapi Sésame - 125g'].map(libelle => ({ libelle })));
   assert.ok(types.some(t => t.nom === 'Sésame' && t.n === 3));
   assert.ok(types.some(t => t.nom === 'Romarin' && t.n === 2));
+});
+
+test('ce que le drive renvoie faute de mieux ne parle pas de l’article', () => {
+  assert.ok(parleDe('REFLETS DE FRANCE Brie de Meaux AOP', 'Brie'));
+  assert.ok(parleDe('Bière blonde IPA Brooklyn', 'Bières'));
+  assert.ok(!parleDe('Escalope de poulet Le Gaulois 240g', 'Brie'));
+  assert.ok(!parleDe('Oignon jaune 1p', 'Brie'));
 });
