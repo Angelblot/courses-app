@@ -196,11 +196,17 @@ export function pageAgent(cfg, item, mode) {
    * texte de l'image et du lien.
    */
   function nomDeCarte(card) {
-    const candidats = [
-      ...cfg.title.flatMap((sel) => queryAll(card, sel).map(textOf)),
-      ...[...card.querySelectorAll('img[alt], a[title], a[aria-label]')].map((e) => e.getAttribute('alt') || e.getAttribute('title') || e.getAttribute('aria-label') || ''),
-    ].map((t) => (t || '').replace(/\s+/g, ' ').trim()).filter((t) => t && t.length <= 200);
-    return candidats.sort((a, b) => b.length - a.length)[0] || textOf(card);
+    const propre = (t) => (t || '').replace(/\s+/g, ' ').trim();
+    // Une note (« 2 avis pour une note moyenne de 3.5 sur 5 ») n'est jamais un nom.
+    const valable = (t) => t && t.length <= 200 && !/\bavis\b|note moyenne|sur 5\b|étoile/i.test(t);
+    // « PELICAN » seul : rien en minuscules, deux mots au plus. C'est la marque, pas le nom.
+    const marqueSeule = (t) => !/[a-zà-ÿ]/.test(t) || t.split(' ').length <= 2;
+    const titres = cfg.title.flatMap((sel) => queryAll(card, sel).map((e) => propre(textOf(e)))).filter(valable);
+    const titre = [...titres].sort((x, y) => y.length - x.length)[0] || '';
+    if (titre && !marqueSeule(titre)) return titre;
+    const autres = [...card.querySelectorAll('img[alt], a[title], a[aria-label]')]
+      .map((e) => propre(e.getAttribute('alt') || e.getAttribute('title') || e.getAttribute('aria-label'))).filter(valable).filter((t) => !marqueSeule(t));
+    return [...autres].sort((x, y) => y.length - x.length)[0] || titre || textOf(card);
   }
 
   /**
