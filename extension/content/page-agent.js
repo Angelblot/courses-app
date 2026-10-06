@@ -193,12 +193,13 @@ export function pageAgent(cfg, item, mode) {
    * Fait défiler la page par petits pas, à rythme de lecture, pour que les
    * produits dessinés à la demande (E.Leclerc) s'affichent, puis remonte.
    */
-  async function defiler() {
+  async function defiler(assez = () => false) {
     const fenetre = document.defaultView ?? window;
     let avant = -1;
     for (let pas = 0; pas < 30; pas += 1) {
       const y = fenetre.scrollY;
-      if (y === avant) break;
+      // Assez de produits dessinés pour le relevé : inutile d'aller plus bas.
+      if (y === avant || assez()) break;
       avant = y;
       fenetre.scrollBy(0, Math.round(fenetre.innerHeight * 0.8));
       await sleep(500 + Math.random() * 400);
@@ -646,21 +647,11 @@ export function pageAgent(cfg, item, mode) {
     if (mode === 'releve') {
       const avant = cards.filter(complete).length;
       if (avant < Math.min(cards.length, MAX_RELEVE)) {
-        await defiler();
+        await defiler(() => queryFirstList(document, [cardSelector]).elements.filter(complete).length >= MAX_RELEVE);
         lues = queryFirstList(document, [cardSelector]).elements;
         if (!lues.length) lues = cards;
       }
       chargement = { cartes: lues.length, completesAvant: avant, completesApres: lues.filter(complete).length };
-      // Les produits pas encore dessinés sont-ils déjà dans un script de la page ?
-      const attente = lues.find((c) => !complete(c));
-      const nomAttente = attente ? textOf(queryFirst(attente, cfg.title) || attente).split('\n')[0].trim() : '';
-      if (nomAttente) {
-        const scripts = [...document.querySelectorAll('script:not([src])')].map((x) => x.textContent || '');
-        const dedans = scripts.find((t) => t.includes(nomAttente));
-        const i = dedans ? dedans.indexOf(nomAttente) : -1;
-        chargement.script = { nom: nomAttente.slice(0, 60), scripts: scripts.length, trouve: i >= 0, taille: dedans?.length ?? 0,
-          debut: dedans ? dedans.slice(0, 300) : '', autour: i >= 0 ? dedans.slice(Math.max(0, i - 700), i + 900) : '' };
-      }
     }
     const releve = lues.slice(0, MAX_RELEVE).map((card) => {
       // L'adresse du produit, pas celle du rayon : chez E.Leclerc, le premier
