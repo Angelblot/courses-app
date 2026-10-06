@@ -137,3 +137,8 @@ Xcode Cloud, ou pousser une modification réelle sous `mobile/`.
 Si l'archive réussit mais que TestFlight ne reçoit rien, regarder l'étape
 « TestFlight Internal Testing » du build dans App Store Connect : GitHub ne
 reçoit que le résultat de l'archivage (cas du 4 octobre 2026, relancé).
+
+Si le build reste « en file d'attente » côté Xcode Cloud (cas du 6 octobre
+2026 : une heure sans démarrer pour le commit 5499147), pousser une
+modification sous `mobile/` redéclenche un build ; à défaut, le relancer à la
+main avec « Start Build » sur `main`.
