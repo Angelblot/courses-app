@@ -6,10 +6,14 @@ import type { LigneConsolidee } from './consolidation.ts';
 import { normalizeProductType } from './typology.ts';
 import { quantiteNormalisee, convertToProductQty } from './unites.ts';
 import { rayonDepuisLibelle } from './rayons.ts';
-export type LigneMaison = LigneConsolidee & { owned: boolean; aPreciser: boolean; choixKey?: string; candidats: Product[]; besoin?: string };
+export type LigneMaison = LigneConsolidee & { owned: boolean; aPreciser: boolean; choixKey?: string; candidats: Product[]; besoin?: string;
+  /** Les ingrédients de recette dont vient la ligne : les relier à un produit vaut pour les fois suivantes. */
+  ingredientIds?: string[];
+  /** La part des repas, dans l'unité du produit : Habitudes la montre, et l'on ajoute en plus. */
+  quantiteRepas?: number; };
 export function listeMaison(e: Etat, recettes: Recipe[], produits: Product[]): LigneMaison[] {
   const lignes = new Map<string, LigneMaison>();
-  const groupes = new Map<string, { nom: string; qty: number; unit: string; candidats: Product[]; sources: LigneConsolidee['sources']; rayon: string }>();
+  const groupes = new Map<string, { nom: string; qty: number; unit: string; candidats: Product[]; sources: LigneConsolidee['sources']; rayon: string; ids: string[] }>();
   for (const recette of recettes) {
     const parts = e.selectedRecipes[recette.id];
     if (!parts || parts < 1) continue;
@@ -23,7 +27,8 @@ export function listeMaison(e: Etat, recettes: Recipe[], produits: Product[]): L
       // Une liaison explicite est prioritaire sur une simple ressemblance de nom.
       candidats.sort((a,b) => Number(b.id === ing.product_id) - Number(a.id === ing.product_id));
       let g = groupes.get(key);
-      if (!g) { g = { nom: ing.name, qty: 0, unit, candidats, sources: [], rayon: ing.rayon }; groupes.set(key,g); }
+      if (!g) { g = { nom: ing.name, qty: 0, unit, candidats, sources: [], rayon: ing.rayon, ids: [] }; groupes.set(key,g); }
+      if (ing.id) g.ids.push(ing.id);
       g.qty += normal?.valeur ?? q;
       g.sources.push({ type: 'recipe', label: recette.name, qty: q });
     }
@@ -34,16 +39,18 @@ export function listeMaison(e: Etat, recettes: Recipe[], produits: Product[]): L
     const conversion = produit ? convertToProductQty(g.qty,g.unit,produit) : null;
     const valide = conversion && conversion.qty > 0;
     const key = produit ? `produit:${produit.id}` : `ingredient:${choixKey}`;
-    const besoin = `${g.qty.toLocaleString('fr-FR')} ${g.unit} pour les recettes`;
+    // « 2 pour les recettes » : l'unité n'est dite que si c'est une mesure (g, cl…).
+    const besoin = `${g.qty.toLocaleString('fr-FR')} ${g.unit === 'unité' ? '' : `${g.unit} `}pour les recettes`;
     const ligne: LigneMaison = { key, choixKey, name: produit?.name ?? g.nom, unit: produit?.unit ?? g.unit,
       totalQuantity: valide ? conversion.qty : g.unit === 'unité' ? g.qty : 1,
       product_id: produit?.id ?? null, ean13: produit?.ean13 ?? null,
       rayon: rayonDepuisLibelle(produit?.category ?? g.rayon), sources: g.sources,
       owned: !!produit && e.quotidien[produit.id] === 'have',
-      aPreciser: !valide && g.unit !== 'unité', candidats: g.candidats, besoin,
+      aPreciser: !valide && g.unit !== 'unité', candidats: g.candidats, besoin, ingredientIds: g.ids,
+      quantiteRepas: valide ? conversion.qty : g.unit === 'unité' ? g.qty : 1,
     };
     const existante = lignes.get(key);
-    if (existante) { existante.totalQuantity += ligne.totalQuantity; existante.sources.push(...ligne.sources); existante.aPreciser ||= ligne.aPreciser; }
+    if (existante) { existante.totalQuantity += ligne.totalQuantity; existante.quantiteRepas = (existante.quantiteRepas ?? 0) + (ligne.quantiteRepas ?? 0); existante.sources.push(...ligne.sources); existante.aPreciser ||= ligne.aPreciser; }
     else lignes.set(key,ligne);
   }
   for (const [id,statut] of Object.entries(e.quotidien)) {
@@ -67,8 +74,12 @@ export function listeMaison(e: Etat, recettes: Recipe[], produits: Product[]): L
     lignes.set(key,{key,name:extra.name,unit:extra.unit,totalQuantity:extra.quantity,product_id:null,ean13:null,rayon:extra.rayon,sources:[{type:'extra',label:'Noté',qty:extra.quantity}],owned:false,aPreciser:false,candidats:[]});
   }
   return [...lignes.values()].map(l=>{
-    const q = e.ligneQuantites?.[l.key];
-    return {...l, totalQuantity:q ?? l.totalQuantity, owned:e.lignePossedees?.[l.key] ?? l.owned,
+    // Un produit pris par les repas suit les recettes : seul un retrait (0) s'impose,
+    // et ce qu'on a ajouté en plus s'additionne à leur part.
+    const brut = e.ligneQuantites?.[l.key], repas = !!l.quantiteRepas && !!l.product_id;
+    const q = repas && brut !== 0 ? undefined : brut;
+    const enPlus = repas ? e.enPlus?.[l.product_id!] ?? 0 : 0;
+    return {...l, totalQuantity:q ?? l.totalQuantity + enPlus, owned:e.lignePossedees?.[l.key] ?? l.owned,
       // Une quantité explicitement confirmée est le nombre de conditionnements à acheter.
       unit:q != null && l.aPreciser ? 'unité' : l.unit,
       aPreciser:q == null && l.aPreciser};

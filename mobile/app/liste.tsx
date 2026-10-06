@@ -28,12 +28,14 @@ const pluriel=(n:number,mot:string)=>`${n} ${mot}${n>1?'s':''}`;
 export default function Liste({session=false}:{session?:boolean}){
  const {w,p,r,lignes,acheter,loading,erreur,stale}=useMaison();
  const {width}=useWindowDimensions(),large=session&&width>=768;
- const [owned,setOwned]=useState(false),[nom,setNom]=useState(''),[ouverte,setOuverte]=useState<string|null>(null),[detail,setDetail]=useState(!session),[regler,setRegler]=useState(false),[envoi,setEnvoi]=useState(false);
+ const [owned,setOwned]=useState(false),[nom,setNom]=useState(''),[ouverte,setOuverte]=useState<string|null>(null),[detail,setDetail]=useState(!session),[regler,setRegler]=useState(false),[depart,setDepart]=useState<'manques'|'ingredients'>('manques'),[envoi,setEnvoi]=useState(false);
  const doublons=doublonsPossibles(acheter,w.doublonsValides,w.distincts),manques=manquesAPreciser(w,p.produits.map(x=>x.id));
  const visibles=lignes.filter(l=>l.owned===owned);
  const points=manques.length+doublons.length;
+ // Les ingrédients des repas sans produit (ni gardés tels quels) : un point du bilan à lier.
+ const ingredients=acheter.filter(l=>l.key.startsWith('ingredient:')&&!(w.ingredientsSansProduit??[]).includes(l.choixKey??''));
  // Les articles à préciser sont cherchés sur les drives sans attendre : en ouvrant Préciser, les résultats sont là.
- const aChercher=JSON.stringify(manques.map(([,m])=>m.name).sort());
+ const aChercher=JSON.stringify([...manques.map(([,m])=>m.name),...ingredients.map(l=>l.name)].sort());
  useEffect(()=>{const noms=JSON.parse(aChercher) as string[];if(noms.length)void preparerRecherches(noms);},[aChercher]);
  const annulation=useAnnulation();
  // La feuille Préciser se ferme d'elle-même quand elle n'a plus rien à montrer (récapitulatif compris).
@@ -52,8 +54,9 @@ export default function Liste({session=false}:{session?:boolean}){
  const entete=session?loading&&vide?<View style={[b.hero,{minHeight:68}]} accessible accessibilityLabel="Préparation de ta liste"><ActivityIndicator color={colors.accent}/><Text style={ui.detail}>Préparation de ta liste…</Text></View>:<>
   <View style={b.hero} accessible accessibilityRole="header" accessibilityLabel={`${pluriel(acheter.length,'produit')} dans ta liste. ${sousTitre}`}><Text style={b.nombre}>{acheter.length}</Text><View style={{flex:1}}><Text style={b.pret}>{acheter.length>1?'produits':'produit'} dans ta liste</Text><Text style={ui.detail}>{sousTitre}</Text></View></View>
   {vignettes.length>0&&<View style={[ui.row,{gap:0,paddingLeft:6}]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>{vignettes.map((l,i)=><Photo key={l.key} name={l.name} url={p.produits.find(x=>x.id===l.product_id)?.image_url} style={[b.vignette,i>0&&{marginLeft:-10}]}/>)}</View>}
-  <Corrections points={points} doublons={doublons.length} aPreciser={manques.map(([,m])=>m.name)} onVerifier={()=>setRegler(true)}/>
-  {!large&&<Pressable accessibilityRole="button" accessibilityLabel={detail?'Masquer la liste':'Voir et ajuster la liste'} accessibilityHint="Par rayon, quantités, déjà chez moi" accessibilityState={{expanded:detail}} onPress={()=>setDetail(!detail)} style={({pressed})=>[ui.product,{minHeight:60,paddingLeft:16},pressed&&{opacity:.85}]}><View style={{flex:1}}><Text style={ui.productName}>{detail?'Masquer la liste':'Voir et ajuster la liste'}</Text><Text style={[ui.detail,{marginTop:2}]}>Par rayon, quantités, déjà chez moi</Text></View><Feather name={detail?'chevron-up':'chevron-down'} size={20} color={colors.textMuted}/></Pressable>}
+  <Corrections points={points} doublons={doublons.length} aPreciser={manques.map(([,m])=>m.name)} ingredients={ingredients.map(l=>l.name)} onVerifier={()=>{setDepart('manques');setRegler(true);}} onLier={()=>{setDepart('ingredients');setRegler(true);}}/>
+  {/* En session, la liste par rayon vit dans « Habitudes et liste » ; le bilan reste un sommaire. */}
+  {!large&&!session&&<Pressable accessibilityRole="button" accessibilityLabel={detail?'Masquer la liste':'Voir et ajuster la liste'} accessibilityHint="Par rayon, quantités, déjà chez moi" accessibilityState={{expanded:detail}} onPress={()=>setDetail(!detail)} style={({pressed})=>[ui.product,{minHeight:60,paddingLeft:16},pressed&&{opacity:.85}]}><View style={{flex:1}}><Text style={ui.productName}>{detail?'Masquer la liste':'Voir et ajuster la liste'}</Text><Text style={[ui.detail,{marginTop:2}]}>Par rayon, quantités, déjà chez moi</Text></View><Feather name={detail?'chevron-up':'chevron-down'} size={20} color={colors.textMuted}/></Pressable>}
  </>:<><Head title="Ma liste" back/><Text style={ui.subtitle}>{pluriel(acheter.length,'produit')} à acheter</Text></>;
  const statut=<>
  {loading&&<ActivityIndicator color={colors.accent}/>}{erreur&&<><Text style={ui.error}>{erreur}</Text><Action secondary onPress={()=>{p.recharger();r.recharger();}}>Réessayer</Action></>}
@@ -75,7 +78,7 @@ export default function Liste({session=false}:{session?:boolean}){
  <Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>Alert.alert('Vider cette liste ?','Les recettes et les favoris de ton catalogue seront conservés.',[{text:'Annuler',style:'cancel'},{text:'Vider la liste',style:'destructive',onPress:w.reinitialiser}])}><Text style={ui.detail}>Vider la liste</Text></Pressable></>}
  </>;
  const feuilles=<>
- <ReglerSheet visible={regler} onFermer={()=>setRegler(false)} manques={manques} doublons={doublons} products={p.produits} onRetrait={annulation.proposer} toast={annulation.toast}/>
+ <ReglerSheet visible={regler} onFermer={()=>setRegler(false)} manques={manques} doublons={doublons} ingredients={ingredients} depart={depart} products={p.produits} onRetrait={annulation.proposer} toast={annulation.toast}/>
  <EnvoiSheet visible={envoi} onFermer={()=>setEnvoi(false)}/>
  </>;
  // Tablette : le résumé et l'envoi à gauche, la liste toujours visible à droite.
@@ -117,7 +120,7 @@ function LigneCorrection({etat,titre,detail,action,onPress}:{etat:EtatCorrection
  * Manques, Habitudes, Extras : plus des étapes, des corrections. Rien ne
  * bloque l'envoi ; ce qui n'a pas été vu est seulement rappelé.
  */
-function Corrections({points,doublons,aPreciser,onVerifier}:{points:number;doublons:number;aPreciser:string[];onVerifier:()=>void}){
+function Corrections({points,doublons,aPreciser,ingredients,onVerifier,onLier}:{points:number;doublons:number;aPreciser:string[];ingredients:string[];onVerifier:()=>void;onLier:()=>void}){
  const {w,p}=useMaison();
  const manques=Object.entries(manquesDuBrouillon(w)).filter(([key])=>manqueActif(w,key));
  const favoris=references(p.produits).filter(x=>rayonDepuisLibelle(x.category)&&!manques.some(([k])=>k===`produit:${x.id}`));
@@ -130,12 +133,15 @@ function Corrections({points,doublons,aPreciser,onVerifier}:{points:number;doubl
  const pl=(n:number,mot:string)=>`${n} ${mot}${n>1?'s':''}`;
  return <View style={{gap:8}}>
   {!repas&&<LigneCorrection etat="rappel" titre="Repas" detail="Aucun repas choisi cette fois" action="Choisir" onPress={()=>router.dismissTo('/wizard/recettes')}/>}
+  {/* Les ingrédients des repas sans produit : on les lie comme un manque, le lien vaut pour la recette. */}
+  {repas>0&&(ingredients.length?<LigneCorrection etat="attention" titre="Ingrédients des repas" detail={`${ingredients.length} sans produit : ${ingredients.slice(0,4).join(', ')}${ingredients.length>4?'…':''}`} action="Lier" onPress={onLier}/>
+   :<LigneCorrection etat="ok" titre="Ingrédients des repas" detail="Tous liés à un produit" onPress={()=>router.dismissTo('/wizard/recettes')}/>)}
   {/* Ce qui peut être précisé passe par la ligne Manques, qui ouvre la feuille ; rien ne bloque l'envoi. */}
-  {points?<LigneCorrection etat="attention" titre="Manques" detail={[pl(manques.length,'noté'),aPreciser.length===1?`« ${aPreciser[0]} » : l’extension cherchera ce nom`:aPreciser.length?`${aPreciser.length} produits cherchés par leur nom`:'',doublons?`${doublons} doublon${doublons>1?'s':''} possible${doublons>1?'s':''}`:''].filter(Boolean).join(' · ')} action="Préciser" onPress={onVerifier}/>
+  {points?<LigneCorrection etat="attention" titre="Manques" detail={[manques.length?pl(manques.length,'noté'):'',aPreciser.length===1?`« ${aPreciser[0]} » : l’extension cherchera ce nom`:aPreciser.length?`${aPreciser.length} produits cherchés par leur nom`:'',doublons?`${doublons} doublon${doublons>1?'s':''} possible${doublons>1?'s':''}`:''].filter(Boolean).join(' · ')} action="Préciser" onPress={onVerifier}/>
   :<LigneCorrection etat={manques.length?'ok':'ajout'} titre="Manques" detail={manques.length?pl(manques.length,'noté'):'Rien de noté'} onPress={()=>ouvrir('manques')}/>}
-  {favoris.length>0&&(!vus.length?<LigneCorrection etat="rappel" titre="Habitudes" detail={`Pas encore revues · ${pl(favoris.length,'produit')}`} action="Revoir" onPress={()=>ouvrir('habitudes')}/>
-   :revus<rayons.length?<LigneCorrection etat="rappel" titre="Habitudes" detail={`${revus} rayon${revus>1?'s':''} sur ${rayons.length} revu${revus>1?'s':''} · ${pl(retenues,'retenu')}`} action="Continuer" onPress={()=>ouvrir('habitudes')}/>
-   :<LigneCorrection etat="ok" titre="Habitudes" detail={`${pl(retenues,'retenu')} sur ${favoris.length}`} onPress={()=>ouvrir('habitudes')}/>)}
+  {favoris.length>0&&(!vus.length?<LigneCorrection etat="rappel" titre="Habitudes et liste" detail={`Par rayon · ${pl(favoris.length,'produit')}${repas?' · repas déjà comptés':''}`} action="Revoir" onPress={()=>ouvrir('habitudes')}/>
+   :revus<rayons.length?<LigneCorrection etat="rappel" titre="Habitudes et liste" detail={`${revus} rayon${revus>1?'s':''} sur ${rayons.length} revu${revus>1?'s':''} · ${pl(retenues,'retenu')}`} action="Continuer" onPress={()=>ouvrir('habitudes')}/>
+   :<LigneCorrection etat="ok" titre="Habitudes et liste" detail={`${pl(retenues,'retenu')} sur ${favoris.length}`} onPress={()=>ouvrir('habitudes')}/>)}
   <LigneCorrection etat="ajout" titre="Extras" detail={extras?pl(extras,'ajouté'):'Un produit hors habitudes'} onPress={()=>ouvrir('exceptions')}/>
  </View>;
 }

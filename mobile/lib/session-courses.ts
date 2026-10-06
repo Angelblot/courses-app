@@ -121,7 +121,7 @@ export function abandonner(e: Etat): Etat {
   manques, importsExternes: e.importsExternes, extrasFrequents: e.extrasFrequents, drives: e.drives,
   quotidien: garder(e.quotidien), quotidienQty: garder(e.quotidienQty),
   extras: e.extras.filter(x => `extra:${x.id}` in manques),
-  selectedRecipes: {}, habitudesVues: {}, ligneQuantites: {}, lignePossedees: {}, doublonsValides: [], choixProduits: {},
+  selectedRecipes: {}, habitudesVues: {}, ligneQuantites: {}, lignePossedees: {}, doublonsValides: [], choixProduits: {}, ingredientsSansProduit: [], enPlus: {},
  };
 }
 

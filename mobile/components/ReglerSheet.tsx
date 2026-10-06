@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { useWizard } from '../contexts/WizardContext';
 import { useProducts, type Product } from '../stores/products';
 import { garderOffres } from '../stores/recherches-drive';
+import { rattacherIngredient } from '../stores/recipes';
 import type { LigneMaison } from '../lib/liste-maison';
 import type { Manque } from '../lib/session-courses';
 import { sources } from './Manques';
@@ -19,8 +20,22 @@ import { precedentDe, rangDans, visiter } from '../lib/parcours-preciser.ts';
 import { Photo, ui } from './MaisonUI';
 import { colors } from '../lib/theme';
 
+/**
+ * Relie (ou délie) des ingrédients de recette, dans l'ordre des demandes :
+ * « Lier » puis « Modifier » ne doivent pas se croiser en base. Un échec
+ * laisse le lien valable pour la liste en cours ; il est journalisé.
+ */
+let fileRattache: Promise<unknown> = Promise.resolve();
+function rattacher(ids: string[], productId: string | null, rayon: LigneMaison['rayon'] | undefined) {
+ if (!ids.length || !rayon) return;
+ fileRattache = fileRattache.then(async () => {
+  const r = await Promise.all(ids.map(i => rattacherIngredient(i, productId, rayon)));
+  if (r.some(x => !x.ok)) console.error('[rattacher] lien de recette non enregistré', ids);
+ });
+}
+
 type Doublon = { id: string; a: LigneMaison; b: LigneMaison };
-type Point = { type: 'manque'; key: string; manque: Manque } | { type: 'doublon'; doublon: Doublon };
+type Point = { type: 'manque'; key: string; manque: Manque } | { type: 'doublon'; doublon: Doublon } | { type: 'ingredient'; key: string; ligne: LigneMaison };
 /** Ce qui a été décidé pour un point, en lignes « qui : quoi », pour le revoir. */
 type Resume = {
  qui: string; quoi: string; vide?: boolean;
@@ -39,7 +54,10 @@ type OnRegle = (resume: Resume, annuler: () => void, choix?: ChoixOffres) => voi
  * dès qu'il ne reste plus rien. Le chevron de l'en-tête remonte les points
  * déjà vus : réglé, un point s'affiche en résumé et peut être rouvert.
  */
-export function ReglerSheet({ visible, onFermer, manques, doublons, products, onRetrait, toast }: { visible: boolean; onFermer: () => void; manques: [string, Manque][]; doublons: Doublon[]; products: Product[]; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode }) {
+export function ReglerSheet({ visible, onFermer, manques, doublons, ingredients = [], depart = 'manques', products, onRetrait, toast }: { visible: boolean; onFermer: () => void; manques: [string, Manque][]; doublons: Doublon[];
+ /** Les ingrédients de repas sans produit, et par quoi commencer (la ligne du bilan touchée). */
+ ingredients?: LigneMaison[]; depart?: 'manques' | 'ingredients';
+ products: Product[]; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode }) {
  // « Passer au suivant » range un point en fin de file, le temps que l'extension cherche.
  const [reportes, setReportes] = useState<string[]>([]);
  // L'ordre de visite, ce qui a été réglé, et le point revu par « Précédent » (null : la tête de file).
@@ -48,8 +66,10 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
  const [focus, setFocus] = useState<string | null>(null);
  // « Modifier » rouvre un point avec les produits qu'il avait retenus, déjà cochés.
  const [reprises, setReprises] = useState<Record<string, ChoixOffres>>({});
- const cle = (p: Point) => p.type === 'manque' ? p.key : p.doublon.id;
- const tous: Point[] = [...manques.map(([key, manque]) => ({ type: 'manque' as const, key, manque })), ...doublons.map(doublon => ({ type: 'doublon' as const, doublon }))];
+ const cle = (p: Point) => p.type === 'doublon' ? p.doublon.id : p.key;
+ const pointsManques: Point[] = [...manques.map(([key, manque]) => ({ type: 'manque' as const, key, manque })), ...doublons.map(doublon => ({ type: 'doublon' as const, doublon }))];
+ const pointsIngredients: Point[] = ingredients.map(ligne => ({ type: 'ingredient' as const, key: ligne.key, ligne }));
+ const tous: Point[] = depart === 'ingredients' ? [...pointsIngredients, ...pointsManques] : [...pointsManques, ...pointsIngredients];
  const points = [...tous.filter(p => !reportes.includes(cle(p))), ...reportes.flatMap(k => tous.filter(p => cle(p) === k))];
  const tete = points[0], cleTete = tete ? cle(tete) : null;
  const focusOuvert = focus ? points.find(p => cle(p) === focus) : undefined;
@@ -75,7 +95,7 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
  </View> : null;
 
  const nomDe = (k: string) => { const p = points.find(x => cle(x) === k);
-  return p ? (p.type === 'manque' ? p.manque.name : `${p.doublon.a.name} ou ${p.doublon.b.name}`) : regles[k]?.nom ?? ''; };
+  return p ? (p.type === 'manque' ? p.manque.name : p.type === 'ingredient' ? p.ligne.name : `${p.doublon.a.name} ou ${p.doublon.b.name}`) : regles[k]?.nom ?? ''; };
  const reglesDansLOrdre = ordre.filter(k => regles[k] && !ouverts.has(k)).map(k => ({ cle: k, regle: regles[k] }));
  const avant = affiche ? precedentDe(parcours, affiche) : fin ? reglesDansLOrdre[reglesDansLOrdre.length - 1]?.cle ?? null : null;
  const onPrecedent = avant ? () => setFocus(avant) : null;
@@ -101,6 +121,10 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, products, on
      onContinuer={() => setFocus(null)}
      onChanger={() => { focusRegle.annuler(); const choix = focusRegle.choix; if (choix) setReprises(x => ({ ...x, [focus]: choix }));
       setRegles(r => { const { [focus]: _, ...reste } = r; return reste; }); }} />
+   : courant?.type === 'ingredient'
+   ? <PreciserManque key={courant.key} titre={titre} progression={progression} lineKey={courant.key} manque={{ name: courant.ligne.name, source: 'manuel' }} ingredient={courant.ligne} products={products} onFermer={onFermer} onRetrait={onRetrait} toast={toast}
+     autres={[]} onPrecedent={onPrecedent} libellePrecedent={libellePrecedent} onRegle={regle(courant.key, courant.ligne.name, 'manque')} choixInitial={reprises[courant.key]}
+     onPasser={points.length > 1 ? () => { setFocus(null); setReportes(r => [...r.filter(k => k !== courant.key), courant.key]); } : undefined} />
    : courant?.type === 'manque'
    ? <PreciserManque key={courant.key} titre={titre} progression={progression} lineKey={courant.key} manque={courant.manque} products={products} onFermer={onFermer} onRetrait={onRetrait} toast={toast}
      autres={manques.filter(([k]) => k !== courant.key).map(([, m]) => m.name)} onPrecedent={onPrecedent} libellePrecedent={libellePrecedent}
@@ -217,7 +241,9 @@ function PointRegle({ titre, progression, regle, onFermer, onPrecedent, libelleP
  * pied récapitule et valide ; rien ne passe au point suivant avant « Valider ».
  * Sinon, en bas, « garder sans produit » ou « retirer ».
  */
-function PreciserManque({ titre, progression, lineKey, manque, products, onFermer, onRetrait, toast, autres, onPasser, onPrecedent, libellePrecedent, onRegle, choixInitial }: { titre: string; progression: ReactNode; lineKey: string; manque: Manque; products: Product[]; onFermer: () => void; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode; autres: string[]; onPasser?: () => void; onPrecedent: (() => void) | null; libellePrecedent: string; onRegle: OnRegle; choixInitial?: ChoixOffres }) {
+function PreciserManque({ titre, progression, lineKey, manque, products, onFermer, onRetrait, toast, autres, onPasser, onPrecedent, libellePrecedent, onRegle, choixInitial, ingredient }: { titre: string; progression: ReactNode; lineKey: string; manque: Manque; products: Product[]; onFermer: () => void; onRetrait: (texte: string, annuler: () => void) => void; toast?: ReactNode; autres: string[]; onPasser?: () => void; onPrecedent: (() => void) | null; libellePrecedent: string; onRegle: OnRegle; choixInitial?: ChoixOffres;
+ /** Un ingrédient de repas sans produit : le lier vaut pour ses recettes, pas seulement pour cette liste. */
+ ingredient?: LigneMaison }) {
  const w = useWizard(), extension = useExtension();
  const [etape, setEtape] = useState<ReturnType<typeof Phase>>('aucune');
  const { recharger } = useProducts();
@@ -245,24 +271,32 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
    return o ? { qui: NOMS_DRIVE[d], quoi: `${nomCourt(o.libelle)} · ${prixLisible(o.prix) ?? 'n.c.'}`,
     produit: { nom: o.libelle, image: o.image_url, prix: prixLisible(o.prix), unite: o.prix_unitaire != null && o.unite_prix ? prixLisible(o.prix_unitaire, o.unite_prix) : null, histoire: o.histoire ?? null } }
     : { qui: NOMS_DRIVE[d], quoi: 'non choisi', vide: true }; }),
-   () => avant.rouvrirManque(lineKey, avant, productId), Object.fromEntries(offres.map(o => [o.drive, o])) as ChoixOffres);
-  w.validerManque(lineKey, qty, productId);
+   ingredient ? () => delier(productId) : () => avant.rouvrirManque(lineKey, avant, productId), Object.fromEntries(offres.map(o => [o.drive, o])) as ChoixOffres);
+  if (ingredient) lier(productId); else w.validerManque(lineKey, qty, productId);
  };
  const choisies = [choix.carrefour, choix.leclerc].filter((o): o is OffreRelevee => !!o);
  const id = lineKey.startsWith('produit:') ? lineKey.slice(8) : undefined, extra = w.extras.find(x => `extra:${x.id}` === lineKey);
  const qty = id ? w.quotidienQty[id] ?? 1 : extra?.quantity ?? 1, nom = extra?.name ?? manque.name;
  const disparu = !!id && !products.some(p => p.id === id);
- const origine = [sources[manque.source], disparu ? 'produit retiré de ton catalogue' : 'pas encore un de tes produits'].filter(Boolean).join(' · ');
+ const recettes = ingredient ? [...new Set(ingredient.sources.map(x => x.label))].join(', ') : '';
+ const origine = ingredient ? [ingredient.besoin, recettes].filter(Boolean).join(' · ')
+  : [sources[manque.source], disparu ? 'produit retiré de ton catalogue' : 'pas encore un de tes produits'].filter(Boolean).join(' · ');
+ // Un ingrédient lié l'est pour ses recettes (les fois suivantes aussi) et pour la liste en cours.
+ const ck = ingredient?.choixKey ?? '';
+ const lier = (productId: string) => { w.choisirProduit(ck, productId); rattacher(ingredient?.ingredientIds ?? [], productId, ingredient?.rayon); };
+ const delier = (productId: string) => { void productId; w.oublierChoixProduit(ck); rattacher(ingredient?.ingredientIds ?? [], null, ingredient?.rayon); };
  const retirer = () => { const avant = w.ligneQuantites[lineKey];
   onRegle([{ qui: 'Retiré', quoi: 'de ta liste', vide: true }], () => w.restaurerLigne(lineKey, avant));
   w.modifierLigne(lineKey, 0); onRetrait(`${nom} retiré de ta liste`, () => w.restaurerLigne(lineKey, avant)); };
- const garderSansProduit = () => { onRegle([{ qui: 'Gardé', quoi: 'sans produit, cherché par son nom', vide: true }], () => w.rouvrirManque(lineKey, w)); w.validerManque(lineKey, qty); };
+ const garderSansProduit = () => {
+  if (ingredient) { onRegle([{ qui: 'Gardé', quoi: 'sans produit, cherché par son nom', vide: true }], () => w.garderIngredient(ck, false)); w.garderIngredient(ck, true); return; }
+  onRegle([{ qui: 'Gardé', quoi: 'sans produit, cherché par son nom', vide: true }], () => w.rouvrirManque(lineKey, w)); w.validerManque(lineKey, qty); };
  const entete = <View style={{ gap: 10, paddingBottom: 10 }}>
   {progression}
   <View style={s.heros}>
-   <View style={s.inconnu}><Feather name={manque.source === 'siri' ? 'mic' : manque.source === 'rappels' ? 'check-circle' : 'edit-2'} size={20} color={colors.attentionText} /></View>
+   <View style={s.inconnu}><Feather name={ingredient ? 'book-open' : manque.source === 'siri' ? 'mic' : manque.source === 'rappels' ? 'check-circle' : 'edit-2'} size={20} color={colors.attentionText} /></View>
    <View style={{ flex: 1, gap: 2 }}>
-    <View style={s.nomLigne}><Text style={[s.nom, { flexShrink: 1 }]} numberOfLines={2}>« {nom} »</Text><Text style={s.qteDiscrete}>× {qty}</Text></View>
+    <View style={s.nomLigne}><Text style={[s.nom, { flexShrink: 1 }]} numberOfLines={2}>« {nom} »</Text>{!ingredient && <Text style={s.qteDiscrete}>× {qty}</Text>}</View>
     <Text style={[ui.detail, { marginTop: 0 }, !!filtre && s.sousFiltre]} accessibilityLiveRegion="polite">{filtre
      ? `${filtre} · ${affinage?.trouves ?? 0} trouvé${(affinage?.trouves ?? 0) > 1 ? 's' : ''}` : origine}</Text>
     {!!filtre && <Pressable accessibilityRole="button" onPress={() => setFiltre(null)} hitSlop={8} style={s.toutVoir}><Text style={s.toutVoirTexte}>Voir tous les « {nom} »</Text></Pressable>}
@@ -344,11 +378,19 @@ function GarderUn({ titre, progression, doublon, products, onFermer, onRetrait, 
   onRegle([{ qui: 'Gardé', quoi: garde.name }, { qui: 'Retiré', quoi: l.name, vide: true }], () => w.restaurerLigne(l.key, avant));
   w.modifierLigne(l.key, 0); onRetrait(`${l.name} retiré de ta liste`, () => w.restaurerLigne(l.key, avant)); };
  const { a, b } = doublon;
+ // Ni l'un ni l'autre : les deux lignes quittent la liste, « Annuler » les remet.
+ const retirerLesDeux = () => {
+  const avantA = w.ligneQuantites[a.key], avantB = w.ligneQuantites[b.key];
+  const remettre = () => { w.restaurerLigne(a.key, avantA); w.restaurerLigne(b.key, avantB); };
+  onRegle([{ qui: 'Retirés', quoi: `${a.name} et ${b.name}`, vide: true }], remettre);
+  w.modifierLigne(a.key, 0); w.modifierLigne(b.key, 0);
+  onRetrait(`${a.name} et ${b.name} retirés de ta liste`, remettre);
+ };
  const tuile = (garde: LigneMaison, autre: LigneMaison) => {
   const produit = products.find(p => p.id === garde.product_id), origine = [...new Set(garde.sources.map(x => x.label))].join(' · ');
   return <View style={s.tuile}>
    <View style={s.image}><Photo name={garde.name} url={produit?.image_url} style={s.photo} /></View>
-   <View style={s.texte}><Text style={ui.productName} numberOfLines={3}>{garde.name}</Text><Text style={[ui.detail, { marginTop: 2 }]} numberOfLines={1}>{[origine, `× ${garde.totalQuantity}`].filter(Boolean).join(' · ')}</Text></View>
+   <View style={s.texte}><Text style={ui.productName} numberOfLines={3}>{garde.name}</Text><Text style={[ui.detail, { marginTop: 2 }]} numberOfLines={1}>{[origine, garde.unit && garde.unit !== 'unité' ? `${garde.totalQuantity.toLocaleString('fr-FR')} ${garde.unit}` : `× ${garde.totalQuantity}`].filter(Boolean).join(' · ')}</Text></View>
    <Pressable accessibilityRole="button" accessibilityLabel={`Garder ${garde.name}, ${garde.totalQuantity} article${garde.totalQuantity > 1 ? 's' : ''}. ${autre.name} sera retiré`} onPress={() => retirer(autre, garde)} style={({ pressed }) => [s.garder, pressed && { opacity: .85 }]}>
     <Text style={s.garderTexte}>Garder celui-ci</Text>
    </Pressable>
@@ -364,6 +406,7 @@ function GarderUn({ titre, progression, doublon, products, onFermer, onRetrait, 
   <View style={[s.basDoublon, { paddingBottom: 12 + insets.bottom }]}>
    {toast}
    <Pressable accessibilityRole="button" onPress={() => { onRegle([{ qui: 'Gardés', quoi: 'deux achats différents' }], () => w.oublierDistinct(a.name, b.name)); w.declarerDistinct(a.name, b.name); }} style={({ pressed }) => [s.differents, pressed && { opacity: .85 }]}><Text style={s.garderNomTexte}>Ce sont deux achats différents</Text></Pressable>
+   <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${a.name} et ${b.name} de ta liste`} onPress={retirerLesDeux} style={({ pressed }) => [s.lienPied, pressed && { opacity: .6 }]}><Text style={[s.lienPiedTexte, { color: colors.danger }]}>Retirer les deux</Text></Pressable>
    <Text style={s.explication}>Garder l’un retire l’autre de ta liste ; « Annuler » reste possible.</Text>
   </View>
  </SafeAreaView>;
@@ -429,7 +472,8 @@ const s = StyleSheet.create({
  tuile: { flex: 1, alignSelf: 'stretch', backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
  image: { height: 112, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' },
  photo: { width: 92, height: 92, borderRadius: 8 },
- texte: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, flex: 1 },
+ // flexGrow et non flex : sur iPhone, flex: 1 écrasait le texte à zéro dans une carte sans hauteur fixe.
+ texte: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8, flexGrow: 1 },
  garder: { margin: 8, marginTop: 0, minHeight: 44, borderRadius: 10, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
  garderTexte: { fontSize: 15, fontWeight: '700', color: colors.accent },
  basDoublon: { paddingHorizontal: 16, paddingTop: 10, gap: 6 },

@@ -42,6 +42,10 @@ export type Etat = {
   extras: LigneExtra[];
   /** Produit retenu par groupe d'ingrédients, à l'étape 3. */
   choixProduits: Record<string, string>;
+  /** Ingrédients de repas gardés sans produit au bilan : l'extension les cherchera par leur nom. */
+  ingredientsSansProduit?: string[];
+  /** Ce qu'on ajoute en plus de la part des repas, par produit (Habitudes et liste). La part des repas suit les recettes. */
+  enPlus?: Record<string, number>;
   drives: string[];
 };
 
@@ -83,6 +87,11 @@ type Contexte = Etat & {
   ajouterExtra: (e: Omit<LigneExtra, 'id'>, manque?: boolean) => string;
   retirerExtra: (id: string) => void;
   choisirProduit: (cleGroupe: string, produitId: string) => void;
+  oublierChoixProduit: (cleGroupe: string) => void;
+  /** Marque des habitudes comme passées en revue, sans rien décider pour elles (produits déjà pris par les repas). */
+  marquerVues: (ids: string[]) => void;
+  ajouterEnPlus: (id: string, n: number) => void;
+  garderIngredient: (cleGroupe: string, garder: boolean) => void;
   basculerDrive: (nom: string) => void;
   reinitialiser: () => void;
   /** Retient l'identifiant d'un envoi incertain, ou l'oublie (undefined). */
@@ -262,6 +271,18 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
     setEtat((e) => ({ ...e, choixProduits: { ...e.choixProduits, [cleGroupe]: produitId } }));
   }, []);
 
+  const oublierChoixProduit = useCallback((cleGroupe: string) => {
+    setEtat((e) => { const { [cleGroupe]: _, ...reste } = e.choixProduits; return { ...e, choixProduits: reste }; });
+  }, []);
+  const marquerVues = useCallback((ids: string[]) => setEtat(e => ({ ...e, habitudesVues: { ...e.habitudesVues, ...Object.fromEntries(ids.map(id => [id, true])) } })), []);
+  const ajouterEnPlus = useCallback((id: string, n: number) => setEtat(e => {
+    const enPlus = { ...(e.enPlus ?? {}) }; if (n > 0) enPlus[id] = Math.round(n); else delete enPlus[id];
+    return { ...e, enPlus, habitudesVues: { ...e.habitudesVues, [id]: true } };
+  }), []);
+  const garderIngredient = useCallback((cleGroupe: string, garder: boolean) => {
+    setEtat((e) => { const l = (e.ingredientsSansProduit ?? []).filter(k => k !== cleGroupe); return { ...e, ingredientsSansProduit: garder ? [...l, cleGroupe] : l }; });
+  }, []);
+
   const basculerDrive = useCallback((nom: string) => {
     setEtat((e) => ({
       ...e,
@@ -313,11 +334,11 @@ export function WizardProvider({ children, userId }: { children: ReactNode; user
   const valeur = useMemo<Contexte>(() => ({
     ...etat, demarrerSession, allerEtape, validerManque, rouvrirManque, oublierDistinct, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes,
     toggleRecette, setParts, marquerProduit, setQuantite,
-    ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser, retenirEnvoi,
+    ajouterExtra, retirerExtra, choisirProduit, oublierChoixProduit, marquerVues, ajouterEnPlus, garderIngredient, basculerDrive, reinitialiser, retenirEnvoi,
     abandonnerSession, abandonEnAttente: avantAbandon !== null, annulerAbandon, oublierAbandon, voirReprise, annulerRepriseRappels, actualiserAjouts, compte: userId,
   }), [
     etat, demarrerSession, allerEtape, validerManque, rouvrirManque, oublierDistinct, accepterDoublon, declarerDistinct, pret, sauvegardeErreur, modifierLigne, restaurerLigne, possederLigne, ajouterProduitListe, deciderHabituel, annulerHabituel, retenirExtra, revoirHabitudes, toggleRecette, setParts, marquerProduit, setQuantite,
-    ajouterExtra, retirerExtra, choisirProduit, basculerDrive, reinitialiser, retenirEnvoi,
+    ajouterExtra, retirerExtra, choisirProduit, oublierChoixProduit, marquerVues, ajouterEnPlus, garderIngredient, basculerDrive, reinitialiser, retenirEnvoi,
     abandonnerSession, avantAbandon, annulerAbandon, oublierAbandon, voirReprise, annulerRepriseRappels, actualiserAjouts, userId,
   ]);
 

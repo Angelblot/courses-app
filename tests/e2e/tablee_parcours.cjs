@@ -26,17 +26,18 @@ await btn('Voir le bilan').click();
 // Au bilan, le pain noté à la main se précise depuis la ligne Manques (feuille).
 await page.getByRole('button',{name:/^Manques :.*Préciser$/}).last().click();
 await btn('Garder « Pain du boulanger » sans produit. L’extension le cherchera par son nom.').click();
-await page.getByText('« Pain du boulanger »',{exact:true}).waitFor({state:'detached'});
+// Dernier point réglé : la feuille montre le récapitulatif ; on la ferme.
+await page.getByText('Tout est réglé',{exact:true}).waitFor();await btn('Terminer').click();await page.getByText('Tout est réglé',{exact:true}).waitFor({state:'detached'});
 // Plus rien à préciser : la ligne ouvre l'écran Manques, où l'on ajuste les œufs.
 await page.getByRole('button',{name:/^Manques :/}).last().click();
 await btn('Œufs Plein Air, 1 article. Modifier').click();
 await btn('Augmenter Œufs Plein Air').click();await btn('Enregistrer').click();
 await btn('Revenir au bilan').last().click();
 // Habitudes : on coche les oignons, le reste du rayon est « déjà chez moi ».
-await page.getByRole('button',{name:/^Habitudes :/}).last().click();
+await page.getByRole('button',{name:/^Habitudes et liste :/}).last().click();
 await page.getByRole('checkbox',{name:'Oignons jaunes'}).last().click();
 await page.screenshot({path:'/tmp/tablee-habitudes.png'});
-await btn('Revenir au bilan · 1 retenu').click();
+await page.getByRole('button',{name:/^Revenir au bilan/}).last().click();
 await page.getByRole('button',{name:/^Extras :/}).last().click();
 await page.getByLabel('Produit manquant').last().fill('Noisettes');
 await btn('Chercher « Noisettes » sur Open Food Facts').click();
@@ -45,7 +46,8 @@ await btn('Confirmer l’ajout à ma liste').click();
 await btn('Retirer Crème de noisettes').waitFor();
 if(inserted.ean13!=='3017620422003'||inserted.favorite!==false)throw Error('OFF identity/favorite mismatch');
 await btn('Revenir au bilan').last().click();
-await page.reload();await btn('Voir et ajuster la liste').last().click();await page.getByText('Pain du boulanger',{exact:true}).last().waitFor();
+await page.reload();await page.getByRole('button',{name:/^Habitudes et liste :/}).last().waitFor();
+if(await btn('Voir et ajuster la liste').count())throw Error('Liste encore dépliable au bilan');
 const draft=await page.evaluate(id=>JSON.parse(localStorage.getItem('tablee-maison-v1:'+id)),user.id);
 if(draft.selectedRecipes.rec1!==5||draft.quotidienQty.oeufs!==2||draft.quotidien.oignons!=='needed'||draft.extras[0].quantity!==2||draft.quotidien.off1!=='needed')throw Error('Draft mismatch '+JSON.stringify(draft));
 // Réglages : « À table » enregistre le nombre de personnes du foyer.

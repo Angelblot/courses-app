@@ -24,15 +24,15 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await btn('1 repas choisi, ne voir qu’eux').click();await texte('1 repas choisi').waitFor();await btn('Tout voir').click();await shot('1-repas');
  await btn('Voir le bilan').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Étape 2 sur 2 : le bilan, avec ses corrections ; rien ne bloque sauf les vrais problèmes.
- await btn('Manques : 3 notés · « lessive » : l’extension cherchera ce nom. Préciser').waitFor();await btn('Habitudes : Pas encore revues · 3 produits. Revoir').waitFor();
+ await btn('Manques : 3 notés · « lessive » : l’extension cherchera ce nom. Préciser').waitFor();await btn('Habitudes et liste : Par rayon · 3 produits · repas déjà comptés. Revoir').waitFor();
  await shot('2-bilan');
  // Le retour du pied ramène aux repas, « Voir le bilan » au bilan.
  await btn('Revenir à l’étape Repas').last().click();await texte('Étape 1 sur 2 · Repas').waitFor();await btn('Voir le bilan').last().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Correction Manques : produits du catalogue prêts, « lessive » à préciser plus tard.
  // B1 : la ligne Manques ouvre directement la feuille ; on peut la refermer sans rien trancher.
  await btn('Manques : 3 notés · « lessive » : l’extension cherchera ce nom. Préciser').last().click();await texte('« lessive »').waitFor();await page.waitForTimeout(700);await shot('3-verifier');
- // F2 : la feuille ouvre sur les produits proches du mot noté.
- await btn('Choisir Lessive liquide, Le Chat · 2 L').waitFor();
+ // La feuille ouvre sur la recherche dans les drives ; tes produits proches y vivent dans les onglets (« Déjà acheté ici »).
+ if(await page.getByText('Proches dans tes produits',{exact:true}).count())throw Error('Liste « Proches » encore là');
  await btn('Fermer').last().click();await page.waitForTimeout(500);
  // Pause : abandonner s'annule depuis l'accueil, puis on reprend au bilan.
  await btn('Faire une pause').last().click();await btn('Abandonner ces courses').click();
@@ -40,7 +40,7 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  await btn('Reprendre mes courses').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  await btn('Faire une pause').last().click();await btn('Finir plus tard').click();await page.reload();await btn('Reprendre mes courses').click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Correction Habitudes : liste à cocher par rayon, choix gardés d'un rayon à l'autre, rayon annulable.
- await btn('Habitudes : Pas encore revues · 3 produits. Revoir').last().click();
+ await btn('Habitudes et liste : Par rayon · 3 produits · repas déjà comptés. Revoir').last().click();
  const oignons=page.getByRole('checkbox',{name:'Oignons jaunes'}).last();await oignons.waitFor();
  await oignons.click();if(!await oignons.isChecked())throw Error('Habit row not checked');
  await page.getByRole('tab',{name:'Produits laitiers'}).last().click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
@@ -48,17 +48,17 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  // Quitter par « ‹ Bilan » sans valider ne perd pas non plus la coche.
  await btn('Revenir au bilan').first().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  // Cocher, c'est déjà ajouter à la liste : le bilan compte la coche sans « Rayon suivant ».
- await btn('Habitudes : 1 rayon sur 3 revu · 1 retenu. Continuer').waitFor();
- await page.getByRole('button',{name:/^Habitudes :/}).last().click();await oignons.waitFor();if(!await oignons.isChecked())throw Error('Habit choice lost when leaving to the bilan');
+ await btn('Habitudes et liste : 1 rayon sur 3 revu · 1 retenu. Continuer').waitFor();
+ await page.getByRole('button',{name:/^Habitudes et liste :/}).last().click();await oignons.waitFor();if(!await oignons.isChecked())throw Error('Habit choice lost when leaving to the bilan');
  await shot('4-habitudes');
- await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
- await btn('Annuler : Fruits & légumes : 1 retenu').click();await oignons.waitFor();
+ await page.getByRole('button',{name:/^Rayon suivant · \d+ retenus?$/}).last().click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
+ await page.getByRole('button',{name:/^Annuler : Fruits & légumes : \d+ habitudes? retenues?$/}).last().click();await oignons.waitFor();
  // Annuler le rayon défait le classement du reste, pas la coche.
  if(!await oignons.isChecked())throw Error('Undo removed the checked habit');
- await btn('Rayon suivant · 1 retenu').click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
+ await page.getByRole('button',{name:/^Rayon suivant · \d+ retenus?$/}).last().click();await page.getByRole('checkbox',{name:'Beurre doux'}).last().waitFor();
  // Plus de favoris : tout produit du catalogue est une habitude, la lessive aussi (rayon Autre).
- await btn('Rayon suivant').last().click();await page.getByRole('checkbox',{name:'Lessive liquide'}).last().waitFor();
- await btn('Revenir au bilan').last().click();await btn('Habitudes : 1 retenu sur 3').waitFor();
+ await page.getByRole('button',{name:/^Rayon suivant/}).last().click();await page.getByRole('checkbox',{name:'Lessive liquide'}).last().waitFor();
+ await page.getByRole('button',{name:/^Revenir au bilan · \d+ retenus?$/}).last().click();await btn('Habitudes et liste : 1 retenu sur 3').waitFor();
  // Correction Extras : une ligne proche existe ; on peut l'augmenter (annulable) ou noter à part.
  await btn('Extras : Un produit hors habitudes').last().click();
  const champ=page.getByRole('textbox',{name:'Produit manquant',exact:true}).last();await champ.fill('Pommes de terre bio');
@@ -77,14 +77,14 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  if(await page.getByText(/chose.? à vérifier/).count())throw Error('Banner still shown');
  await shot('6-bilan');
  await preciser.click();await texte('« lessive »').waitFor();await page.waitForTimeout(700);await shot('6b-verifier');
- await btn('Garder « lessive » sans produit. L’extension le cherchera par son nom.').click();await page.getByText('« lessive »',{exact:true}).waitFor({state:'detached'});
+ await btn('Garder « lessive » sans produit. L’extension le cherchera par son nom.').click();await page.waitForTimeout(500);await btn('Fermer').last().click();await page.getByText('« lessive »',{exact:true}).waitFor({state:'detached'});
  await texte('produits dans ta liste').waitFor();if(!await btn('Envoyer au drive').last().isEnabled())throw Error('Send button disabled');
  await shot('6c-bilan-pret');
- await btn('Voir et ajuster la liste').last().click();await texte('Fruits & légumes').waitFor();
- // Tout retrait depuis la liste s'annule : « Déjà chez moi » et « − » à 0.
- await btn('Déjà chez moi : Pommes de terre bio').last().click();await btn('Annuler : Pommes de terre bio : déjà chez moi').click();
- await btn('Diminuer Pommes de terre bio').last().click();await btn('Annuler : Pommes de terre bio retiré de ta liste').click();
- await texte('5',{exact:true}).first().waitFor();
+ // La liste par rayon n'est plus au bilan : elle vit dans « Habitudes et liste », où la part des repas est dite.
+ if(await btn('Voir et ajuster la liste').count())throw Error('Liste encore dépliable au bilan');
+ await page.getByRole('button',{name:/^Habitudes et liste :/}).last().click();await page.getByRole('tab',{name:/^Fruits & légumes/}).first().click();
+ await page.getByText(/^Repas : .*Poulet rôti aux légumes/).first().waitFor();await page.waitForTimeout(400);await shot('6d-habitudes-repas');
+ await btn('Revenir au bilan').last().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  await page.setViewportSize({width:1024,height:1366});await page.waitForTimeout(600);await shot('6-bilan-tablette');
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow');
  await page.setViewportSize({width:390,height:844});
