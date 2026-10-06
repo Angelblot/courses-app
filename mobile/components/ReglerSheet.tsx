@@ -9,7 +9,8 @@ import type { LigneMaison } from '../lib/liste-maison';
 import type { Manque } from '../lib/session-courses';
 import { sources } from './Manques';
 import { Precedent, SelecteurIngredient } from './SelecteurIngredient';
-import { RechercheDrives, Recapitulatif, type Comparaison } from './RechercheDrives';
+import { RechercheDrives, Recapitulatif, type Affinage, type Comparaison } from './RechercheDrives';
+import { FeuilleType } from './FeuilleType';
 import { EtatExtension } from './EtatExtension';
 import { useExtension } from '../stores/extension';
 import { DRIVES_RECHERCHE, NOMS_DRIVE, prixLisible, type ChoixOffres, type OffreRelevee, type phase as Phase } from '../lib/recherche-drive.ts';
@@ -223,6 +224,10 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
  const [choix, setChoix] = useState<ChoixOffres>(choixInitial ?? {}), [occupe, setOccupe] = useState(false), [erreur, setErreur] = useState<string | null>(null);
  const [comparaison, setComparaison] = useState<Comparaison>(null);
  const [nombres, setNombres] = useState<Record<'carrefour' | 'leclerc', number>>({ carrefour: 0, leclerc: 0 });
+ // « Quel type ? » : le type ou la marque choisis, et ce que la recherche en propose.
+ const [filtre, setFiltre] = useState<string | null>(null), [feuilleType, setFeuilleType] = useState(false);
+ const [affinage, setAffinage] = useState<Affinage | null>(null);
+ const typeVisible = !!affinage?.actif && (affinage.types.length > 0 || affinage.marques.length > 0);
  // Valider : chaque produit choisi rejoint « Mes produits », relié à son drive ; le point est réglé.
  const valider = async (offres: OffreRelevee[]) => {
   if (!offres.length || occupe) return;
@@ -256,9 +261,19 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
   {progression}
   <View style={s.heros}>
    <View style={s.inconnu}><Feather name={manque.source === 'siri' ? 'mic' : manque.source === 'rappels' ? 'check-circle' : 'edit-2'} size={20} color={colors.attentionText} /></View>
-   <View style={{ flex: 1, gap: 2 }}><Text style={s.nom} numberOfLines={2}>« {nom} »</Text><Text style={[ui.detail, { marginTop: 0 }]}>{origine}</Text></View>
-   <Text style={s.qte}>× {qty}</Text>
+   <View style={{ flex: 1, gap: 2 }}>
+    <View style={s.nomLigne}><Text style={[s.nom, { flexShrink: 1 }]} numberOfLines={2}>« {nom} »</Text><Text style={s.qteDiscrete}>× {qty}</Text></View>
+    <Text style={[ui.detail, { marginTop: 0 }, !!filtre && s.sousFiltre]} accessibilityLiveRegion="polite">{filtre
+     ? `${filtre} · ${affinage?.trouves ?? 0} trouvé${(affinage?.trouves ?? 0) > 1 ? 's' : ''}` : origine}</Text>
+    {!!filtre && <Pressable accessibilityRole="button" onPress={() => setFiltre(null)} hitSlop={8} style={s.toutVoir}><Text style={s.toutVoirTexte}>Voir tous les « {nom} »</Text></Pressable>}
+   </View>
+   {typeVisible && <Pressable accessibilityRole="button" accessibilityLabel={filtre ? `Type : ${filtre}. Changer de type` : `Quel type de ${nom} ?`} onPress={() => setFeuilleType(true)}
+    style={({ pressed }) => [s.type, !!filtre && s.typeActif, pressed && { opacity: .8 }]}>
+    <Text style={[s.typeTexte, !!filtre && { color: colors.accentContrast }]} numberOfLines={1}>{filtre ?? 'Quel type ?'}</Text>
+    <Feather name="chevron-down" size={15} color={filtre ? colors.accentContrast : colors.accent} />
+   </Pressable>}
   </View>
+  <FeuilleType visible={feuilleType} onFermer={() => setFeuilleType(false)} nom={nom} types={affinage?.types ?? []} marques={affinage?.marques ?? []} filtre={filtre} onFiltre={setFiltre} />
  </View>;
  const nCoches = comparaison?.coches.length ?? 0;
  // En comparaison, le pied fixe garde « Comparer » à portée du pouce, quelle que soit la longueur de la liste.
@@ -319,7 +334,7 @@ function PreciserManque({ titre, progression, lineKey, manque, products, onFerme
    onRegle([{ qui: 'Produit', quoi: c.name }], () => w.rouvrirManque(lineKey, w, productId)); w.validerManque(lineKey, qty, productId); }}
   basesOuvertes={false}
   apres={<RechercheDrives requete={nom} autres={autres} onPhase={setEtape} choix={choix} onChoix={c => { setChoix(c); setErreur(null); }}
-   onValider={o => { void valider(o); }} occupe={occupe} erreurValider={erreur} comparaison={comparaison} onComparaison={setComparaison} onNombres={setNombres} />} />;
+   onValider={o => { void valider(o); }} occupe={occupe} erreurValider={erreur} comparaison={comparaison} onComparaison={setComparaison} onNombres={setNombres} filtre={filtre} onAffinage={setAffinage} />} />;
 }
 
 /** Un doublon possible (DB1) : « Garder celui-ci » sous chaque photo ; l'autre est retiré, annulable. */
@@ -380,6 +395,14 @@ const s = StyleSheet.create({
  prixRetenu: { fontSize: 16, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
  piedRegle: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12, backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
  modifier: { flex: 1, minHeight: 50, borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+ nomLigne: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+ qteDiscrete: { fontSize: 15, fontWeight: '600', color: colors.textMuted },
+ toutVoir: { minHeight: 32, justifyContent: 'center', alignSelf: 'flex-start' },
+ toutVoirTexte: { fontSize: 14, fontWeight: '600', color: colors.accent },
+ sousFiltre: { color: colors.accent, fontWeight: '600' },
+ type: { maxWidth: 140, minHeight: 44, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1.5, borderColor: colors.accent, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 4 },
+ typeActif: { backgroundColor: colors.accent },
+ typeTexte: { flexShrink: 1, fontSize: 14, fontWeight: '600', color: colors.accent },
  dejaRegle: { fontSize: 13, fontWeight: '600', color: colors.accent },
  qui: { fontSize: 15, fontWeight: '600', color: colors.text },
  quoi: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, textAlign: 'right' },

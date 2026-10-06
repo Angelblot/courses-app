@@ -1,7 +1,7 @@
 import { ProductSuggestions, productSuggestion } from '../components/ProductSuggestions';
 import { doublonsPossibles, manqueActif, manquesAPreciser, manquesDuBrouillon, resumeBilan } from '../lib/session-courses';
 import { rayonDepuisLibelle } from '../lib/rayons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -12,6 +12,7 @@ import { appuiLongFiche } from '../components/FicheAppuiLong';
 import type { LigneMaison } from '../lib/liste-maison';
 import { references } from '../lib/references';
 import { ReglerSheet } from '../components/ReglerSheet';
+import { preparerRecherches } from '../stores/recherches-drive';
 import { EnvoiSheet } from '../components/EnvoiSheet';
 import { RAYONS } from '../lib/rayons';
 import { colors } from '../lib/theme';
@@ -31,6 +32,9 @@ export default function Liste({session=false}:{session?:boolean}){
  const doublons=doublonsPossibles(acheter,w.doublonsValides,w.distincts),manques=manquesAPreciser(w,p.produits.map(x=>x.id));
  const visibles=lignes.filter(l=>l.owned===owned);
  const points=manques.length+doublons.length;
+ // Les articles à préciser sont cherchés sur les drives sans attendre : en ouvrant Préciser, les résultats sont là.
+ const aChercher=JSON.stringify(manques.map(([,m])=>m.name).sort());
+ useEffect(()=>{const noms=JSON.parse(aChercher) as string[];if(noms.length)void preparerRecherches(noms);},[aChercher]);
  const annulation=useAnnulation();
  // La feuille Préciser se ferme d'elle-même quand elle n'a plus rien à montrer (récapitulatif compris).
  const vide=!acheter.length;

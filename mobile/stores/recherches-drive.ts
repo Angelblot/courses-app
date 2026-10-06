@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { DRIVES_RECHERCHE, planGarde, type OffreRelevee, type RechercheDrive } from '../lib/recherche-drive.ts';
+import { DRIVES_RECHERCHE, planGarde, type DriveRecherche, type OffreRelevee, type RechercheDrive } from '../lib/recherche-drive.ts';
+import { famille, requeteAffinee, typesDeFamille } from '../lib/affinage.ts';
 import { normalizeProductType } from '../lib/typology.ts';
 
 const CHAMPS_RECHERCHE = 'id, drive, requete, ean13, statut, resultats, demandee_le, faite_le';
@@ -11,18 +12,36 @@ const CHAMPS_OFFRE = 'id, recherche_id, drive, libelle, marque, ean13, url, imag
  * Une recherche déjà en attente pour le même nom et le même drive n'est pas
  * redemandée.
  */
-export async function demanderRecherches(demandes: { requete: string; ean13?: string | null }[]): Promise<{ ok: boolean; erreur?: string }> {
-  const propres = demandes.map(d => ({ requete: d.requete.trim().slice(0, 200), ean13: d.ean13 && /^\d{8,14}$/.test(d.ean13) ? d.ean13 : null })).filter(d => d.requete);
+export async function demanderRecherches(demandes: { requete: string; ean13?: string | null; drives?: DriveRecherche[] }[], { siAbsente = false }: { siAbsente?: boolean } = {}): Promise<{ ok: boolean; erreur?: string }> {
+  const propres = demandes.map(d => ({ requete: d.requete.trim().slice(0, 200), ean13: d.ean13 && /^\d{8,14}$/.test(d.ean13) ? d.ean13 : null, drives: d.drives ?? DRIVES_RECHERCHE })).filter(d => d.requete);
   if (!propres.length) return { ok: true };
-  const { data: deja, error: e1 } = await supabase.from('recherches_drive').select('requete, drive')
-    .in('statut', ['en_attente', 'en_cours', 'verification']);
+  // Une recherche en file ne se double pas ; avec siAbsente, une recherche faite depuis moins d'une semaine non plus.
+  const semaine = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const { data: deja, error: e1 } = siAbsente
+    ? await supabase.from('recherches_drive').select('requete, drive').eq('type', 'recherche').or(`statut.in.(en_attente,en_cours,verification),demandee_le.gte.${semaine}`)
+    : await supabase.from('recherches_drive').select('requete, drive').in('statut', ['en_attente', 'en_cours', 'verification']);
   if (e1) { console.error('[demanderRecherches]', e1); return { ok: false, erreur: 'Impossible d’envoyer la recherche. Réessaie.' }; }
   const pris = new Set((deja ?? []).map(r => `${r.drive}:${String(r.requete).toLowerCase()}`));
-  const lignes = propres.flatMap(d => DRIVES_RECHERCHE.filter(drive => !pris.has(`${drive}:${d.requete.toLowerCase()}`)).map(drive => ({ drive, requete: d.requete, ean13: d.ean13 })));
+  const lignes = propres.flatMap(d => d.drives.filter(drive => !pris.has(`${drive}:${d.requete.toLowerCase()}`)).map(drive => ({ drive, requete: d.requete, ean13: d.ean13 })));
   if (!lignes.length) return { ok: true };
   const { error } = await supabase.from('recherches_drive').insert(lignes);
   if (error) { console.error('[demanderRecherches]', error); return { ok: false, erreur: 'Impossible d’envoyer la recherche. Réessaie.' }; }
   return { ok: true };
+}
+
+/**
+ * Avant même d'ouvrir Préciser : chaque article est cherché sur les deux
+ * drives, et ses types courants (« Bière IPA », « Bière Blonde »…) sur
+ * Carrefour seulement. E.Leclerc bloque au-delà d'un rythme humain : ses
+ * recherches approfondies attendent qu'on touche un type.
+ */
+export async function preparerRecherches(noms: string[]): Promise<{ ok: boolean }> {
+  const demandes = noms.flatMap(n => {
+    const fam = famille(n);
+    return [{ requete: n }, ...(fam ? typesDeFamille(fam).map(t => ({ requete: requeteAffinee(n, t), drives: ['carrefour'] as DriveRecherche[] })) : [])];
+  });
+  const r = await demanderRecherches(demandes, { siAbsente: true });
+  return { ok: r.ok };
 }
 
 /** Retire une recherche pas encore faite. */
@@ -44,6 +63,8 @@ export function useRecherchesDrive(requete: string) {
   const [fichesEnCours, setFichesEnCours] = useState<string[]>([]);
 
   const recharger = useCallback(async () => {
+    // Aucun type choisi : rien à suivre.
+    if (!requete) { setRecherches([]); setOffres([]); setChargement(false); return; }
     const { data, error } = await supabase.from('recherches_drive').select(CHAMPS_RECHERCHE)
       .eq('requete', requete).order('demandee_le', { ascending: false }).limit(10);
     if (error) { console.error('[useRecherchesDrive]', error); setChargement(false); return; }
@@ -68,7 +89,10 @@ export function useRecherchesDrive(requete: string) {
 
   useEffect(() => {
     let vivant = true;
+    // Nouvelle requête : rien de l'ancienne ne doit passer pour elle le temps de la relire.
+    setRecherches([]); setOffres([]); setChargement(!!requete);
     void recharger();
+    if (!requete) return () => { vivant = false; };
     // Toute avancée compte : une fiche lue porte le libellé de l'offre, pas le nom cherché.
     const canal = supabase.channel(`recherches-${requete}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'recherches_drive' }, () => { if (vivant) void recharger(); })

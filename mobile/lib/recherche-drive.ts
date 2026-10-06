@@ -32,6 +32,8 @@ export type OffreRelevee = {
   historique?: boolean;
   /** « Acheté 3 fois · dernier le 12 sept. » : ce que l'historique en dit. */
   histoire?: string;
+  /** Arrivée par la recherche approfondie d'un type (« Bière IPA »), absente des premiers résultats. */
+  approfondie?: boolean;
 };
 
 const EN_ATTENTE: StatutRecherche[] = ['en_attente', 'en_cours', 'verification'];

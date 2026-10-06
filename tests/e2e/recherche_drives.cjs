@@ -41,18 +41,12 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
  const ouvrir=async()=>{await page.getByRole('button',{name:/^Manques :.*Préciser$/}).last().click();await page.getByText('« Papier sulfurisé »',{exact:true}).waitFor();};
  await page.goto(`http://localhost:${PORT}`);await btn('Préparer mes courses').waitFor({timeout:60000});
  await btn('Préparer mes courses').click();await btn('Voir le bilan').click();await ouvrir();
- // 1. Rien demandé : l'encart propose la recherche sur les deux drives.
- const chercher=btn('Chercher sur Carrefour et E.Leclerc');await chercher.waitFor({timeout:20000});await chercher.scrollIntoViewIfNeeded();
- await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd1-encart.png'});
- await chercher.click();
- // 2. Envoyée : une recherche par drive, l'état de chacun, et « Tout envoyer » pour l'autre point.
- await page.getByText('Recherche en file',{exact:true}).waitFor();
- const deux=JSON.stringify(ecrit.recherches.map(r=>[r.drive,r.requete]));
- if(deux!==JSON.stringify([['carrefour','Papier sulfurisé'],['leclerc','Papier sulfurisé']]))throw Error('Mauvaises recherches '+deux);
+ // 1-2. Dès le bilan, chaque point part sur les deux drives, sans rien toucher : Préciser s'ouvre sur l'attente.
+ await page.getByText('Recherche en file',{exact:true}).waitFor({timeout:20000});
+ const envoyees=JSON.stringify(ecrit.recherches.map(r=>[r.drive,r.requete]).sort());
+ if(envoyees!==JSON.stringify([['carrefour','Gel intime'],['carrefour','Papier sulfurisé'],['leclerc','Gel intime'],['leclerc','Papier sulfurisé']]))throw Error('Mauvaises recherches '+envoyees);
  if(await page.getByText('en file',{exact:true}).count()!==1)throw Error('État des drives absent');
- await btn('Chercher aussi l’autre point sur les drives').click();
- await page.getByText('L’autre point est en file aussi',{exact:true}).waitFor();
- if(ecrit.recherches.length!==4||ecrit.recherches[3].requete!=='Gel intime')throw Error('Lot mal envoyé '+JSON.stringify(ecrit.recherches));
+ if(await page.getByText('L’autre point aussi ?',{exact:true}).count())throw Error('« Tout envoyer » encore là');
  // Le pied dit où en est l'extension (vue il y a un instant, prête) et propose de passer au suivant.
  await page.getByText('Chrome est ouvert',{exact:true}).waitFor();
  await page.getByText('Les recherches partent d’elles-mêmes dans les 30 secondes.',{exact:true}).waitFor();

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import {
@@ -13,7 +13,8 @@ import { annulerRecherche, demanderFiches, demanderRecherches, useRecherchesDriv
 import { useProducts } from '../stores/products';
 import { useDejaAchete } from '../stores/deja-achete';
 import { dejaAchetes, type Connu } from '../lib/deja-achete.ts';
-import { produitsProches } from '../lib/session-courses.ts';
+import { normaliserNom, produitsProches } from '../lib/session-courses.ts';
+import { correspond, requeteAffinee, suggestions, type Suggestion } from '../lib/affinage.ts';
 import { FicheOffre, TableauComparatif, type LigneComparatif } from './FicheOffre';
 import { Photo, ui } from './MaisonUI';
 import { colors } from '../lib/theme';
@@ -54,8 +55,16 @@ const insecable = (t: string) => t.replace(/ %/g, '\u00a0%');
  */
 /** Le mode comparaison : les produits cochés pour le comparatif, et s'il est ouvert. null : on choisit. */
 export type Comparaison = { coches: string[]; ouvert: boolean } | null;
+/** Ce que Préciser montre à côté du nom : types et marques à proposer, et la recherche approfondie en cours. */
+export type Affinage = { actif: boolean; types: Suggestion[]; marques: Suggestion[]; enCours: boolean; trouves: number };
+/** Une même offre vue par les deux recherches (large et approfondie) ne compte qu'une fois. */
+const cleOffre = (o: OffreRelevee) => `${o.drive}:${o.ean13 ?? normaliserNom(o.libelle)}`;
+const annoncerTexte = (t: string) => { if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(t); };
+/** Où en est la recherche approfondie sur un drive, en mots. */
+const etatApprofondi = (statut: string | undefined, nouveaux: number) => !statut ? 'pas lancée' : statut === 'en_attente' ? 'en attente' : statut === 'en_cours' ? 'en cours…'
+  : statut === 'verification' ? 'vérification demandée' : statut === 'echec' ? 'n’a pas abouti' : nouveaux ? `${nouveaux} nouveau${nouveaux > 1 ? 'x' : ''}` : 'rien de plus';
 
-export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoix, onValider, occupe, erreurValider, comparaison, onComparaison, onNombres }: {
+export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoix, onValider, occupe, erreurValider, comparaison, onComparaison, onNombres, filtre = null, onAffinage }: {
   requete: string; ean13?: string | null;
   /** Dit au parent où en est la recherche : son pied change pendant l'attente et avec les résultats. */
   onPhase?: (p: ReturnType<typeof phase>) => void;
@@ -68,8 +77,26 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
   comparaison: Comparaison; onComparaison: (c: Comparaison) => void;
   /** Combien de produits chaque enseigne propose : le pied sait s'il reste une enseigne à choisir. */
   onNombres?: (n: Record<DriveRecherche, number>) => void;
+  /** Le type ou la marque choisis dans « Quel type ? » : filtre instantané, puis recherche approfondie. */
+  filtre?: string | null; onAffinage?: (a: Affinage) => void;
 }) {
-  const { recherches, offres, chargement, recharger, fichesEnCours } = useRecherchesDrive(requete);
+  const { recherches, offres: offresBase, chargement, recharger, fichesEnCours } = useRecherchesDrive(requete);
+  // Un type choisi : les offres déjà relevées qui en sont, puis celles de la recherche approfondie (« Bière IPA »).
+  const affinee = filtre ? requeteAffinee(requete, filtre) : '';
+  const approfondie = useRecherchesDrive(affinee);
+  // Le produit déjà choisi reste visible, même s'il n'est pas du type choisi.
+  const filtrees = filtre ? offresBase.filter(o => correspond(o.libelle, filtre) || DRIVES_RECHERCHE.some(d => choix[d]?.id === o.id)) : offresBase;
+  const vues = new Set(filtrees.map(cleOffre));
+  const nouvelles = filtre ? approfondie.offres.filter(o => !vues.has(cleOffre(o))).map(o => ({ ...o, approfondie: true, rang: 1000 + (o.rang ?? 0) })) : [];
+  const offres = [...filtrees, ...nouvelles];
+  const dernieresAff = dernieresParDrive(approfondie.recherches);
+  const enCoursAff = (d: DriveRecherche) => !!filtre && !!dernieresAff[d] && estEnAttente(dernieresAff[d]!.statut);
+  // Moins de 5 produits du type sur une enseigne : on y cherche le type lui-même (déjà fait à l'avance chez Carrefour, le plus souvent).
+  useEffect(() => {
+    if (!filtre || approfondie.chargement) return;
+    const manquants = DRIVES_RECHERCHE.filter(d => offresDuDrive(filtrees, d).length < 5 && !dernieresAff[d]);
+    if (manquants.length) void demanderRecherches([{ requete: affinee, drives: manquants }], { siAbsente: true }).then(() => approfondie.recharger());
+  }, [filtre, approfondie.chargement]);
   const [envoi, setEnvoi] = useState(false), [erreur, setErreur] = useState<string | null>(null);
   const [ouverts, setOuverts] = useState<Partial<Record<DriveRecherche, boolean>>>({}), [onglet, setOnglet] = useState<DriveRecherche | null>(null);
   const [lot, setLot] = useState(false);
@@ -77,7 +104,17 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
   const mesures = new Map(offres.map(o => [o.id, mesuresDe(o)]));
   const unite = uniteCommune([...mesures.values()]);
   const meilleurs = new Set(plusPetits(offres.map(o => (unite ? prixParUnite(o.prix, mesures.get(o.id)!, unite) : null))).map(i => offres[i].id));
-  const etape = phase(recherches, offres), dernieres = dernieresParDrive(recherches);
+  const etape = phase(recherches, offresBase), dernieres = dernieresParDrive(recherches);
+  const sugg = suggestions(requete, offresBase), enCours = DRIVES_RECHERCHE.some(enCoursAff);
+  const affinage: Affinage = { actif: !chargement && etape === 'resultats', ...sugg, enCours, trouves: offres.length };
+  useEffect(() => { onAffinage?.(affinage); }, [JSON.stringify(affinage)]);
+  // VoiceOver : le début et la fin de la recherche approfondie sont annoncés (pas de région live sur iOS).
+  const avantEnCours = useRef(false);
+  useEffect(() => {
+    if (enCours && !avantEnCours.current) annoncerTexte(`On cherche d’autres « ${affinee} » sur les drives.`);
+    if (!enCours && avantEnCours.current && filtre) annoncerTexte(`${offres.length} produit${offres.length > 1 ? 's' : ''} « ${filtre} » trouvé${offres.length > 1 ? 's' : ''}.`);
+    avantEnCours.current = enCours;
+  }, [enCours]);
   // Tes produits reconnus dans les offres (ou achetés là), en tête de chaque onglet.
   const { produits } = useProducts();
   const proches = produitsProches(requete, produits, 8).map(p => p.id);
@@ -159,17 +196,6 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
         ? <Pressable accessibilityRole="button" onPress={() => { void annuler(); }} hitSlop={6} style={s.lien}><Text style={s.lienDiscret}>Annuler la recherche</Text></Pressable>
         : <Pressable accessibilityRole="button" disabled={envoi} onPress={() => { void demander(); }} hitSlop={6} style={s.lien}><Text style={ui.link}>Relancer la recherche</Text></Pressable>}
     </View>
-    {etape === 'attente' && autres.length > 0 && <View style={s.carteLigne}>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text style={s.titrePetit}>{autres.length === 1
-          ? (lot ? 'L’autre point est en file aussi' : 'L’autre point aussi ?')
-          : (lot ? `Les ${autres.length} autres sont en file aussi` : `Les ${autres.length} autres aussi ?`)}</Text>
-        <Text style={s.texte}>{lot ? 'Une seule séance de recherche, sur ton ordinateur.' : 'Ils partiront dans la même séance.'}</Text>
-      </View>
-      {!lot && <Pressable accessibilityRole="button" accessibilityLabel={autres.length === 1 ? 'Chercher aussi l’autre point sur les drives' : `Chercher aussi les ${autres.length} autres points sur les drives`} disabled={envoi} onPress={() => { void toutEnvoyer(); }} style={({ pressed }) => [s.secondaire, pressed && { opacity: .8 }]}>
-        {envoi ? <ActivityIndicator color={colors.accent} /> : <Text style={s.secondaireTexte}>Tout envoyer</Text>}
-      </Pressable>}
-    </View>}
     {pied}
   </View>;
 
@@ -205,6 +231,7 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={ui.productName} numberOfLines={2}>{o.libelle}</Text>
             {!!o.histoire && <Text style={s.histoire} numberOfLines={2}>{o.histoire}</Text>}
+            {!o.histoire && o.approfondie && <View style={s.pastilleNouveau}><Text style={s.pastilleNouveauTexte}>Nouveau</Text></View>}
             {!!detail && <Text style={[ui.detail, { marginTop: 0 }]} numberOfLines={1}>{detail}</Text>}
             {!!o.promotion && <Text style={s.promo} numberOfLines={1}>{insecable(o.promotion)}</Text>}
           </View>
@@ -219,14 +246,22 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
     <View accessibilityRole="tablist" style={s.onglets}>
       {DRIVES_RECHERCHE.map(d => {
         const sel = d === actif, r = dernieres[d];
-        const sous = choix[d] ? 'choisi' : nombres[d] ? `${nombres[d]} produit${nombres[d] > 1 ? 's' : ''}` : libelleStatut(r);
-        return <Pressable key={d} accessibilityRole="tab" accessibilityState={{ selected: sel }} accessibilityLabel={`${NOMS_DRIVE[d]}, ${sous}`} onPress={() => setOnglet(d)} style={[s.onglet, sel && s.ongletActif]}>
+        const sous = choix[d] ? 'choisi' : filtre && !nombres[d] ? `aucun « ${filtre} »` : nombres[d] ? `${nombres[d]} produit${nombres[d] > 1 ? 's' : ''}` : libelleStatut(r);
+        return <Pressable key={d} accessibilityRole="tab" accessibilityState={{ selected: sel }} accessibilityLabel={`${NOMS_DRIVE[d]}, ${enCoursAff(d) ? `${nombres[d] ? `${nombres[d]} produits, ` : ''}recherche en cours` : sous}`} onPress={() => setOnglet(d)} style={[s.onglet, sel && s.ongletActif]}>
           <Text style={s.ongletNom}>{NOMS_DRIVE[d]}</Text>
-          <View style={s.ongletSous}>{choix[d] && <Feather name="check" size={12} color="#2F6B2F" />}<Text style={[s.ongletEtat, choix[d] && { color: '#2F6B2F' }]}>{sous}</Text></View>
+          <View style={s.ongletSous}>{enCoursAff(d) ? <ActivityIndicator size="small" color={colors.accent} style={{ transform: [{ scale: .7 }] }} /> : choix[d] && <Feather name="check" size={12} color="#2F6B2F" />}
+            <Text style={[s.ongletEtat, choix[d] && !enCoursAff(d) && { color: '#2F6B2F' }]}>{enCoursAff(d) ? (nombres[d] ? `${nombres[d]} · recherche…` : 'recherche…') : sous}</Text></View>
         </Pressable>;
       })}
     </View>
     {/* « Comparer » en haut, toujours visible : les bons candidats sont en tête de liste. */}
+    {enCours && <View style={[s.carte, s.carteAvance]} accessible
+      accessibilityLabel={`On cherche d’autres « ${affinee} ». ${DRIVES_RECHERCHE.map(d => `${NOMS_DRIVE[d]} : ${etatApprofondi(dernieresAff[d]?.statut, nouvelles.filter(o => o.drive === d).length)}`).join('. ')}`}>
+      <Text style={s.titrePetit}>On cherche d’autres « {affinee} »</Text>
+      <BarreEnCours />
+      <View style={{ gap: 4 }}>{DRIVES_RECHERCHE.map(d => { const n = nouvelles.filter(o => o.drive === d).length, st = dernieresAff[d]?.statut;
+        return <View key={d} style={s.resume}><Text style={s.etatDrive}>{NOMS_DRIVE[d]}</Text><Text style={[s.etatTexte, st === 'faite' && n > 0 && { color: colors.accent, fontWeight: '600' }]}>{etatApprofondi(st, n)}</Text></View>; })}</View>
+    </View>}
     <View style={s.sousEntete}>
       <Text style={s.consigne}>{consigne}</Text>
       {!enComparaison && offres.length >= 2 && <Pressable accessibilityRole="button" accessibilityLabel="Comparer des produits" accessibilityHint="Coche ensuite les produits à comparer, d’une enseigne ou des deux"
@@ -242,7 +277,9 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
     {liste.length > 0 ? <View style={s.liste}>
       {(tout ? liste : liste.slice(0, PREMIERS)).map((o, i, vus) => rang(o, i < vus.length - 1 || !tout))}
       {!tout && <Pressable accessibilityRole="button" onPress={() => setOuverts(x => ({ ...x, [actif]: true }))} style={s.voir}><Text style={ui.link}>Voir les {liste.length - PREMIERS} autres</Text></Pressable>}
-    </View> : !connus.length && <View style={s.carte}><Text style={s.texte}>{dernieres[actif] && estEnAttente(dernieres[actif]!.statut)
+    </View> : !connus.length && filtre ? <View style={s.carte}><Text style={s.texte}>{enCoursAff(actif)
+      ? `Pas encore de « ${filtre} » chez ${NOMS_DRIVE[actif]} : on en cherche.` : `Pas de « ${filtre} » chez ${NOMS_DRIVE[actif]}. Touche le type pour en changer.`}</Text></View>
+    : !connus.length && <View style={s.carte}><Text style={s.texte}>{dernieres[actif] && estEnAttente(dernieres[actif]!.statut)
       ? `${NOMS_DRIVE[actif]} n’a pas encore répondu : ${libelleStatut(dernieres[actif])}.` : `Rien trouvé sur ${NOMS_DRIVE[actif]}. Tu peux valider le seul produit ${NOMS_DRIVE[autre]}.`}</Text></View>}
     <Text style={[s.texte, s.marge, { textAlign: 'center' }]}>{releve}Appui long sur un produit pour sa fiche.{unite && [...mesures.values()].some(m => m.estime?.[unite]) ? ' « ≈ » : mètres estimés d’après la taille des feuilles.' : ''}</Text>
     {pied}
@@ -349,6 +386,25 @@ function ComparerOffres({ visible, offres: toutes, choix, onChoix, occupe, erreu
   </Modal>;
 }
 
+/** Une barre qui glisse sans fin : la recherche avance, sans durée connue. Immobile si les animations sont réduites. */
+function BarreEnCours() {
+  const x = useRef(new Animated.Value(0)).current, [largeur, setLargeur] = useState(0);
+  useEffect(() => {
+    let boucle: Animated.CompositeAnimation | null = null, vivant = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then(reduit => {
+      // Animations réduites : la barre reste visible, au milieu, immobile.
+      if (!vivant) return;
+      if (reduit) { x.setValue(.45); return; }
+      boucle = Animated.loop(Animated.timing(x, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: Platform.OS !== 'web' }));
+      boucle.start();
+    });
+    return () => { vivant = false; boucle?.stop(); };
+  }, []);
+  return <View style={s.barreAvance} onLayout={e => setLargeur(e.nativeEvent.layout.width)}>
+    <Animated.View style={[s.barrePleine, { width: largeur * .4, transform: [{ translateX: x.interpolate({ inputRange: [0, 1], outputRange: [-largeur * .4, largeur] }) }] }]} />
+  </View>;
+}
+
 /** Le récapitulatif du choix, une ligne par enseigne : le produit et son prix, ou « à choisir ». */
 export function Recapitulatif({ choix }: { choix: ChoixOffres }) {
   return <View style={{ gap: 4 }}>
@@ -393,6 +449,11 @@ const s = StyleSheet.create({
   sectionConnus: { fontSize: 12, fontWeight: '700', letterSpacing: .4, color: colors.accent, textTransform: 'uppercase', paddingHorizontal: 4, marginBottom: -4 },
   sectionAutres: { fontSize: 12, fontWeight: '700', letterSpacing: .4, color: colors.textMuted, textTransform: 'uppercase', paddingHorizontal: 4, marginTop: 4, marginBottom: -4 },
   histoire: { fontSize: 12, fontWeight: '600', color: colors.accent },
+  carteAvance: { gap: 10, paddingVertical: 12 },
+  pastilleNouveau: { alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, backgroundColor: colors.accentSoft },
+  pastilleNouveauTexte: { fontSize: 11, fontWeight: '700', color: colors.accent },
+  barreAvance: { height: 4, borderRadius: 2, backgroundColor: colors.accentSoft, overflow: 'hidden' },
+  barrePleine: { position: 'absolute', top: 0, bottom: 0, borderRadius: 2, backgroundColor: colors.accent },
   offre: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 64, paddingVertical: 8, paddingHorizontal: 12 },
   separee: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   case: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
