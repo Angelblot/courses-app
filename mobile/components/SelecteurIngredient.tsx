@@ -174,7 +174,8 @@ export function SelecteurIngredient({ onChoisir, onFermer, titre = 'Ajouter un i
         {!!erreur && <Text accessibilityLiveRegion="polite" style={[ui.error, { paddingHorizontal: 16 }]}>{erreur}</Text>}
       </ScrollView>
 
-      {!!pied && <View onLayout={e => setHautPied(e.nativeEvent.layout.height)} style={[s.pied, { bottom: clavier, paddingBottom: clavier ? 10 : 10 + insets.bottom }]}>{pied}</View>}
+      {/* Le dernier lien fait déjà 44 pt : sous lui, la zone de l'indicateur d'accueil suffit, sans marge en plus. */}
+      {!!pied && <View onLayout={e => setHautPied(e.nativeEvent.layout.height)} style={[s.pied, { bottom: clavier, paddingBottom: clavier ? 8 : Math.max(8, insets.bottom - 16) }]}>{pied}</View>}
       <FicheOffre fiche={detail} proches={[...(off.resultats ?? [])].filter(x => x.details).sort((a, b) => Number(b.productType === detail?.productType) - Number(a.productType === detail?.productType))} onFermer={() => setDetail(null)}
         onChoisir={f => { setDetail(null); void choisirFiche(f); }} />
       <ScanRapide visible={scanner} onFermer={() => setScanner(false)} onFiche={f => { setScanner(false); void choisirFiche(f); }} />

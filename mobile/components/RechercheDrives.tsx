@@ -227,7 +227,6 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
           accessibilityLabel={`${o.libelle}, ${[o.histoire, o.historique ? 'dernier prix payé, absent des derniers résultats' : null, o.disponible ? null : 'indisponible', prixLisible(o.prix), pu != null && unite ? prixUnitaireLisible(pu, unite) : null, cont, o.promotion].filter(Boolean).join(', ')}`}
           accessibilityHint="Appui long pour voir la fiche détaillée" onPress={() => (enComparaison ? cocher(o) : choisir(o))} onLongPress={() => voir(o)} delayLongPress={350}
           style={({ pressed }) => [s.offre, separee && s.separee, (enComparaison ? coche : pris) && s.offrePrise, pressed && { opacity: .75 }]}>
-          {enComparaison && <View style={[s.boite, coche && s.boiteCochee]}>{coche && <Feather name="check" size={14} color={colors.accentContrast} />}</View>}
           <Photo name={o.libelle} url={o.image_url} style={s.photo} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={ui.productName} numberOfLines={2}>{o.libelle}</Text>
@@ -240,7 +239,10 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
             <Text style={s.prixListe}>{prixLisible(o.prix) ?? NC}</Text>
             {pu != null && unite && <Text style={[s.unite, meilleurs.has(o.id) && s.uniteMeilleure]}>{m.estime?.[unite] ? '≈ ' : ''}{prixUnitaireLisible(pu, unite)}</Text>}
           </View>
-          {!enComparaison && <View style={[s.radio, pris && s.radioPris]}>{pris && <View style={s.radioPoint} />}</View>}
+          {/* En comparaison, le rond devient une case carrée, à la même place. */}
+          {enComparaison
+            ? <View style={[s.boite, coche && s.boiteCochee]}>{coche && <Feather name="check" size={14} color={colors.accentContrast} />}</View>
+            : <View style={[s.radio, pris && s.radioPris]}>{pris && <View style={s.radioPoint} />}</View>}
         </Pressable>;
   };
   return <View style={s.bloc}>
