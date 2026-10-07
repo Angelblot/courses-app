@@ -287,6 +287,7 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
       enseigne={detail ? [NOMS_DRIVE[detail.offre.drive], prixLisible(detail.offre.prix), contenanceDe(mesures.get(detail.offre.id) ?? {}), detail.offre.promotion].filter(Boolean).join(' · ') : null}
       onChoisir={() => { const o = detail?.offre; setDetail(null); if (o) choisir(o); }} />
     <ComparerOffres visible={!!comparaison?.ouvert} offres={cochees} choix={choix} onChoix={onChoix} occupe={occupe} erreur={comparaison?.ouvert ? erreurValider : null} fichesEnCours={fichesEnCours}
+      nombres={nombres} onAutreEnseigne={d => { onComparaison(null); setOnglet(d); }}
       onOuvert={() => { void demanderFiches(cochees, fichesEnCours).then(() => recharger()); }} onFermer={() => comparaison && onComparaison({ ...comparaison, ouvert: false })} onValider={onValider} />
   </View>;
 }
@@ -299,11 +300,13 @@ export function RechercheDrives({ requete, ean13, autres, onPhase, choix, onChoi
  * ouvertes complètent Nutri-Score, NOVA et repères. Un choix par enseigne,
  * puis « Valider ».
  */
-function ComparerOffres({ visible, offres: toutes, choix, onChoix, occupe, erreur, fichesEnCours, onOuvert, onFermer, onValider }: {
+function ComparerOffres({ visible, offres: toutes, choix, onChoix, occupe, erreur, fichesEnCours, onOuvert, onFermer, onValider, nombres, onAutreEnseigne }: {
   visible: boolean; offres: OffreRelevee[]; choix: ChoixOffres; onChoix: (c: ChoixOffres) => void; occupe: boolean; erreur: string | null;
   /** Les fiches que l'extension lit en ce moment, pour compléter les contenances. */
   fichesEnCours: string[]; onOuvert: () => void;
   onFermer: () => void; onValider: (o: OffreRelevee[]) => void;
+  /** Produits par enseigne, et le retour à la liste d'une enseigne encore à choisir. */
+  nombres: Record<DriveRecherche, number>; onAutreEnseigne: (d: DriveRecherche) => void;
 }) {
   // À l'ouverture, les fiches qui manquent sont demandées à l'extension ; le tableau se complète à leur arrivée.
   useEffect(() => { if (visible) onOuvert(); }, [visible]);
@@ -377,9 +380,18 @@ function ComparerOffres({ visible, offres: toutes, choix, onChoix, occupe, erreu
       <View style={s.validation}>
         {!!erreur && <Text style={[ui.error, { textAlign: 'center' }]}>{erreur}</Text>}
         <Recapitulatif choix={choix} />
-        <Pressable accessibilityRole="button" disabled={!n || occupe} onPress={() => onValider(choisies)} style={[s.principal, (!n || occupe) && s.inactif]}>
-          {occupe ? <ActivityIndicator color={colors.accentContrast} /> : <Text style={[s.principalTexte, !n && { color: colors.offText }]}>{n === 2 ? 'Valider les 2 produits' : n === 1 ? 'Valider ce seul produit' : 'Choisis un produit'}</Text>}
-        </Pressable>
+        {/* Une enseigne choisie, l'autre a des produits : on propose d'abord de la choisir, valider sans elle reste possible. */}
+        {(() => { const manquante = n === 1 ? DRIVES_RECHERCHE.find(d => !choix[d] && nombres[d] > 0) : undefined;
+          return manquante ? <>
+            <Pressable accessibilityRole="button" onPress={() => onAutreEnseigne(manquante)} style={({ pressed }) => [s.principal, pressed && { opacity: .85 }]}>
+              <Text style={s.principalTexte}>Choisir mon produit {NOMS_DRIVE[manquante]}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" disabled={occupe} onPress={() => onValider(choisies)} style={s.lien}>
+              {occupe ? <ActivityIndicator color={colors.accent} /> : <Text style={ui.link}>Valider sans {NOMS_DRIVE[manquante]}</Text>}
+            </Pressable>
+          </> : <Pressable accessibilityRole="button" disabled={!n || occupe} onPress={() => onValider(choisies)} style={[s.principal, (!n || occupe) && s.inactif]}>
+            {occupe ? <ActivityIndicator color={colors.accentContrast} /> : <Text style={[s.principalTexte, !n && { color: colors.offText }]}>{n === 2 ? 'Valider les 2 produits' : n === 1 ? 'Valider ce produit' : 'Choisis un produit'}</Text>}
+          </Pressable>; })()}
       </View>
     </SafeAreaView>
   </Modal>;

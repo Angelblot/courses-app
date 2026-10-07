@@ -97,7 +97,10 @@ export function ReglerSheet({ visible, onFermer, manques, doublons, ingredients 
  const nomDe = (k: string) => { const p = points.find(x => cle(x) === k);
   return p ? (p.type === 'manque' ? p.manque.name : p.type === 'ingredient' ? p.ligne.name : `${p.doublon.a.name} ou ${p.doublon.b.name}`) : regles[k]?.nom ?? ''; };
  const reglesDansLOrdre = ordre.filter(k => regles[k] && !ouverts.has(k)).map(k => ({ cle: k, regle: regles[k] }));
- const avant = affiche ? precedentDe(parcours, affiche) : fin ? reglesDansLOrdre[reglesDansLOrdre.length - 1]?.cle ?? null : null;
+ // Seuls les points qu'on peut encore montrer comptent : un point dont la clé a changé (ingrédient lié,
+ // doublon recalculé) laisserait le chevron sans effet.
+ const navigables = parcours.filter(k => k === affiche || ouverts.has(k) || !!regles[k]);
+ const avant = affiche ? precedentDe(navigables, affiche) : fin ? reglesDansLOrdre[reglesDansLOrdre.length - 1]?.cle ?? null : null;
  const onPrecedent = avant ? () => setFocus(avant) : null;
  const libellePrecedent = avant ? `Revenir à « ${nomDe(avant)} »` : 'Point précédent';
  // VoiceOver suit le changement de point : le contenu de la feuille est remplacé d'un bloc.

@@ -103,6 +103,8 @@ const offre=(id,drive,rang,libelle,prix,ean13=null,extra={})=>({id,recherche_id:
  await page.getByRole('button',{name:'Choisir Papier cuisson sulfurisé Carrefour 8 m pour Carrefour'}).click();
  await page.getByRole('button',{name:'Choisir Papier cuisson Albal 10 m pour Carrefour'}).click();
  if(await page.getByRole('button',{name:'Ne plus choisir Papier cuisson sulfurisé Carrefour 8 m pour Carrefour'}).count())throw Error('Deux choix Carrefour');
+ // Une seule enseigne choisie : le comparatif propose d'abord de choisir l'autre, valider sans elle reste un lien.
+ await btn('Choisir mon produit E.Leclerc').waitFor();await btn('Valider sans E.Leclerc').waitFor();await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd4a-un-choix.png'});
  await page.getByRole('button',{name:'Choisir Papier cuisson Repère 8 m pour E.Leclerc'}).click();
  await page.getByText('E.LECLERC',{exact:true}).waitFor();if(await page.getByText('à choisir',{exact:true}).count()>1)throw Error('E.Leclerc pas marqué choisi');
  await page.waitForTimeout(300);await page.screenshot({path:dossier+'/cd4-comparer.png'});
