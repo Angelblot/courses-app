@@ -36,16 +36,29 @@ const COUNTABLE_UNITS: ReadonlySet<string> = new Set([
   'boîte', 'boites', 'boite',
   'botte', 'bottes',
   'paquet', 'paquets',
-  'pincée', 'pincées', 'pincee', 'pincees',
-  'cuillère à soupe', 'cuillères à soupe', 'c. à soupe', 'cs',
-  'cuillère à café', 'cuillères à café', 'c. à café', 'cc',
 ]);
 
+/**
+ * Petites mesures de cuisine, ramenées à un poids (et un volume) approximatif.
+ * Les compter comme des articles faisait acheter 4 paquets de chapelure pour
+ * 4 cuillères. Une cuillère à soupe ≈ 15 g ou 15 ml, à café ≈ 5, pincée ≈ 0,5.
+ */
+const PETITES_MESURES: Record<string, number> = {
+  'cuillère à soupe': 15, 'cuillères à soupe': 15, 'c. à soupe': 15, 'cs': 15, 'c.s.': 15, 'càs': 15,
+  'cuillère à café': 5, 'cuillères à café': 5, 'c. à café': 5, 'cc': 5, 'c.c.': 5, 'càc': 5,
+  'pincée': 0.5, 'pincées': 0.5, 'pincee': 0.5, 'pincees': 0.5,
+};
+
 /** Ramène une unité à sa famille : `g`, `ml`, `unité`, ou `null`. */
+/** Cuillère ou pincée : une petite mesure, qui tient toujours dans un conditionnement. */
+export function estPetiteMesure(unit: string | null | undefined): boolean {
+  return !!unit && unit.trim().toLowerCase() in PETITES_MESURES;
+}
+
 export function normalizeUnit(unit: string | null | undefined): UniteNormalisee | null {
   if (!unit) return null;
   const u = unit.trim().toLowerCase();
-  if (GRAM_UNITS.has(u)) return 'g';
+  if (GRAM_UNITS.has(u) || u in PETITES_MESURES) return 'g';
   if (ML_UNITS.has(u)) return 'ml';
   if (COUNTABLE_UNITS.has(u)) return 'unité';
   return null;
@@ -58,6 +71,7 @@ function versGrammes(qty: number, unit: string): number | null {
   if (u === 'kg' || u === 'kilo' || u === 'kilos' || u === 'kilogramme' || u === 'kilogrammes') {
     return qty * 1000;
   }
+  if (u in PETITES_MESURES) return qty * PETITES_MESURES[u];
   return null;
 }
 
@@ -67,6 +81,7 @@ function versMillilitres(qty: number, unit: string): number | null {
   if (u === 'ml' || u === 'millilitre' || u === 'millilitres') return qty;
   if (u === 'cl' || u === 'centilitre' || u === 'centilitres') return qty * 10;
   if (u === 'l' || u === 'litre' || u === 'litres') return qty * 1000;
+  if (u in PETITES_MESURES) return qty * PETITES_MESURES[u];
   return null;
 }
 
@@ -113,7 +128,9 @@ export function convertToProductQty(
 
   // Même famille d'unité : rapport direct.
   if (ingNorm !== null && ingNorm === prodNorm) {
-    return { qty: Math.ceil(ingredientQty), approximate: false };
+    const v = ingNorm === 'g' ? versGrammes(ingredientQty, ingredientUnit)
+      : ingNorm === 'ml' ? versMillilitres(ingredientQty, ingredientUnit) : ingredientQty;
+    return { qty: Math.ceil(v ?? ingredientQty), approximate: false };
   }
 
   // Masse vers articles. On convertit AVANT de diviser : la version web
@@ -133,6 +150,16 @@ export function convertToProductQty(
     if (enMl != null) {
       return { qty: Math.ceil(enMl / product.volume_ml), approximate: true };
     }
+  }
+
+  // Un poids pour un produit vendu au volume (ou l'inverse) : 1 g ≈ 1 ml, à peu près.
+  if (prodNorm === 'unité' && product.volume_ml != null && product.volume_ml > 0) {
+    const enGrammes = versGrammes(ingredientQty, ingredientUnit);
+    if (enGrammes != null) return { qty: Math.ceil(enGrammes / product.volume_ml), approximate: true };
+  }
+  if (prodNorm === 'unité' && product.grammage_g != null && product.grammage_g > 0) {
+    const enMl = versMillilitres(ingredientQty, ingredientUnit);
+    if (enMl != null) return { qty: Math.ceil(enMl / product.grammage_g), approximate: true };
   }
 
   // Unités dénombrables : un pour un.
@@ -156,8 +183,10 @@ export function isConvertible(
   const prodNorm = normalizeUnit(product.unit || 'unité');
 
   if (ingNorm !== null && ingNorm === prodNorm) return true;
-  if (ingNorm === 'g' && prodNorm === 'unité' && (product.grammage_g ?? 0) > 0) return true;
-  if (ingNorm === 'ml' && prodNorm === 'unité' && (product.volume_ml ?? 0) > 0) return true;
+  // Le poids et le volume se convertissent l'un dans l'autre (≈ 1 g par ml).
+  if ((ingNorm === 'g' || ingNorm === 'ml') && prodNorm === 'unité'
+    && ((product.grammage_g ?? 0) > 0 || (product.volume_ml ?? 0) > 0)) return true;
+  if (estPetiteMesure(ingredientUnit)) return true;
   if (COUNTABLE_UNITS.has(ingredientUnit.trim().toLowerCase())) return true;
 
   return false;

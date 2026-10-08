@@ -57,9 +57,10 @@ const offres=[offre('c1','rc','carrefour','HERTA Lardons fumés 2x75g',2.49),off
  // Habitudes et liste : les œufs portent la part de la quiche ; « + » ajoute en plus.
  await page.getByRole('button',{name:/^Habitudes et liste :/}).last().click();
  await page.getByRole('tab',{name:/^Produits laitiers/}).first().click();
- await page.getByText('Repas : 2 · Quiche lorraine',{exact:true}).first().waitFor();
+ // Variante B : une carte par recette, ses produits du rayon dedans.
+ await page.getByRole('heading',{name:/^Quiche lorraine, 2 personnes, \d+ produits? dans ce rayon$/}).first().waitFor();
  await page.getByRole('button',{name:'Augmenter Œufs Plein Air x6, en plus des 2 pour les repas'}).click();
- await texte('2 repas + 1').waitFor();
+ await texte('+1 en plus des repas').waitFor();
  await page.waitForTimeout(400);await page.screenshot({path:dossier+'/br4-habitudes.png'});
  if(errors.length)throw Error(errors.join('\n'));console.log(JSON.stringify({ok:true}));
  }catch(e){console.error(e);await page?.screenshot({path:dossier+'/br-erreur.png'}).catch(()=>{});process.exitCode=1}finally{await b.close()}})();

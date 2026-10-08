@@ -12,7 +12,8 @@ test("normalise les familles d'unités", () => {
   assert.equal(normalizeUnit('ml'), 'ml');
   assert.equal(normalizeUnit('L'), 'ml');
   assert.equal(normalizeUnit('gousse'), 'unité');
-  assert.equal(normalizeUnit('cuillère à soupe'), 'unité');
+  // Une cuillère est une petite mesure (≈ 15 g), pas un article.
+  assert.equal(normalizeUnit('cuillère à soupe'), 'g');
   assert.equal(normalizeUnit('parsec'), null);
   assert.equal(normalizeUnit(''), null);
 });
@@ -69,4 +70,14 @@ test("formatIngredientQty colle l'unité aux mesures, l'espace au reste", () => 
   assert.equal(formatIngredientQty(1, 'L'), '1L');
   assert.equal(formatIngredientQty(2, 'gousse'), '2 gousse');
   assert.equal(formatIngredientQty(0, 'g'), '');
+});
+
+test('des cuillères ne font pas acheter autant de paquets', async () => {
+  const { convertToProductQty, quantiteNormalisee } = await import('./unites.ts');
+  // Brochettes Tsukune pour 2 : 4 c. à soupe de chapelure (≈ 60 g) dans un paquet de 275 g.
+  assert.deepEqual(quantiteNormalisee(4, 'cuillère à soupe'), { famille: 'g', valeur: 60 });
+  assert.equal(convertToProductQty(60, 'g', { unit: 'unité', grammage_g: 275, volume_ml: null }).qty, 1);
+  // Sauce soja, vendue au volume (250 ml) : 4 c. à soupe ≈ 60 g ≈ 60 ml, une bouteille.
+  assert.equal(convertToProductQty(60, 'g', { unit: 'unité', grammage_g: null, volume_ml: 250 }).qty, 1);
+  assert.equal(convertToProductQty(2, 'pincée', { unit: 'unité', grammage_g: 100, volume_ml: null }).qty, 1);
 });

@@ -83,7 +83,7 @@ const recipes=[{id:'rec1',name:'Poulet rôti aux légumes',servings_default:2,im
  // La liste par rayon n'est plus au bilan : elle vit dans « Habitudes et liste », où la part des repas est dite.
  if(await btn('Voir et ajuster la liste').count())throw Error('Liste encore dépliable au bilan');
  await page.getByRole('button',{name:/^Habitudes et liste :/}).last().click();await page.getByRole('tab',{name:/^Fruits & légumes/}).first().click();
- await page.getByText(/^Repas : .*Poulet rôti aux légumes/).first().waitFor();await page.waitForTimeout(400);await shot('6d-habitudes-repas');
+ await page.getByRole('heading',{name:/^Poulet rôti aux légumes, .*dans ce rayon$/}).first().waitFor();await page.waitForTimeout(400);await shot('6d-habitudes-repas');
  await btn('Revenir au bilan').last().click();await texte('Étape 2 sur 2 · Bilan').waitFor();
  await page.setViewportSize({width:1024,height:1366});await page.waitForTimeout(600);await shot('6-bilan-tablette');
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow');
