@@ -104,3 +104,9 @@ test('deux noms ne sont pas des doublons pour leur seul premier mot',()=>{
  assert.equal(doublonsPossibles([l('extra:a','Papier aluminium'),l('extra:b','Papier film')]).length,0);
  assert.equal(doublonsPossibles([l('extra:a','Lait'),l('extra:b','Lait demi-écrémé bio')]).length,1);
 });
+test('deux céréales cochées dans Habitudes ne sont pas un doublon ; une céréale notée à côté, si',()=>{
+ const l=(key,name,id,label)=>({key,name,unit:'unité',totalQuantity:1,product_id:id,ean13:null,rayon:'epicerie',sources:[{type:'quotidien',label,qty:1}],owned:false,aPreciser:false,candidats:[]});
+ const bjorg=l('produit:a','Céréales Croustillant Bjorg','a','Habitudes'),lion=l('produit:b','Céréales Lion Nestlé','b','Habitudes');
+ assert.equal(doublonsPossibles([bjorg,lion]).length,0);
+ assert.equal(doublonsPossibles([bjorg,{...lion,sources:[{type:'quotidien',label:'Widget',qty:1}]}]).length,1);
+});
