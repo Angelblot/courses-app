@@ -1,9 +1,10 @@
 import { instantaneHabitude, manqueActif, type InstantaneHabitude } from '../lib/session-courses';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../lib/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { router, useFocusEffect } from 'expo-router';
 import { BasDeLEcran, Head, Photo, Action, ui, useAnnulation } from '../components/MaisonUI';
 import { appuiLongFiche } from '../components/FicheAppuiLong';
@@ -53,6 +54,12 @@ export default function Habitudes({session=false}:{session?:boolean}){
  const terminer=()=>session?revenirAuBilan():router.push('/liste');
  const allerA=(cle:string)=>{setRayon(cle);annulation.effacer();};
  useEffect(()=>{if(cat&&!ouverts.includes(cat.cle))setOuverts(o=>[...o,cat.cle]);},[cat?.cle]);
+ // Glisser sur la liste passe au rayon voisin, comme toucher sa pastille ; la pastille active reste en vue.
+ const pastilles=useRef<ScrollView>(null),positions=useRef<Record<string,number>>({});
+ useEffect(()=>{const x=cat?positions.current[cat.cle]:undefined;if(x!=null)pastilles.current?.scrollTo({x:Math.max(0,x-20),animated:true});},[cat?.cle]);
+ const voisin=(pas:number)=>{const c=categories[index+pas];if(c)allerA(c.cle);};
+ const glisser=Gesture.Pan().runOnJS(true).activeOffsetX([-24,24]).failOffsetY([-14,14])
+  .onEnd(e=>{if(Math.abs(e.translationX)<60&&Math.abs(e.velocityX)<600)return;voisin(e.translationX<0?1:-1);});
  const retenus=items.filter(x=>x.id in choix||(parRepas(x.id)&&!ligneDe(x.id)?.owned)).length+autres.filter(l=>!l.owned).length;
  function valider(){
   // Tant que les repas se chargent, leur part est inconnue : on ne classe rien.
@@ -98,8 +105,8 @@ export default function Habitudes({session=false}:{session?:boolean}){
   .sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
  const libelle=`${suivant?'Rayon suivant':session?'Revenir au bilan':'Vérifier ma liste'}${retenus?` · ${retenus} retenu${retenus>1?'s':''}`:''}`;
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><View style={{paddingHorizontal:20,paddingTop:session?4:20,paddingBottom:4}}><Head title={session?'Habitudes et liste':'Mes habitudes'} back={!session} avatar={!session}/></View>
- <View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8,paddingHorizontal:20,paddingTop:session?8:0,paddingBottom:8}}>{categories.map(c=>{const actif=cat?.cle===c.cle,ok=fini(c.cle)&&!actif;return <Pressable key={c.cle} accessibilityRole="tab" accessibilityState={{selected:actif}} aria-selected={actif} accessibilityLabel={`${c.label}${ok?', passé en revue':''}`} onPress={()=>allerA(c.cle)} style={[h.rayon,actif&&{backgroundColor:colors.accent,borderColor:colors.accent}]}>{ok&&<Feather name="check" size={15} color={colors.accent}/>}<Text style={{color:actif?colors.accentContrast:colors.accent,fontWeight:'600'}}>{c.label}</Text></Pressable>;})}</ScrollView></View>
- <ScrollView contentContainerStyle={[ui.content,{paddingTop:4,gap:8}]}>
+ <View><ScrollView ref={pastilles} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8,paddingHorizontal:20,paddingTop:session?8:0,paddingBottom:8}}>{categories.map(c=>{const actif=cat?.cle===c.cle,ok=fini(c.cle)&&!actif;return <Pressable key={c.cle} onLayout={e=>{positions.current[c.cle]=e.nativeEvent.layout.x;}} accessibilityRole="tab" accessibilityState={{selected:actif}} aria-selected={actif} accessibilityLabel={`${c.label}${ok?', passé en revue':''}`} onPress={()=>allerA(c.cle)} style={[h.rayon,actif&&{backgroundColor:colors.accent,borderColor:colors.accent}]}>{ok&&<Feather name="check" size={15} color={colors.accent}/>}<Text style={{color:actif?colors.accentContrast:colors.accent,fontWeight:'600'}}>{c.label}</Text></Pressable>;})}</ScrollView></View>
+ <GestureDetector gesture={glisser}><ScrollView contentContainerStyle={[ui.content,{paddingTop:4,gap:8,flexGrow:1}]}>
  {p.chargement&&!p.produits.length&&<ActivityIndicator/>}{p.erreur&&<><Text style={ui.error}>{p.erreur}</Text><Action secondary onPress={p.recharger}>Réessayer</Action></>}
  {cat&&(items.length>0||autres.length>0)&&<Text style={ui.detail}>{groupesRepas.length>0?'Les repas sont déjà comptés. Décoche ce que tu as déjà, coche tes habitudes.':'Touche ce qu’il te faut. Le reste est considéré comme déjà chez toi.'}</Text>}
  {/* Variante B validée : une carte par recette, ses produits du rayon dedans ; puis les habitudes de A à Z. */}
@@ -108,7 +115,7 @@ export default function Habitudes({session=false}:{session?:boolean}){
  {habituelles.map(x=>x.el)}
  {cat&&!items.length&&!autres.length&&!p.chargement&&<Text style={ui.subtitle}>Rien à passer en revue dans ce rayon : ses produits sont déjà dans tes manques.</Text>}
  {!cat&&!p.chargement&&!p.erreur&&<><Text style={ui.heading}>Tes habitudes commencent ici.</Text><Text style={ui.subtitle}>Enregistre tes produits préférés avec le scanner.</Text><Action secondary onPress={()=>router.push('/scan')}>Scanner un premier favori</Action></>}
- </ScrollView>
+ </ScrollView></GestureDetector>
  <View style={ui.footer}>{annulation.toastPied}<Action disabled={chargeListe} onPress={valider}>{libelle}</Action></View>{!session&&<BasDeLEcran/>}</SafeAreaView>
 }
 /**
