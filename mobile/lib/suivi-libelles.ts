@@ -42,7 +42,7 @@ export function resume(travail: {
     return travail.error ?? "Ouvre l'extension sur ton ordinateur pour reprendre.";
   }
   if (travail.status === 'pending') {
-    return "Ouvre l'extension sur ton ordinateur : elle attend ton feu vert.";
+    return 'Le remplissage part de lui-même dès que Chrome est ouvert sur ton ordinateur.';
   }
   if (travail.status === 'failed') return travail.error ?? "Réessaie depuis l'extension.";
   return libelleEtat(travail.status);

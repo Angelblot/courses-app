@@ -699,8 +699,10 @@ async function essayerRemplissageAuto() {
   const etat = await getState();
   if (etat?.status === 'paused') return false;
   const r = await travauxEnAttente();
-  const travail = r.ok ? r.data?.[0] : null;
-  if (!travail) return false;
+  // La plus récente seulement, et envoyée il y a moins de 12 heures : une
+  // vieille liste restée en attente ne doit jamais partir seule.
+  const travail = r.ok ? (r.data ?? []).at(-1) : null;
+  if (!travail || Date.now() - new Date(travail.created_at).getTime() > 12 * 3600_000) return false;
   try {
     await demarrerTravail(travail.id);
     const n = travail.items?.length ?? 0;

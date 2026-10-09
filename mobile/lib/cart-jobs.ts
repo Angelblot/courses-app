@@ -5,8 +5,9 @@ import type { ItemPanier } from './consolidation.ts';
  * Dépose la liste dans `cart_jobs`, à l'état `pending`, sous l'identifiant
  * `id` créé sur le téléphone (voir id-envoi.ts).
  *
- * L'extension Chrome connectée au même compte relève ces travaux.
- * Le remplissage ne démarre qu'après confirmation dans son popup.
+ * L'extension Chrome connectée au même compte relève ces travaux et lance
+ * d'elle-même le plus récent. Les listes envoyées avant et jamais relevées
+ * sont annulées : l'extension ne doit pas remplir une liste d'il y a un mois.
  *
  * Un nouvel essai avec le même `id` après une réponse perdue heurte la clé
  * primaire : l'envoi est alors déjà parti, c'est un succès, pas un doublon.
@@ -24,10 +25,9 @@ export async function envoyerListe(
     .from('cart_jobs')
     .insert({ id, user_id: userId, status: 'pending', drives, items });
 
-  if (error) {
-    if (error.code === '23505') return { ok: true, id };
-    return { ok: false, erreur: "Impossible d'envoyer la liste pour le moment." };
-  }
+  if (error && error.code !== '23505') return { ok: false, erreur: "Impossible d'envoyer la liste pour le moment." };
+  // Sans conséquence si cela échoue : l'extension ne prend de toute façon que la plus récente.
+  await supabase.from('cart_jobs').update({ status: 'cancelled' }).eq('user_id', userId).eq('status', 'pending').neq('id', id);
   return { ok: true, id };
 }
 
