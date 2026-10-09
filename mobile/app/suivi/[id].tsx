@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -8,9 +8,15 @@ import { useSuiviTravail, useTravailActif } from '../../stores/suivi';
 import { libelleEtat, libelleDrive, resume } from '../../lib/suivi-libelles.ts';
 import { estClos } from '../../lib/suivi-bandeau.ts';
 import { colors, radius, spacing } from '../../lib/theme';
-import { adresseReprise, bilanParDrive, nomDrive, raison, siteDrive, type BilanDrive, type LigneResultat, type Ton } from '../../lib/compte-rendu.ts';
+import { bilanParDrive, nomDrive, raison, siteDrive, type BilanDrive, type LigneResultat, type Ton } from '../../lib/compte-rendu.ts';
 import { Photo } from '../../components/MaisonUI';
 import { useProducts } from '../../stores/products';
+import { useOffresTravail, useRemplacements } from '../../stores/remplacements';
+import { itemsDesRemplacements } from '../../lib/remplacement.ts';
+import { envoyerListe } from '../../lib/cart-jobs';
+import { nouvelIdEnvoi } from '../../lib/id-envoi';
+import { RemplacerSheet } from '../../components/RemplacerSheet';
+import type { Travail } from '../../stores/suivi';
 
 export default function SuiviTravail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -46,7 +52,7 @@ export default function SuiviTravail() {
   // Variante B validée : un onglet par drive, ce qui manque avec sa raison et son geste.
   // Le compte rendu vaut pour un remplissage fini, ou en pause (résultats partiels) ;
   // pendant qu'il tourne, l'écran d'avancement reste.
-  if (parDrive.length && (travail.status === 'done' || travail.status === 'needs_action')) return <CompteRendu travail={travail} parDrive={parDrive} onTerminer={() => router.dismissTo('/')} />;
+  if (parDrive.length && (travail.status === 'done' || travail.status === 'needs_action')) return <CompteRendu travail={travail} parDrive={parDrive} onTerminer={() => router.dismissTo('/')} onEnvoye={(params) => router.push({ pathname: '/suivi/envoye', params })} />;
 
   const bilan = travail.results ?? null;
   const manquants = bilan
@@ -87,11 +93,15 @@ const TONS: Record<Ton, { fond: string; texte: string }> = {
   neutre: { fond: colors.off, texte: colors.textMuted },
 };
 
-function CompteRendu({ travail, parDrive, onTerminer }: { travail: { status: string; error: string | null; progress: { drive?: string; fait?: number; total?: number } | null }; parDrive: BilanDrive[]; onTerminer: () => void }) {
+function CompteRendu({ travail, parDrive, onTerminer, onEnvoye }: { travail: Travail; parDrive: BilanDrive[]; onTerminer: () => void;
+  onEnvoye: (params: { id: string; n: string; drives: string; heure: string }) => void }) {
   const [drive, setDrive] = useState(parDrive[0].drive), [voirAjoutes, setVoirAjoutes] = useState(false);
-  // Les lignes déjà ouvertes sur le site, pour s'y retrouver en les reprenant une à une.
-  const [ouvertes, setOuvertes] = useState<Set<string>>(new Set()), [erreurLien, setErreurLien] = useState<string | null>(null);
-  const { produits } = useProducts(), insets = useSafeAreaInsets();
+  const [aRemplacer, setARemplacer] = useState<LigneResultat | null>(null), [envoi, setEnvoi] = useState(false), [erreurEnvoi, setErreurEnvoi] = useState<string | null>(null);
+  const { produits, recharger } = useProducts(), insets = useSafeAreaInsets();
+  const { offres: offresVues } = useOffresTravail(travail.id);
+  const { remplacements, choisir, oublier, oublierDrive } = useRemplacements(travail.id);
+  // Gardé jusqu'au succès : un nouvel essai après une réponse perdue ne crée pas de doublon.
+  const idEnvoi = useRef<string | null>(null);
   const b = parDrive.find(x => x.drive === drive) ?? parDrive[0];
   const drives = parDrive.map(x => x.drive);
   const parId = useMemo(() => new Map(produits.map(p => [p.id, p.image_url])), [produits]);
@@ -99,12 +109,25 @@ function CompteRendu({ travail, parDrive, onTerminer }: { travail: { status: str
   const image = (l: LigneResultat & { product_id?: string | null }) => (l.product_id ? parId.get(l.product_id) : undefined) ?? parNom.get(l.item.toLowerCase());
   const n = b.ajoutes.length, m = b.manquants.length;
   const enPause = travail.status === 'needs_action';
-  const reprendre = (l: LigneResultat, cle: string) => {
-    setErreurLien(null);
-    Linking.openURL(adresseReprise(l, b.drive, [...b.ajoutes, ...b.manquants]))
-      .then(() => setOuvertes(o => new Set(o).add(cle)))
-      .catch(() => { setErreurLien(`Impossible d’ouvrir ${siteDrive(b.drive)} pour le moment.`); AccessibilityInfo.announceForAccessibility(`Impossible d’ouvrir ${siteDrive(b.drive)}`); });
-  };
+  // Le produit d'origine d'une ligne, et les noms sous lesquels l'extension l'a cherché.
+  const origine = (item: string) => (travail.items ?? []).find(x => x.name === item);
+  const remplaces = remplacements[b.drive] ?? {}, nr = Object.keys(remplaces).filter(k => b.manquants.some(l => l.item === k)).length;
+  async function envoyerRemplacements() {
+    if (envoi || !nr) return;
+    setEnvoi(true); setErreurEnvoi(null);
+    // La quantité d'origine vient de la liste envoyée, ajustée au format du remplaçant.
+    const origines = Object.fromEntries(b.manquants.map(l => [l.item, origine(l.item) ?? { quantity: l.quantity ?? 1 }]));
+    const items = itemsDesRemplacements(Object.fromEntries(Object.entries(remplaces).filter(([k]) => k in origines)), origines);
+    const id = idEnvoi.current ??= nouvelIdEnvoi();
+    let res: { ok: boolean; erreur?: string };
+    try { res = await envoyerListe(items, [b.drive], id, { annulerAnciennes: false }); }
+    catch { res = { ok: false }; }
+    finally { setEnvoi(false); }
+    if (!res.ok) { setErreurEnvoi(res.erreur ?? 'Impossible d’envoyer pour le moment. Réessaie.'); return; }
+    idEnvoi.current = null;
+    oublierDrive(b.drive);
+    onEnvoye({ id, n: String(items.length), drives: b.drive, heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) });
+  }
   // Sans manque, la liste montre d'emblée ce qui est au panier.
   const ajoutesVisibles = voirAjoutes || !m;
   return (
@@ -131,14 +154,21 @@ function CompteRendu({ travail, parDrive, onTerminer }: { travail: { status: str
             <Text style={[c.bandeauTitre, { color: colors.attentionText }]}>En pause</Text>
             <Text style={[c.bandeauSous, { color: colors.attentionText, opacity: 1 }]}>{travail.error ?? 'Une vérification t’attend sur ton ordinateur.'} Le compte rendu se complètera à la reprise.</Text>
           </View>
-        </View> : <View style={c.bandeau} accessible accessibilityLabel={`${n} produit${n > 1 ? 's' : ''} au panier ${nomDrive(b.drive)}. ${m ? `${m} non ajouté${m > 1 ? 's' : ''}. ` : ''}À payer sur ${siteDrive(b.drive)}.`}>
+        </View> : <View style={[c.bandeau, c.bandeauColonne]}><View style={c.bandeauLigne} accessible accessibilityLabel={`${n} produit${n > 1 ? 's' : ''} au panier ${nomDrive(b.drive)}. ${m ? `${m} non ajouté${m > 1 ? 's' : ''}. ` : ''}${nr ? `${nr} remplacé${nr > 1 ? 's' : ''} par toi. ` : ''}À payer sur ${siteDrive(b.drive)}.`}>
           <Feather name="shopping-cart" size={26} color={colors.accentContrast} />
           <View style={{ flex: 1 }}>
             <Text style={c.bandeauTitre}>{n} produit{n > 1 ? 's' : ''} au panier</Text>
-            <Text style={c.bandeauSous} numberOfLines={2}>{m ? `${m} non ajouté${m > 1 ? 's' : ''} · ` : ''}à payer sur {siteDrive(b.drive)}</Text>
+            <Text style={c.bandeauSous} numberOfLines={2}>{m ? `${m} non ajouté${m > 1 ? 's' : ''} · ` : ''}{nr ? `${nr} remplacé${nr > 1 ? 's' : ''} par toi · ` : ''}à payer sur {siteDrive(b.drive)}</Text>
           </View>
+        </View>
+        {/* Variante A : un geste pour mettre au panier les seuls remplacements choisis. */}
+        {nr > 0 && <Pressable accessibilityRole="button" accessibilityLabel={envoi ? 'Envoi en cours' : undefined} disabled={envoi} accessibilityState={{ disabled: envoi }} onPress={() => { void envoyerRemplacements(); }}
+          accessibilityHint={`L’extension ajoute ces produits au panier ${nomDrive(b.drive)}, Chrome ouvert`} style={c.relancer}>
+          {envoi ? <ActivityIndicator color={colors.accent} /> : <><Feather name="refresh-cw" size={16} color={colors.accent} />
+            <Text style={c.relancerTexte}>Ajouter {nr > 1 ? `les ${nr} remplacements` : 'le remplacement'} au panier</Text></>}
+        </Pressable>}
         </View>}
-        {!!erreurLien && <Text accessibilityLiveRegion="polite" style={c.erreur}>{erreurLien}</Text>}
+        {!!erreurEnvoi && <Text accessibilityLiveRegion="polite" style={c.erreur}>{erreurEnvoi}</Text>}
         {m > 0 && <>
           <View style={c.entete}>
             <Text style={c.enteteTexte}>NON AJOUTÉS · {m}</Text>
@@ -147,19 +177,19 @@ function CompteRendu({ travail, parDrive, onTerminer }: { travail: { status: str
             </Pressable>}
           </View>
           {b.manquants.map((l, i) => {
-            const r = raison(l, b.drive, drives), ton = TONS[r.ton], cle = `${b.drive}-m-${i}`, ouverte = ouvertes.has(cle);
-            return <View key={cle} style={[c.ligne, ouverte && { opacity: 0.6 }]}>
-              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Photo name={l.item} url={image(l)} style={c.photo} /></View>
-              <View style={{ flex: 1 }} accessible accessibilityLabel={`${l.item}. ${ouverte ? `Ouvert sur ${siteDrive(b.drive)}` : r.libelle}`}>
-                <Text style={c.nom} numberOfLines={2}>{l.item}</Text>
-                {ouverte ? <View style={[c.pastille, c.pastilleOuverte]}><Feather name="check" size={11} color={colors.textMuted} /><Text style={[c.pastilleTexte, { color: colors.textMuted }]}>Ouvert sur {siteDrive(b.drive)}</Text></View>
+            const r = raison(l, b.drive, drives), ton = TONS[r.ton], cle = `${b.drive}-m-${i}`, rp = remplaces[l.item];
+            const prix = rp?.prix != null ? ` · ${rp.prix.toFixed(2).replace('.', ',')} €` : '';
+            return <Pressable key={cle} accessibilityRole="button" onPress={() => setARemplacer(l)}
+              accessibilityLabel={rp ? `${l.item}, remplacé par ${rp.nom}${prix}. Changer` : `${l.item}. ${r.libelle}. Remplacer`}
+              style={({ pressed }) => [c.ligne, pressed && { opacity: 0.85 }]}>
+              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Photo name={rp?.nom ?? l.item} url={rp?.image_url ?? image(l)} style={c.photo} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={[c.nom, rp && c.nomBarre]} numberOfLines={2}>{l.item}</Text>
+                {rp ? <View style={c.remplace}><Feather name="check" size={12} color={colors.accent} /><Text style={c.remplaceTexte} numberOfLines={2}>{rp.nom}{prix}</Text></View>
                   : <View style={[c.pastille, { backgroundColor: ton.fond }]}><Text style={[c.pastilleTexte, { color: ton.texte }]}>{r.libelle}</Text></View>}
               </View>
-              <Pressable accessibilityRole="link" accessibilityLabel={`${r.action} ${l.item} sur ${siteDrive(b.drive)}`} accessibilityHint="Ouvre la recherche du site ; ton panier y est relié à ton compte"
-                onPress={() => reprendre(l, cle)} hitSlop={6} style={c.action}>
-                <Text style={c.lien}>{r.action}</Text><Feather name="arrow-up-right" size={14} color={colors.accent} />
-              </Pressable>
-            </View>;
+              <View style={c.action}><Text style={[c.lien, rp && { color: colors.textMuted }]}>{rp ? 'Changer' : 'Remplacer'}</Text>{!rp && <Feather name="chevron-right" size={16} color={colors.accent} />}</View>
+            </Pressable>;
           })}
         </>}
         {ajoutesVisibles && n > 0 && <>
@@ -179,6 +209,12 @@ function CompteRendu({ travail, parDrive, onTerminer }: { travail: { status: str
       <View style={[c.pied, { paddingBottom: Math.max(16, insets.bottom + 4) }]}>
         <Pressable accessibilityRole="button" style={c.terminer} onPress={onTerminer}><Text style={s.boutonTexte}>Terminer</Text></Pressable>
       </View>
+      <RemplacerSheet visible={!!aRemplacer} onFermer={() => setARemplacer(null)} drive={b.drive} drives={drives} ligne={aRemplacer}
+        offresVues={offresVues} produits={produits} origineId={aRemplacer ? origine(aRemplacer.item)?.product_id ?? null : null}
+        recherches={aRemplacer ? [aRemplacer.item, ...(origine(aRemplacer.item)?.alternatives ?? []).map(x => x.name)] : []}
+        actuel={aRemplacer ? remplaces[aRemplacer.item] : undefined}
+        onChoisi={(rp) => { if (aRemplacer) choisir(b.drive, aRemplacer.item, rp); setARemplacer(null); recharger(); }}
+        onRetirer={() => { if (aRemplacer) oublier(b.drive, aRemplacer.item); setARemplacer(null); }} />
     </SafeAreaView>
   );
 }
@@ -210,6 +246,13 @@ const c = StyleSheet.create({
   pastilleTexte: { fontSize: 11, fontWeight: '700' },
   action: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 4 },
   cible: { minHeight: 44, justifyContent: 'center' },
+  nomBarre: { color: colors.textMuted, textDecorationLine: 'line-through' },
+  remplace: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
+  remplaceTexte: { flex: 1, fontSize: 12, fontWeight: '600', color: colors.accent },
+  bandeauColonne: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },
+  bandeauLigne: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  relancer: { minHeight: 46, borderRadius: 10, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  relancerTexte: { fontSize: 15, fontWeight: '700', color: colors.accent },
   quantite: { fontSize: 13, color: colors.textMuted, fontVariant: ['tabular-nums'] },
   pied: { padding: 16, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
   terminer: { backgroundColor: colors.accent, borderRadius: 12, minHeight: 50, alignItems: 'center', justifyContent: 'center' },

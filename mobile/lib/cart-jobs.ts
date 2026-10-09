@@ -16,6 +16,7 @@ export async function envoyerListe(
   items: ItemPanier[],
   drives: string[],
   id: string,
+  { annulerAnciennes = true }: { annulerAnciennes?: boolean } = {},
 ): Promise<{ ok: boolean; id?: string; erreur?: string }> {
   const { data: utilisateur } = await supabase.auth.getUser();
   const userId = utilisateur?.user?.id;
@@ -27,7 +28,8 @@ export async function envoyerListe(
 
   if (error && error.code !== '23505') return { ok: false, erreur: "Impossible d'envoyer la liste pour le moment." };
   // Sans conséquence si cela échoue : l'extension ne prend de toute façon que la plus récente.
-  await supabase.from('cart_jobs').update({ status: 'cancelled' }).eq('user_id', userId).eq('status', 'pending').neq('id', id);
+  // Un complément (des remplacements) s'ajoute à ce qui attend, sans rien annuler.
+  if (annulerAnciennes) await supabase.from('cart_jobs').update({ status: 'cancelled' }).eq('user_id', userId).eq('status', 'pending').neq('id', id);
   return { ok: true, id };
 }
 

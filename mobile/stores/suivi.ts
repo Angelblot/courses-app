@@ -12,6 +12,8 @@ export type Travail = {
   created_at?: string;
   progress: { drive?: string; fait?: number; total?: number } | null;
   results: Record<string, LigneResultat[]> | null;
+  /** La liste envoyée (lue seulement pour un travail suivi) : le produit d'origine de chaque ligne. */
+  items?: { name: string; product_id: string | null; quantity?: number; grammage_g?: number | null; volume_ml?: number | null; alternatives?: { name: string }[] }[] | null;
   error: string | null;
 };
 
@@ -37,7 +39,7 @@ export function useSuiviTravail(jobId: string | null) {
     (async () => {
       const { data, error } = await supabase
         .from('cart_jobs')
-        .select('id, status, progress, results, error, created_at')
+        .select('id, status, progress, results, error, created_at, items')
         .eq('id', jobId)
         .maybeSingle();
       if (!vivant) return;
