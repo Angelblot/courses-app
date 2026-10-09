@@ -52,7 +52,6 @@ export const cleDistinct = (a: string, b: string) => [normaliserNom(a), normalis
  * (et redemande si les quantités bougent) ; `distincts` retient une paire
  * déclarée distincte dès la saisie, par ses noms seulement.
  */
-const choisiEnHabitudes = (l: LigneMaison) => !!l.product_id && l.sources.some(x => x.type === 'quotidien' && x.label === 'Habitudes');
 export function doublonsPossibles(lignes: LigneMaison[], acceptes: string[] = [], distincts: string[] = []) {
  const actifs=lignes.filter(l=>!l.owned), result: {id:string;a:LigneMaison;b:LigneMaison}[]=[];
  for(let i=0;i<actifs.length;i++) for(let j=i+1;j<actifs.length;j++) {
@@ -60,8 +59,10 @@ export function doublonsPossibles(lignes: LigneMaison[], acceptes: string[] = []
   const ta=normalizeProductType(a.name,null,{repli:false}),tb=normalizeProductType(b.name,null,{repli:false});
   if (!(a.ean13&&a.ean13===b.ean13) && na!==nb && !(ta&&ta===tb)) continue;
   if (distincts.includes(cleDistinct(a.name,b.name))) continue;
-  // Deux produits cochés un à un dans Habitudes sont voulus tous les deux : rien à demander.
-  if (choisiEnHabitudes(a) && choisiEnHabitudes(b) && a.product_id !== b.product_id) continue;
+  // Deux produits choisis (habitude, recette, offre gardée) sont voulus tous les deux :
+  // les lardons d'une recette et la poitrine des habitudes ne sont pas le même achat.
+  // Seule une note en texte libre peut doubler un produit (« Céréales » au widget).
+  if (a.product_id && b.product_id && a.product_id !== b.product_id && !(a.ean13 && a.ean13 === b.ean13)) continue;
   const id=[a,b].map(l=>`${l.key}:${l.totalQuantity}:${l.name}:${l.unit}`).sort().join('|');
   if(!acceptes.includes(id)) result.push({id,a,b});
  }
