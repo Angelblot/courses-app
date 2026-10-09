@@ -166,7 +166,9 @@ export const SITES = {
       title: ['h1'],
       price: ['[class*="Prix"]', '[class*="price"]'],
     },
-    challengeHints: ['un instant', 'formalité', 'vous êtes un humain', 'captcha'],
+    // « Service momentanément indisponible » : maintenance ou blocage. Continuer
+    // reviendrait à marteler un site qui refuse déjà : on s'arrête comme pour une vérification.
+    challengeHints: ['un instant', 'formalité', 'vous êtes un humain', 'captcha', 'service est momentanément indisponible'],
     loginHints: ['se connecter', 'connexion', 'identifiez-vous'],
   },
 };
