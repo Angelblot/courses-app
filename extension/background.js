@@ -346,12 +346,14 @@ async function deroulerJob() {
   let state = await getState();
   if (!state || state.status !== 'running') return;
 
-  const cfg = SITES[state.site];
   const tabId = state.tabId;
 
   while (true) {
     state = await getState();
     if (!state || state.status !== 'running') return;
+    // Relue à chaque tour : après Carrefour vient E.Leclerc. Figée avant la
+    // boucle, elle faisait chercher les produits Leclerc sur carrefour.fr.
+    const cfg = SITES[state.site];
 
     const index = state.cursor;
     if (index >= state.items.length) {
@@ -364,7 +366,8 @@ async function deroulerJob() {
         // On repart de l'origine de l'enseigne suivante. Si la session n'y est
         // pas ouverte ou le magasin pas choisi, l'agent le signalera dès le
         // premier produit et on s'arrêtera proprement en `needs_action`.
-        await naviguer(tabId, cfgSuivant.origin);
+        // Droit au magasin retenu : l'accueil nu de leclercdrive.fr n'en désigne aucun.
+        await naviguer(tabId, (await magasinConnu(cfgSuivant, suivant)) ?? cfgSuivant.origin);
         const onglet = await chrome.tabs.get(tabId);
         let origineSuivante = null;
         try {
