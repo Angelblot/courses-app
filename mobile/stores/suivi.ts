@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { cleEcart, doitAfficher, ETATS_ACTIFS } from '../lib/suivi-bandeau.ts';
 import { lireAcquittement, ecrireAcquittement } from './acquittement';
 import { nomCanal } from '../lib/canal';
+import type { LigneResultat } from '../lib/compte-rendu.ts';
 
 export type Travail = {
   id: string;
@@ -10,7 +11,7 @@ export type Travail = {
   /** Sert à oublier un travail que l'extension n'a jamais pris en charge. */
   created_at?: string;
   progress: { drive?: string; fait?: number; total?: number } | null;
-  results: Record<string, Array<{ item: string; ok: boolean; message?: string }>> | null;
+  results: Record<string, LigneResultat[]> | null;
   error: string | null;
 };
 
