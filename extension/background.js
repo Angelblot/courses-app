@@ -66,7 +66,7 @@ async function activiteCourante() {
   if (enMarche.remplissage && job) {
     return ['remplissage', { fait: job.cursor ?? 0, total: job.items?.length ?? 0, drive: job.site ?? null }];
   }
-  if (job?.status === 'paused') return ['pause', { message: `Vérification demandée sur ${SITES[job.site]?.label ?? 'le drive'}.` }];
+  if (job?.status === 'paused') return ['pause', { message: job.pauseReason === 'magasin' ? `Choisis ton magasin sur ${SITES[job.site]?.label ?? 'le drive'}.` : `Vérification demandée sur ${SITES[job.site]?.label ?? 'le drive'}.` }];
   if (rech?.statut === 'pause' && rech.message && rech.cause !== 'erreur') return ['pause', { message: rech.message }];
   return ['prete', { auto: await rechercheAuto() }];
 }
@@ -400,6 +400,18 @@ async function deroulerJob() {
         message: `${state.results.filter((r) => r.ok).length} produit(s) ajouté(s) sur ${cfg.label}.`,
       });
       await chrome.action.setBadgeText({ text: '' });
+      return;
+    }
+
+    // E.Leclerc sans magasin dans l'adresse : chaque recherche tomberait à côté
+    // (47 « aucun résultat » le 09/10). On va au magasin retenu, sinon on attend une main.
+    if (cfg.storePathPattern && !/\/magasin-/.test(state.baseOrigin ?? '')) {
+      const connu = await magasinConnu(cfg, state.site);
+      if (connu) { await naviguer(tabId, connu); await setState({ baseOrigin: connu }); continue; }
+      const message = `Choisis ton magasin sur ${cfg.label} dans Chrome, puis reprends depuis l'extension.`;
+      await setState({ status: 'paused', pauseReason: 'magasin' });
+      if (state.jobId) await terminer(state.jobId, 'needs_action', { ...(state.resultatsParDrive ?? {}), [state.site]: state.results }, message);
+      chrome.notifications.create({ type: 'basic', iconUrl: 'icon-128.png', title: 'Magasin à choisir', message });
       return;
     }
 
