@@ -109,7 +109,7 @@ export default function Habitudes({session=false}:{session?:boolean}){
  {cat&&!items.length&&!autres.length&&!p.chargement&&<Text style={ui.subtitle}>Rien à passer en revue dans ce rayon : ses produits sont déjà dans tes manques.</Text>}
  {!cat&&!p.chargement&&!p.erreur&&<><Text style={ui.heading}>Tes habitudes commencent ici.</Text><Text style={ui.subtitle}>Enregistre tes produits préférés avec le scanner.</Text><Action secondary onPress={()=>router.push('/scan')}>Scanner un premier favori</Action></>}
  </ScrollView>
- <View style={ui.footer}>{annulation.toast}<Action disabled={chargeListe} onPress={valider}>{libelle}</Action></View>{!session&&<BasDeLEcran/>}</SafeAreaView>
+ <View style={ui.footer}>{annulation.toastPied}<Action disabled={chargeListe} onPress={valider}>{libelle}</Action></View>{!session&&<BasDeLEcran/>}</SafeAreaView>
 }
 /**
  * Une ligne de la liste dans Habitudes : un produit pris par les repas (sa

@@ -78,18 +78,18 @@ export default function Liste({session=false}:{session?:boolean}){
  <Pressable accessibilityRole="button" style={ui.iconButton} onPress={()=>Alert.alert('Vider cette liste ?','Les recettes et les favoris de ton catalogue seront conservés.',[{text:'Annuler',style:'cancel'},{text:'Vider la liste',style:'destructive',onPress:w.reinitialiser}])}><Text style={ui.detail}>Vider la liste</Text></Pressable></>}
  </>;
  const feuilles=<>
- <ReglerSheet visible={regler} onFermer={()=>setRegler(false)} manques={manques} doublons={doublons} ingredients={ingredients} depart={depart} products={p.produits} onRetrait={annulation.proposer} toast={annulation.toast}/>
+ <ReglerSheet visible={regler} onFermer={()=>setRegler(false)} manques={manques} doublons={doublons} ingredients={ingredients} depart={depart} products={p.produits} onRetrait={annulation.proposer} toast={annulation.toastPied}/>
  <EnvoiSheet visible={envoi} onFermer={()=>setEnvoi(false)}/>
  </>;
  // Tablette : le résumé et l'envoi à gauche, la liste toujours visible à droite.
  if(large)return <SafeAreaView edges={[]} style={ui.screen}><View style={b.colonnes}>
-  <ScrollView style={b.gauche} contentContainerStyle={ui.content}>{entete}{statut}<View style={{marginTop:8,gap:8}}>{annulation.toast}{pied}</View></ScrollView>
+  <ScrollView style={b.gauche} contentContainerStyle={ui.content}>{entete}{statut}<View style={{marginTop:8,gap:8}}>{annulation.toastPied}{pied}</View></ScrollView>
   <ScrollView style={b.droite} keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}>{liste}</ScrollView>
  </View>{feuilles}</SafeAreaView>;
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={ui.content}>
  {entete}{statut}{detail&&liste}
  </ScrollView>
- <View>{annulation.toast}<View style={ui.footer}>{pied}</View>{!session&&<BasDeLEcran/>}</View>
+ <View><View style={ui.footer}>{annulation.toastPied}{pied}</View>{!session&&<BasDeLEcran/>}</View>
  {feuilles}
  </SafeAreaView>
 }

@@ -73,7 +73,7 @@ export default function Ajout({session=false}:{session?:boolean}){
  </>}
  {!!erreur&&<Text accessibilityLiveRegion="polite" style={ui.error}>{erreur}</Text>}
  {ajoutes.length>0&&<View style={{gap:2,marginTop:4}}><Text accessibilityLiveRegion="polite" style={ui.detail}>Ajouté à ta liste</Text>{ajoutes.map(x=><View key={x.key} style={ui.sectionRow}><View style={[ui.row,{flex:1,gap:8}]}><Feather name="check" size={18} color={colors.accent}/><Text style={a.ajoute}>{x.qty} × {x.name}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${x.name}`} onPress={()=>retirer(x)} style={ui.iconButton}><Text style={ui.link}>Retirer</Text></Pressable></View>)}</View>}
- </ScrollView>{session?<View style={ui.footer}>{annulation.toast}{notable?<Action disabled={busy} onPress={()=>{noterLibre(saisie);revenirAuBilan();}}>{`Noter « ${saisie} » et revenir`}</Action>:<Action onPress={revenirAuBilan}>Revenir au bilan</Action>}</View>:<View style={{marginBottom:insets.bottom+8}}>{annulation.toast}</View>}</SafeAreaView>
+ </ScrollView>{session?<View style={ui.footer}>{annulation.toastPied}{notable?<Action disabled={busy} onPress={()=>{noterLibre(saisie);revenirAuBilan();}}>{`Noter « ${saisie} » et revenir`}</Action>:<Action onPress={revenirAuBilan}>Revenir au bilan</Action>}</View>:<View style={{marginBottom:insets.bottom+8}}>{annulation.toast}</View>}</SafeAreaView>
 }
 const a=StyleSheet.create({
  champ:{flex:1,flexDirection:'row',alignItems:'center',gap:8,minHeight:48,paddingHorizontal:14,borderRadius:12,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.traitControle},
