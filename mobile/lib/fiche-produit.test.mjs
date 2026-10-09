@@ -67,3 +67,16 @@ test('pertesSuppression : les vrais nombres, et rien quand rien ne part', () => 
   });
   assert.deepEqual(pertesSuppression({ correspondances: 0, achats: 0, recettes: 0, alternativeDe: null }), { pertes: [], garde: null });
 });
+
+test('contenance en pièces : lue, formatée, relue', () => {
+  assert.deepEqual(lireContenance('6 pièces'), { grammage_g: null, volume_ml: null, nombre_unites: 6 });
+  assert.deepEqual(lireContenance('x12'), { grammage_g: null, volume_ml: null, nombre_unites: 12 });
+  assert.deepEqual(lireContenance('6 œufs'), { grammage_g: null, volume_ml: null, nombre_unites: 6 });
+  assert.deepEqual(lireContenance('4 x 125 g'), { grammage_g: 500, volume_ml: null, nombre_unites: 4 });
+  assert.deepEqual(lireContenance('1,5 L'), { grammage_g: null, volume_ml: 1500 });
+  const v = { grammage_g: 500, volume_ml: null, nombre_unites: 4 };
+  assert.equal(formaterContenance(v), '500 g · 4 pièces');
+  assert.deepEqual(lireContenance(formaterContenance(v)), v);
+  assert.equal(formaterContenance({ grammage_g: null, volume_ml: null, nombre_unites: 6 }), '6 pièces');
+  assert.equal(lireContenance('150 g · 1 L'), null);
+});

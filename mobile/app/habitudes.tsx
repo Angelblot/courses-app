@@ -95,13 +95,13 @@ export default function Habitudes({session=false}:{session?:boolean}){
  const recetteDe=(l?:LigneMaison)=>l?.sources.find(x=>x.type==='recipe')?.label??'';
  const repasDuRayon=[
   ...items.filter(x=>parRepas(x.id)).map(x=>({cle:x.id,recette:recetteDe(ligneDe(x.id)),el:<LigneRepas key={x.id} dansCarte recette={recetteDe(ligneDe(x.id))} ligne={ligneDe(x.id)!} nom={x.name} image={x.image_url} appui={appuiLongFiche(x)} onVue={()=>w.marquerVues([x.id])}/>})),
-  ...autres.filter(l=>(l.quantiteRepas??0)>0).map(l=>({cle:l.key,recette:recetteDe(l),el:<LigneRepas key={l.key} dansCarte recette={recetteDe(l)} ligne={l} nom={l.name} image={p.produits.find(x=>x.id===l.product_id)?.image_url}/>})),
+  ...autres.filter(l=>(l.quantiteRepas??0)>0).map(l=>({cle:l.key,recette:recetteDe(l),el:<LigneRepas key={l.key} dansCarte recette={recetteDe(l)} ligne={l} nom={l.name} image={p.produits.find(x=>x.id===l.product_id)?.image_url} appui={appuiLongFiche(l.product_id?{id:l.product_id}:null)}/>})),
  ];
  const groupesRepas=[...new Set(repasDuRayon.map(x=>x.recette))].map(nom=>{const recette=rec.recettes.find(x=>x.name===nom&&!!w.selectedRecipes[x.id])??rec.recettes.find(x=>x.name===nom);
   return {recette:nom,image:recette?.image_url??null,parts:recette?w.selectedRecipes[recette.id]??0:0,lignes:repasDuRayon.filter(x=>x.recette===nom).map(x=>x.el)};});
  // Le reste du rayon, par ordre alphabétique.
  const habituelles=[...items.filter(x=>!parRepas(x.id)).map(x=>({nom:x.name,el:ligneHabitude(x)})),
-  ...autres.filter(l=>!((l.quantiteRepas??0)>0)).map(l=>({nom:l.name,el:<LigneRepas key={l.key} ligne={l} nom={l.name} image={p.produits.find(x=>x.id===l.product_id)?.image_url}/>}))]
+  ...autres.filter(l=>!((l.quantiteRepas??0)>0)).map(l=>({nom:l.name,el:<LigneRepas key={l.key} ligne={l} nom={l.name} image={p.produits.find(x=>x.id===l.product_id)?.image_url} appui={appuiLongFiche(l.product_id?{id:l.product_id}:null)}/>}))]
   .sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
  const libelle=`${suivant?'Rayon suivant':session?'Revenir au bilan':'Vérifier ma liste'}${retenus?` · ${retenus} retenu${retenus>1?'s':''}`:''}`;
  return <SafeAreaView edges={session?[]:['top']} style={ui.screen}><View style={{paddingHorizontal:20,paddingTop:session?4:20,paddingBottom:4}}><Head title={session?'Habitudes et liste':'Mes habitudes'} back={!session} avatar={!session}/></View>
@@ -139,7 +139,7 @@ function LigneRepas({ligne,nom,image,appui,onVue,dansCarte=false,recette}:{ligne
  const compteur=<View style={ui.counter}>
   <Pressable accessibilityRole="button" accessibilityLabel={`Diminuer ${nom}`} accessibilityState={{disabled:auPlancher}} disabled={auPlancher} style={[ui.iconButton,auPlancher&&{opacity:.35}]} onPress={()=>changer(total-1)}><Text style={ui.title}>−</Text></Pressable>
   <View style={{alignItems:'center',minWidth:dansCarte?28:36}}><Text style={ui.num}>{total}</Text>{!dansCarte&&repas>0&&plus>0&&<Text style={h.decompte}>{repas} repas + {plus}</Text>}</View>
-  <Pressable accessibilityRole="button" accessibilityLabel={`Augmenter ${nom}${repas?`, en plus des ${repas} pour les repas`:''}`} style={ui.iconButton} onPress={()=>changer(total+1)}><Text style={ui.title}>+</Text></Pressable>
+  <Pressable accessibilityRole="button" accessibilityLabel={`Augmenter ${nom}${repas?`, ${repas} déjà pour les repas`:''}`} style={ui.iconButton} onPress={()=>changer(total+1)}><Text style={ui.title}>+</Text></Pressable>
  </View>;
  // Dans une carte sans autre recette à citer : une seule ligne, nom, compteur et case.
  if(dansCarte&&!origine)return <View style={[h.ligneCarte,h.ligneCarteCompacte]}>

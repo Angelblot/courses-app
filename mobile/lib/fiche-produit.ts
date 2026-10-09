@@ -8,6 +8,7 @@
  */
 import type { FicheProduit } from './openfoodfacts.ts';
 import { libelleRayon, rayonDepuisLibelle } from './rayons.ts';
+import { piecesDansTexte } from './pieces.ts';
 
 /** Champs qu'on modifie à la main ou qu'Open Food Facts peut actualiser. */
 export type ChampFiche = 'name' | 'brand' | 'contenance' | 'category' | 'nutriscore' | 'image_url';
@@ -17,13 +18,18 @@ export type ValeursFiche = {
   brand: string | null;
   grammage_g: number | null;
   volume_ml: number | null;
+  nombre_unites?: number | null;
   category: string | null;
   nutriscore: string | null;
   image_url: string | null;
 };
 
-/** « 200 g », « 1,5 L », « 75 cl », ou null. */
-export function formaterContenance(v: { grammage_g: number | null; volume_ml: number | null }): string | null {
+/** « 200 g », « 1,5 L », « 75 cl », « 6 pièces », « 750 g · 6 pièces », ou null. */
+export function formaterContenance(v: { grammage_g: number | null; volume_ml: number | null; nombre_unites?: number | null }): string | null {
+  const mesure = formaterMesure(v), pieces = v.nombre_unites && v.nombre_unites > 1 ? `${v.nombre_unites} pièces` : null;
+  return [mesure, pieces].filter(Boolean).join(' · ') || null;
+}
+function formaterMesure(v: { grammage_g: number | null; volume_ml: number | null }): string | null {
   if (v.grammage_g != null) return v.grammage_g >= 1000 ? `${String(v.grammage_g / 1000).replace('.', ',')} kg` : `${v.grammage_g} g`;
   if (v.volume_ml != null) {
     if (v.volume_ml >= 1000) return `${String(v.volume_ml / 1000).replace('.', ',')} L`;
@@ -39,7 +45,24 @@ export function formaterContenance(v: { grammage_g: number | null; volume_ml: nu
  * @returns les deux colonnes (l'une nulle), `vide` pour un champ effacé, ou
  *   null si le texte ne se lit pas : l'écran le signale au lieu d'enregistrer.
  */
-export function lireContenance(texte: string): { grammage_g: number | null; volume_ml: number | null } | null {
+export function lireContenance(texte: string): { grammage_g: number | null; volume_ml: number | null; nombre_unites?: number } | null {
+  // « 750 g · 6 pièces », « 6 x 125 g », « 6 œufs » : le nombre de pièces se lit à part.
+  const pieces = piecesDansTexte(texte);
+  const lot = /^\s*(\d{1,3})\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|l|cl|ml)\s*$/i.exec(texte);
+  if (lot) {
+    const une = lireMesure(`${lot[2]}${lot[3]}`);
+    return une && { grammage_g: une.grammage_g && une.grammage_g * Number(lot[1]), volume_ml: une.volume_ml && une.volume_ml * Number(lot[1]), nombre_unites: Number(lot[1]) };
+  }
+  const parties = texte.split(/[·,;](?![0-9])/).map(x => x.trim()).filter(Boolean);
+  const mesures = parties.filter(x => !piecesDansTexte(x) && !/^[x×]?\s*\d{1,3}$/i.test(x));
+  const seul = parties.length === 1 && /^[x×]?\s*(\d{1,3})$/i.exec(parties[0]);
+  const n = pieces ?? (seul ? Number(seul[1]) : null);
+  if (mesures.length > 1) return null;
+  const mesure = lireMesure(mesures[0] ?? '');
+  if (!mesure) return null;
+  return n && n > 1 ? { ...mesure, nombre_unites: n } : mesure;
+}
+function lireMesure(texte: string): { grammage_g: number | null; volume_ml: number | null } | null {
   const t = texte.trim().toLowerCase().replace(',', '.').replace(/\s+/g, '');
   if (!t) return { grammage_g: null, volume_ml: null };
   const m = /^(\d+(?:\.\d+)?)(kg|g|l|cl|ml)$/.exec(t);
@@ -56,7 +79,7 @@ export function champsModifies(avant: ValeursFiche, apres: ValeursFiche): ChampF
   const champs: ChampFiche[] = [];
   if (avant.name.trim() !== apres.name.trim()) champs.push('name');
   if ((avant.brand ?? '') !== (apres.brand ?? '')) champs.push('brand');
-  if (avant.grammage_g !== apres.grammage_g || avant.volume_ml !== apres.volume_ml) champs.push('contenance');
+  if (avant.grammage_g !== apres.grammage_g || avant.volume_ml !== apres.volume_ml || (avant.nombre_unites ?? null) !== (apres.nombre_unites ?? null)) champs.push('contenance');
   if (rayonDepuisLibelle(avant.category) !== rayonDepuisLibelle(apres.category)) champs.push('category');
   if ((avant.nutriscore ?? null) !== (apres.nutriscore ?? null)) champs.push('nutriscore');
   if ((avant.image_url ?? null) !== (apres.image_url ?? null)) champs.push('image_url');
@@ -97,7 +120,7 @@ export function differencesOff(
   };
   ajouter('name', 'Nom', produit.name.trim(), off.name.trim());
   ajouter('brand', 'Marque', produit.brand, off.brand);
-  ajouter('contenance', 'Contenance', formaterContenance(produit), formaterContenance({ grammage_g: off.grammageG, volume_ml: off.volumeMl }));
+  ajouter('contenance', 'Contenance', formaterContenance(produit), formaterContenance({ grammage_g: off.grammageG, volume_ml: off.volumeMl, nombre_unites: produit.nombre_unites }));
   if (off.categoryKey && off.categoryKey !== 'autre') {
     ajouter('category', 'Rayon', libelleRayon(rayonDepuisLibelle(produit.category)), libelleRayon(off.categoryKey));
   }

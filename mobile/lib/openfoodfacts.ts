@@ -8,6 +8,7 @@
 import { CHAMPS_DETAILS, lireDetails, type Details, type OffNutrition } from './nutrition.ts';
 import { normalizeProductType } from './typology.ts';
 import { rayonDepuisCategories, type CleRayon } from './rayons.ts';
+import { piecesDansTexte } from './pieces.ts';
 
 export type NoteNutri = 'a' | 'b' | 'c' | 'd' | 'e';
 
@@ -18,6 +19,8 @@ export type FicheProduit = {
   imageUrl: string | null;
   grammageG: number | null;
   volumeMl: number | null;
+  /** Pièces par conditionnement (« 6 oeufs », « x12 »), quand on les lit. */
+  nombreUnites?: number | null;
   productType: string | null;
   /** Rayon déduit des catégories Open Food Facts, corrigeable par l'utilisateur. */
   categoryKey: CleRayon | null;
@@ -37,6 +40,7 @@ type OffData = OffNutrition & {
   brands?: string;
   image_url?: string;
   product_quantity?: number | string;
+  quantity?: string;
   categories_tags?: string[];
   nutriscore_grade?: string;
 };
@@ -126,6 +130,7 @@ export function mapOffProduct(ean: string, data: OffData): FicheProduit | null {
     imageUrl: data.image_url || null,
     grammageG: valide && !liquide ? Math.round(quantite) : null,
     volumeMl: valide && liquide ? Math.round(quantite) : null,
+    nombreUnites: piecesDansTexte(data.quantity) ?? piecesDansTexte(name),
     productType: normalizeProductType(name, categories),
     categoryKey: rayonDepuisCategories(categories),
     nutriscore: litNutriscore(data.nutriscore_grade),
@@ -144,7 +149,7 @@ const BASES = [
   { url: 'https://world.openbeautyfacts.org/api/v2/product', nom: 'Open Beauty Facts' },
   { url: 'https://world.openproductsfacts.org/api/v2/product', nom: 'Open Products Facts' },
 ] as const;
-const CHAMPS = `product_name,brands,image_url,product_quantity,categories_tags,nutriscore_grade,${CHAMPS_DETAILS}`;
+const CHAMPS = `product_name,brands,image_url,product_quantity,quantity,categories_tags,nutriscore_grade,${CHAMPS_DETAILS}`;
 
 // Délai avant d'abandonner la requête. La source Python (enrich_ean.py) pose
 // 10 secondes, mais elle tourne côté serveur pour un traitement par lot :

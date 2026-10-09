@@ -81,3 +81,12 @@ test('des cuillères ne font pas acheter autant de paquets', async () => {
   assert.equal(convertToProductQty(60, 'g', { unit: 'unité', grammage_g: null, volume_ml: 250 }).qty, 1);
   assert.equal(convertToProductQty(2, 'pincée', { unit: 'unité', grammage_g: 100, volume_ml: null }).qty, 1);
 });
+
+test('des œufs se comptent en boîtes quand la boîte en contient plusieurs', () => {
+  assert.equal(convertToProductQty(6, 'œufs', { unit: 'unité', nombre_unites: 6 }).qty, 1);
+  assert.equal(convertToProductQty(8, 'unité', { unit: 'unité', nombre_unites: 6 }).qty, 2);
+  // Lu dans le nom à défaut de fiche.
+  assert.equal(convertToProductQty(3, 'unité', { unit: 'unité', name: 'Bananes mûries x5' }).qty, 1);
+  // Inconnu : un pour un, comme avant.
+  assert.equal(convertToProductQty(6, 'œufs', { unit: 'unité', name: 'Œufs Plein Air' }).qty, 6);
+});

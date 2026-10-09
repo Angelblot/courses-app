@@ -6,11 +6,15 @@
  * d'ingrédient (g, ml, kg, L, unité, œuf, gousse…) en nombre d'articles à
  * mettre au panier, à partir du conditionnement du produit.
  */
+import { piecesDuProduit } from './pieces.ts';
 
 export type ProduitMesure = {
   unit?: string | null;
   grammage_g?: number | null;
   volume_ml?: number | null;
+  /** Pièces par conditionnement (boîte de 6 œufs) ; à défaut, lues dans le nom. */
+  nombre_unites?: number | null;
+  name?: string | null;
 };
 
 export type UniteNormalisee = 'g' | 'ml' | 'unité';
@@ -127,6 +131,12 @@ export function convertToProductQty(
   const prodNorm = normalizeUnit(product.unit || 'unité');
 
   // Même famille d'unité : rapport direct.
+  // Des pièces (6 œufs) dans un conditionnement qui en contient plusieurs : 1 boîte, pas 6.
+  const pieces = piecesDuProduit(product);
+  if (ingNorm === 'unité' && prodNorm === 'unité' && pieces) {
+    return { qty: Math.ceil(ingredientQty / pieces), approximate: false };
+  }
+
   if (ingNorm !== null && ingNorm === prodNorm) {
     const v = ingNorm === 'g' ? versGrammes(ingredientQty, ingredientUnit)
       : ingNorm === 'ml' ? versMillilitres(ingredientQty, ingredientUnit) : ingredientQty;
@@ -164,7 +174,7 @@ export function convertToProductQty(
 
   // Unités dénombrables : un pour un.
   if (COUNTABLE_UNITS.has((ingredientUnit || '').trim().toLowerCase())) {
-    return { qty: Math.ceil(ingredientQty), approximate: false };
+    return { qty: Math.ceil(ingredientQty / (pieces ?? 1)), approximate: false };
   }
 
   // Conversion impossible : on rend 0 en le signalant, plutôt qu'un nombre

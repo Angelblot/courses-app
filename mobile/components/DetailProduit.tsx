@@ -124,13 +124,14 @@ export function DetailProduit({
       brand: brouillon.brand.trim() || null,
       grammage_g: contenanceLue.grammage_g,
       volume_ml: contenanceLue.volume_ml,
+      nombre_unites: contenanceLue.nombre_unites ?? null,
       category: brouillon.category,
     };
     const champs = champsModifies(produit, apres);
     if (!champs.length) { setEdition(false); return; }
     setEnCours(true); setErreur(null);
     const r = await modifierProduit(produit.id, {
-      name: apres.name, brand: apres.brand, grammage_g: apres.grammage_g, volume_ml: apres.volume_ml, category: apres.category,
+      name: apres.name, brand: apres.brand, grammage_g: apres.grammage_g, volume_ml: apres.volume_ml, nombre_unites: apres.nombre_unites, category: apres.category,
     }, champs);
     setEnCours(false);
     if (!r.ok) { setErreur(r.erreur ?? 'Impossible d’enregistrer la fiche pour le moment.'); return; }
@@ -162,8 +163,8 @@ export function DetailProduit({
             <View style={s.formulaire}>
               <Champ libelle="Nom" valeur={brouillon.name} onChange={(name) => setBrouillon((b) => ({ ...b, name }))} erreur={nomVide ? 'Un produit a besoin d’un nom.' : null} />
               <Champ libelle="Marque" valeur={brouillon.brand} placeholder="Facultatif" onChange={(brand) => setBrouillon((b) => ({ ...b, brand }))} />
-              <Champ libelle="Contenance" valeur={brouillon.contenance} placeholder="150 g, 1,5 L, 75 cl" onChange={(contenance) => setBrouillon((b) => ({ ...b, contenance }))}
-                erreur={contenanceLue ? null : 'Écris un nombre et une unité : 150 g, 1,5 L, 75 cl.'} />
+              <Champ libelle="Contenance" valeur={brouillon.contenance} placeholder="150 g, 1,5 L, 6 pièces" onChange={(contenance) => setBrouillon((b) => ({ ...b, contenance }))}
+                erreur={contenanceLue ? null : 'Écris un nombre et une unité : 150 g, 1,5 L, 6 pièces, 4 x 125 g.'} />
             </View>
             <View style={s.selecteur}><ChoixRayon valeur={brouillon.category} onChoisir={(category) => setBrouillon((b) => ({ ...b, category }))} /></View>
             {erreur && <Text accessibilityLiveRegion="polite" style={s.erreur}>{erreur}</Text>}

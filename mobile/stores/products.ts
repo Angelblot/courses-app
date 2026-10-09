@@ -23,6 +23,8 @@ export type Product = {
   image_url: string | null;
   grammage_g: number | null;
   volume_ml: number | null;
+  /** Pièces par conditionnement (boîte de 6 œufs) ; null : lues dans le nom. */
+  nombre_unites?: number | null;
   product_type: string | null;
   nutriscore: string | null;
   /** Alternatives dans l'ordre d'essai (références seulement). */
@@ -38,7 +40,7 @@ export type Product = {
 };
 
 const CHAMPS =
-  'id, ean13, name, brand, category, unit, favorite, image_url, grammage_g, volume_ml, product_type, nutriscore, alternatives, phrases_siri, siri_sans_type, vendu_chez, lieu_achat';
+  'id, ean13, name, brand, category, unit, favorite, image_url, grammage_g, volume_ml, nombre_unites, product_type, nutriscore, alternatives, phrases_siri, siri_sans_type, vendu_chez, lieu_achat';
 
 // Le dernier catalogue lu, partagé par tous les écrans montés. Un écran qui
 // s'ouvre (la fiche d'un appui long, Mes produits…) l'affiche aussitôt puis le
@@ -120,6 +122,7 @@ export async function ajouterProduit(
     image_url: fiche.imageUrl,
     grammage_g: fiche.grammageG,
     volume_ml: fiche.volumeMl,
+    nombre_unites: fiche.nombreUnites ?? null,
     product_type: fiche.productType,
     // `?? 'autre'` et non `?? null` : une fiche peut venir de la file d'attente
     // persistée dans AsyncStorage, écrite par une version antérieure qui ne
