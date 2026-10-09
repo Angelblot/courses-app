@@ -137,7 +137,8 @@ function CompteRendu({ travail, parDrive, onTerminer, onEnvoye }: { travail: Tra
           <Feather name="chevron-left" size={20} color={colors.accent} /><Text style={c.retourTexte}>Accueil</Text>
         </Pressable>
         <Text accessibilityRole="header" style={c.titre}>Compte rendu</Text>
-        {parDrive.length > 1 && <View style={c.segments} accessibilityRole="tablist">
+        {/* Toujours là, même pour un seul drive : c'est ce qui dit de quel panier on parle. */}
+        <View style={c.segments} accessibilityRole="tablist">
           {parDrive.map(x => {
             const actif = x.drive === b.drive;
             return <Pressable key={x.drive} accessibilityRole="tab" accessibilityState={{ selected: actif }} aria-selected={actif}
@@ -146,7 +147,7 @@ function CompteRendu({ travail, parDrive, onTerminer, onEnvoye }: { travail: Tra
               <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[c.segmentTexte, actif && c.segmentTexteActif]}>{nomDrive(x.drive)} · {x.ajoutes.length}/{x.total}</Text>
             </Pressable>;
           })}
-        </View>}
+        </View>
         {enPause ? <View style={[c.bandeau, c.bandeauPause]} accessible accessibilityLiveRegion="polite"
           accessibilityLabel={`En pause. ${travail.error ?? 'Une vérification t’attend sur ton ordinateur.'} ${n} produit${n > 1 ? 's' : ''} déjà au panier.`}>
           <Feather name="pause-circle" size={26} color={colors.attentionText} />

@@ -5,7 +5,7 @@
  * Logique pure, sans Supabase ni React Native.
  */
 import { parleDe } from './affinage.ts';
-import { requeteSansMarque } from './compte-rendu.ts';
+import { hoteSur, requeteSansMarque } from './compte-rendu.ts';
 import type { ItemPanier } from './consolidation.ts';
 import { rayonDepuisLibelle } from './rayons.ts';
 
@@ -17,7 +17,7 @@ export type Remplacement = {
 /** Par drive, par nom de produit non ajouté. */
 export type Remplacements = Record<string, Record<string, Remplacement>>;
 
-type OffreVue = { libelle: string; recherche?: string | null; drive: string; rang: number | null; ean13: string | null; prix: number | null };
+type OffreVue = { libelle: string; recherche?: string | null; drive: string; rang: number | null; ean13: string | null; prix: number | null; url?: string | null };
 
 /**
  * Les offres vues pour ce produit sur ce drive, et qui en parlent vraiment :
@@ -28,7 +28,9 @@ export function offresPertinentes<O extends OffreVue>(offres: O[], nom: string, 
   const tete = requeteSansMarque(nom).replace(/\S*\d\S*/g, ' ').split(/\s+/).find(m => m.length >= 3) ?? nom;
   const vus = new Set<string>();
   return offres
-    .filter(o => o.drive === drive && recherches.includes(o.recherche ?? '') && parleDe(o.libelle, tete))
+    // Une offre dont l'adresse n'est pas celle du drive n'en vient pas : le 09/10, des offres
+    // Carrefour avaient été rangées sous E.Leclerc.
+    .filter(o => o.drive === drive && (!o.url || !!hoteSur(o.url, drive)) && recherches.includes(o.recherche ?? '') && parleDe(o.libelle, tete))
     .sort((a, b) => (a.rang ?? 99) - (b.rang ?? 99))
     .filter(o => { const k = o.ean13 ?? o.libelle.toLowerCase(); if (vus.has(k)) return false; vus.add(k); return true; });
 }

@@ -77,7 +77,7 @@ export function bilanParDrive(results: Record<string, LigneResultat[] | null | u
   });
 }
 
-const hoteSur = (u: string, drive: string): URL | null => {
+export const hoteSur = (u: string, drive: string): URL | null => {
   try {
     const url = new URL(u);
     if (url.protocol !== 'https:') return null;

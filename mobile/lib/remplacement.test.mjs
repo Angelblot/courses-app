@@ -8,6 +8,8 @@ const o = (libelle, rang, x = {}) => ({ libelle, rang, drive: 'carrefour', reche
 test('les offres vues qui parlent du produit, sans les piquets de tente', () => {
   const offres = [o('BLVIE Piquets De Tente À Visser (blanc Luminescent, 10 Pièces)', 0), o('Ail blanc filet 3 têtes', 1), o('Ail blanc filet 3 têtes', 2), o('Ail rose', 3, { drive: 'leclerc' })];
   assert.deepEqual(offresPertinentes(offres, 'Ail blanc 1p', 'carrefour').map(x => x.libelle), ['Ail blanc filet 3 têtes']);
+  // Une offre Carrefour rangée sous E.Leclerc n'est pas proposée chez Leclerc.
+  assert.deepEqual(offresPertinentes([o('Ail blanc filet', 0, { drive: 'leclerc', url: 'https://www.carrefour.fr/p/ail-123' })], 'Ail blanc 1p', 'leclerc'), []);
   const creme = [o('Crème entière fluide UHT Bio Carrefour Bio 20 cl', 0, { recherche: 'Crème entière Bio Village 25cl' }), o('Lait demi-écrémé', 1, { recherche: 'Crème entière Bio Village 25cl' })];
   assert.deepEqual(offresPertinentes(creme, 'Crème entière Bio Village 25cl', 'carrefour', ['Crème entière Bio Village 25cl']).map(x => x.rang), [0]);
 });
