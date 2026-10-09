@@ -29,7 +29,7 @@ Concrètement : un clic pour quarante produits, au lieu de quarante allers-retou
 1. Dans l’extension, connecte-toi au **même compte Courses que sur l’iPhone**.
 2. Sur l’iPhone, prépare « Ma liste », choisis les drives et touche **Envoyer la liste**.
 3. Sur l’ordinateur, ouvre Chrome et connecte-toi au site du drive choisi.
-4. Ouvre l’extension : la liste en attente apparaît. Clique **Remplir le panier**.
+4. Dans les 30 secondes, l’extension relève la liste et remplit le panier d’elle-même : l’envoi depuis l’iPhone vaut déclenchement. Le bouton **Remplir le panier** du popup reste là pour lancer sans attendre.
 5. Le suivi revient dans l’application. Vérifie le panier sur le site du drive et valide toi-même tes achats.
 
 Le lien entre les deux appareils utilise Supabase (`cart_jobs`). L’extension

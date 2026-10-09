@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { lireExtension, type EtatExtension, type LignePresence } from '../lib/extension-presence.ts';
+import { nomCanal } from '../lib/canal';
 
 /**
  * Ce que fait l'extension Chrome du foyer, en temps réel : elle réécrit sa
@@ -19,7 +20,7 @@ export function useExtension(): EtatExtension | null {
       if (vivant) setLigne((data as LignePresence | null) ?? null);
     };
     void relire();
-    const canal = supabase.channel('extension-presence')
+    const canal = supabase.channel(nomCanal('extension-presence'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'extension_presence' }, (m) => { if (vivant && m.new) setLigne(m.new as LignePresence); })
       .subscribe();
     const minuteur = setInterval(() => setTic(t => t + 1), 30_000);

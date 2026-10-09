@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { cleEcart, doitAfficher, ETATS_ACTIFS } from '../lib/suivi-bandeau.ts';
 import { lireAcquittement, ecrireAcquittement } from './acquittement';
+import { nomCanal } from '../lib/canal';
 
 export type Travail = {
   id: string;
@@ -45,7 +46,7 @@ export function useSuiviTravail(jobId: string | null) {
     })();
 
     const canal = supabase
-      .channel(`travail-${jobId}`)
+      .channel(nomCanal(`travail-${jobId}`))
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'cart_jobs', filter: `id=eq.${jobId}` },
@@ -98,7 +99,7 @@ export function useTravailActif() {
     relire();
 
     const canal = supabase
-      .channel('travail-actif')
+      .channel(nomCanal('travail-actif'))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'cart_jobs' },

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { DRIVES_RECHERCHE, planGarde, type DriveRecherche, type OffreRelevee, type RechercheDrive } from '../lib/recherche-drive.ts';
 import { famille, requeteAffinee, typesDeFamille } from '../lib/affinage.ts';
 import { normalizeProductType } from '../lib/typology.ts';
+import { nomCanal } from '../lib/canal';
 
 const CHAMPS_RECHERCHE = 'id, drive, requete, ean13, statut, resultats, demandee_le, faite_le';
 const CHAMPS_OFFRE = 'id, recherche_id, drive, libelle, marque, ean13, url, image_url, prix, prix_unitaire, unite_prix, grammage_g, volume_ml, nutriscore, promotion, disponible, rang, vu_le, fiche_texte';
@@ -94,7 +95,7 @@ export function useRecherchesDrive(requete: string) {
     void recharger();
     if (!requete) return () => { vivant = false; };
     // Toute avancée compte : une fiche lue porte le libellé de l'offre, pas le nom cherché.
-    const canal = supabase.channel(`recherches-${requete}`)
+    const canal = supabase.channel(nomCanal(`recherches-${requete}`))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'recherches_drive' }, () => { if (vivant) void recharger(); })
       .subscribe();
     return () => { vivant = false; supabase.removeChannel(canal); };

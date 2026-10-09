@@ -49,7 +49,7 @@ export default function Envoye() {
   // Tant que l'ordinateur n'a rien relevé, on attend calmement : il est peut-être éteint.
   // L'étape dit ce que l'extension voit : Chrome ouvert, ordinateur pas vu depuis…, ou rien de connu.
   { etat: prise, titre: prise === 'fait' ? 'Ton ordinateur a pris la liste' : chromeOuvert ? 'Chrome est ouvert' : 'En attente de ton ordinateur',
-   detail: prise === 'fait' ? 'L’extension Chrome l’a relevée.' : chromeOuvert ? 'Dans l’extension, clique sur « Remplir le panier ».'
+   detail: prise === 'fait' ? 'L’extension Chrome l’a relevée.' : chromeOuvert ? 'Le remplissage part de lui-même dans les 30 secondes.'
     : extension?.etat === 'absente' ? `Dernier signe ${extension.depuis}. Ouvre Chrome quand tu veux : l’extension la relèvera.` : 'Ouvre Chrome quand tu veux : l’extension la relèvera.',
    aide: prise === 'encours' && !chromeOuvert, attente: prise === 'encours' && !chromeOuvert },
   { etat: remplie, titre: remplie === 'fait' ? 'Panier rempli' : 'Remplir le panier', detail: remplie === 'avenir' ? 'Tu vérifies puis paies sur le site du drive.' : travail ? resume(travail) : '' },

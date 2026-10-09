@@ -87,7 +87,7 @@ export function EnvoiSheet({ visible, onFermer }: { visible: boolean; onFermer: 
       <Text style={[ui.detail, { flex: 1, marginTop: 0 }]}>Le panier se remplit sur ton ordinateur, avec l’extension Chrome.</Text>
       <Text style={ui.link}>{aide ? 'Masquer' : 'Comment ?'}</Text>
      </Pressable>
-     {aide && <Text style={[ui.detail, { marginTop: 0, paddingHorizontal: 4 }]}>Ouvre Chrome et connecte l’extension Courses au même compte que sur ton iPhone. Après l’envoi, clique sur « Remplir le panier » dans l’extension. Tu vérifies puis paies sur le site du drive.</Text>}
+     {aide && <Text style={[ui.detail, { marginTop: 0, paddingHorizontal: 4 }]}>Ouvre Chrome et connecte l’extension Courses au même compte que sur ton iPhone. Après l’envoi, l’extension remplit le panier d’elle-même. Tu vérifies puis paies sur le site du drive.</Text>}
      {!!erreur && <View ref={refErreur} tabIndex={-1} accessible accessibilityLabel={erreur}><Text accessibilityLiveRegion="polite" style={ui.error}>{erreur}</Text></View>}
      {envoi && <ActivityIndicator color={colors.accent} accessibilityLabel="Envoi en cours" />}
      <Action disabled={envoi || !w.drives.length || !total} onPress={envoyer}>{envoi ? 'Envoi en cours…' : 'Envoyer'}</Action>

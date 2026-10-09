@@ -49,9 +49,12 @@ export function texteExtension(e: EtatExtension, attendu: 'recherches' | 'rempli
   switch (e.etat) {
     case 'jamais': return { titre: 'Extension pas encore vue', consigne: 'Installe l’extension Courses dans Chrome sur ton ordinateur, et connecte-toi avec ce compte.' };
     case 'absente': return { titre: 'Ordinateur pas vu', consigne: `Dernier signe de l’extension ${e.depuis}. Ouvre Chrome sur ton ordinateur.` };
-    case 'prete': return attendu === 'recherches' && e.auto
-      ? { titre: 'Chrome est ouvert', consigne: 'Les recherches partent d’elles-mêmes dans les 30 secondes.' }
-      : { titre: 'Chrome est ouvert', consigne: `Dans l’extension, clique sur ${bouton}.` };
+    // Le remplissage part toujours seul ; les recherches, si le réglage automatique est actif.
+    case 'prete': return attendu === 'remplissage'
+      ? { titre: 'Chrome est ouvert', consigne: 'Le remplissage part de lui-même dans les 30 secondes.' }
+      : e.auto
+        ? { titre: 'Chrome est ouvert', consigne: 'Les recherches partent d’elles-mêmes dans les 30 secondes.' }
+        : { titre: 'Chrome est ouvert', consigne: `Dans l’extension, clique sur ${bouton}.` };
     case 'pause': return { titre: 'Une action t’attend', consigne: e.message };
     default: {
       const ou = e.drive ? ` sur ${NOMS[e.drive] ?? e.drive}` : '';

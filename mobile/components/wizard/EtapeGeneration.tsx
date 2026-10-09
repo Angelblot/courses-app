@@ -16,7 +16,7 @@ export function EtapeGeneration(){
  return <ScrollView contentContainerStyle={ui.content}><Text style={ui.heading}>Où fait-on les courses ?</Text><Text style={ui.subtitle}>{acheter.length} articles à acheter</Text>
  {loadError&&<><Text style={ui.error}>{loadError}</Text><Action secondary onPress={()=>{p.recharger();r.recharger();}}>Réessayer le chargement</Action></>}
  {['carrefour','leclerc'].map(d=><Action key={d} disabled={sending} secondary={!w.drives.includes(d)} onPress={()=>w.basculerDrive(d)}>{w.drives.includes(d)?'✓ ':''}{d==='carrefour'?'Carrefour':'E.Leclerc'}</Action>)}
- <View style={ui.notice}><Text style={ui.productName}>La suite se passe sur ton ordinateur.</Text><Text style={ui.subtitle}>Ouvre Chrome et connecte l’extension Courses au même compte que sur ton iPhone. Après l’envoi, clique sur « Remplir le panier » dans l’extension. Tu vérifies puis paies sur le site du drive.</Text></View>
+ <View style={ui.notice}><Text style={ui.productName}>La suite se passe sur ton ordinateur.</Text><Text style={ui.subtitle}>Ouvre Chrome et connecte l’extension Courses au même compte que sur ton iPhone. Après l’envoi, l’extension remplit le panier d’elle-même. Tu vérifies puis paies sur le site du drive.</Text></View>
  {(aVerifier||stale||acheter.some(l=>l.aPreciser))&&<Text style={ui.error}>Retourne dans ta liste pour vérifier les manques, doublons et conditionnements signalés.</Text>}
  {error&&<Text accessibilityLiveRegion="polite" style={ui.error}>{error}</Text>}{sending&&<ActivityIndicator/>}
  <Action disabled={disabled} onPress={send}>{sending?'Envoi en cours…':'Envoyer à mon ordinateur'}</Action><Action disabled={sending} secondary onPress={()=>router.canGoBack()?router.back():router.replace('/wizard/recap')}>Modifier ma liste</Action>

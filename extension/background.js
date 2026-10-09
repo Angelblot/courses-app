@@ -82,9 +82,8 @@ async function signaler(force = false) {
 /**
  * Allume la pastille quand une liste attend.
  *
- * Ne démarre jamais rien : une extension qui piloterait un site marchand sans
- * qu'on l'ait déclenchée serait une mauvaise surprise, et c'est contraire à ce
- * que le README promet depuis le début.
+ * Ne démarre rien elle-même : c'est `essayerDemarrageAuto` qui lance une liste
+ * envoyée depuis l'application (l'envoi vaut déclenchement).
  */
 async function rafraichirPastille() {
   const r = await travauxEnAttente();
@@ -691,12 +690,34 @@ async function rechercheAuto() {
 }
 
 /**
+ * Une liste envoyée depuis l'iPhone se remplit sans clic : l'envoi vaut
+ * déclenchement. Jamais par-dessus un remplissage en pause qui attend une main
+ * (vérification du site) : celui-là reprend depuis le popup.
+ * Renvoie vrai si un remplissage est parti.
+ */
+async function essayerRemplissageAuto() {
+  const etat = await getState();
+  if (etat?.status === 'paused') return false;
+  const r = await travauxEnAttente();
+  const travail = r.ok ? r.data?.[0] : null;
+  if (!travail) return false;
+  try {
+    await demarrerTravail(travail.id);
+    const n = travail.items?.length ?? 0;
+    chrome.notifications.create('remplissage', { type: 'basic', iconUrl: 'icon-128.png', title: 'Remplissage lancé',
+      message: `${n} produit${n > 1 ? 's' : ''} envoyé${n > 1 ? 's' : ''} depuis l'application. Ne ferme pas l'onglet du drive.` });
+    return true;
+  } catch { return false; /* relancé à la prochaine alarme */ }
+}
+
+/**
  * Au passage de l'alarme : des recherches attendent et rien ne tourne, on les
  * lance sans clic, dans un onglet d'arrière-plan. Jamais après une pause qui
  * attend une main (vérification, magasin, pause demandée).
  */
 async function essayerDemarrageAuto() {
   if (enMarche.recherches || enMarche.remplissage) return;
+  if (await essayerRemplissageAuto()) return;
   const r = await recherchesAFaire();
   if (!r.ok) return;
   const drives = drivesAuto({ auto: await rechercheAuto(), recherches: r.data ?? [], occupe: false, etat: await etatRecherches() });
