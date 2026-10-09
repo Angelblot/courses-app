@@ -109,8 +109,10 @@ const b=StyleSheet.create({
 
 type EtatCorrection='ok'|'attention'|'rappel'|'ajout';
 /** Une correction ouverte depuis le bilan : son état en une ligne, et l'écran qu'on connaît. */
-function LigneCorrection({etat,titre,detail,action,onPress}:{etat:EtatCorrection;titre:string;detail:string;action?:string;onPress:()=>void}){
- return <Pressable accessibilityRole="button" accessibilityLabel={`${titre} : ${detail}${action?`. ${action}`:''}`} onPress={onPress} style={({pressed})=>[b.correction,etat==='rappel'&&b.rappel,pressed&&{opacity:.85}]}>
+function LigneCorrection({etat,titre,detail,action,onPress,focus=false}:{etat:EtatCorrection;titre:string;detail:string;action?:string;onPress:()=>void;
+ /** La prochaine chose à faire : une seule ligne du bilan est encadrée. */
+ focus?:boolean}){
+ return <Pressable accessibilityRole="button" accessibilityLabel={`${titre} : ${detail}${action?`. ${action}`:''}`} onPress={onPress} style={({pressed})=>[b.correction,focus&&b.rappel,pressed&&{opacity:.85}]}>
   <View style={[b.icone,etat==='attention'&&{backgroundColor:colors.attentionSoft},etat==='rappel'&&b.iconeVide]}>{etat==='ok'?<Feather name="check" size={16} color={colors.accent}/>:etat==='attention'?<Feather name="alert-circle" size={16} color={colors.attentionText}/>:etat==='ajout'?<Feather name="plus" size={16} color={colors.accent}/>:null}</View>
   <View style={{flex:1}}><Text style={ui.productName}>{titre}</Text><Text style={[ui.detail,{marginTop:1}]}>{detail}</Text></View>
   {action?<Text style={ui.link}>{action}</Text>:<Feather name="chevron-right" size={18} color={colors.textMuted}/>}
@@ -131,16 +133,18 @@ function Corrections({points,doublons,aPreciser,ingredients,onVerifier,onLier}:{
  const repas=Object.keys(w.selectedRecipes).length;
  const ouvrir=(cle:string)=>router.push(`/wizard/${cle}`);
  const pl=(n:number,mot:string)=>`${n} ${mot}${n>1?'s':''}`;
+ // L'encadré va à la première ligne qui attend une action, dans l'ordre du bilan.
+ const focus=!repas?'repas':ingredients.length?'ingredients':points?'manques':favoris.length&&revus<rayons.length?'habitudes':null;
  return <View style={{gap:8}}>
-  {!repas&&<LigneCorrection etat="rappel" titre="Repas" detail="Aucun repas choisi cette fois" action="Choisir" onPress={()=>router.dismissTo('/wizard/recettes')}/>}
+  {!repas&&<LigneCorrection etat="rappel" titre="Repas" focus={focus==='repas'} detail="Aucun repas choisi cette fois" action="Choisir" onPress={()=>router.dismissTo('/wizard/recettes')}/>}
   {/* Les ingrédients des repas sans produit : on les lie comme un manque, le lien vaut pour la recette. */}
-  {repas>0&&(ingredients.length?<LigneCorrection etat="attention" titre="Ingrédients des repas" detail={`${ingredients.length} sans produit : ${ingredients.slice(0,4).join(', ')}${ingredients.length>4?'…':''}`} action="Lier" onPress={onLier}/>
+  {repas>0&&(ingredients.length?<LigneCorrection etat="attention" titre="Ingrédients des repas" focus={focus==='ingredients'} detail={`${ingredients.length} sans produit : ${ingredients.slice(0,4).join(', ')}${ingredients.length>4?'…':''}`} action="Lier" onPress={onLier}/>
    :<LigneCorrection etat="ok" titre="Ingrédients des repas" detail="Tous liés à un produit" onPress={()=>router.dismissTo('/wizard/recettes')}/>)}
   {/* Ce qui peut être précisé passe par la ligne Manques, qui ouvre la feuille ; rien ne bloque l'envoi. */}
-  {points?<LigneCorrection etat="attention" titre="Manques" detail={[manques.length?pl(manques.length,'noté'):'',aPreciser.length===1?`« ${aPreciser[0]} » : l’extension cherchera ce nom`:aPreciser.length?`${aPreciser.length} produits cherchés par leur nom`:'',doublons?`${doublons} doublon${doublons>1?'s':''} possible${doublons>1?'s':''}`:''].filter(Boolean).join(' · ')} action="Préciser" onPress={onVerifier}/>
+  {points?<LigneCorrection etat="attention" titre="Manques" focus={focus==='manques'} detail={[manques.length?pl(manques.length,'noté'):'',aPreciser.length===1?`« ${aPreciser[0]} » : l’extension cherchera ce nom`:aPreciser.length?`${aPreciser.length} produits cherchés par leur nom`:'',doublons?`${doublons} doublon${doublons>1?'s':''} possible${doublons>1?'s':''}`:''].filter(Boolean).join(' · ')} action="Préciser" onPress={onVerifier}/>
   :<LigneCorrection etat={manques.length?'ok':'ajout'} titre="Manques" detail={manques.length?pl(manques.length,'noté'):'Rien de noté'} onPress={()=>ouvrir('manques')}/>}
-  {favoris.length>0&&(!vus.length?<LigneCorrection etat="rappel" titre="Habitudes et liste" detail={`Par rayon · ${pl(favoris.length,'produit')}${repas?' · repas déjà comptés':''}`} action="Revoir" onPress={()=>ouvrir('habitudes')}/>
-   :revus<rayons.length?<LigneCorrection etat="rappel" titre="Habitudes et liste" detail={`${revus} rayon${revus>1?'s':''} sur ${rayons.length} revu${revus>1?'s':''} · ${pl(retenues,'retenu')}`} action="Continuer" onPress={()=>ouvrir('habitudes')}/>
+  {favoris.length>0&&(!vus.length?<LigneCorrection etat="rappel" titre="Habitudes et liste" focus={focus==='habitudes'} detail={`Par rayon · ${pl(favoris.length,'produit')}${repas?' · repas déjà comptés':''}`} action="Revoir" onPress={()=>ouvrir('habitudes')}/>
+   :revus<rayons.length?<LigneCorrection etat="rappel" titre="Habitudes et liste" focus={focus==='habitudes'} detail={`${revus} rayon${revus>1?'s':''} sur ${rayons.length} revu${revus>1?'s':''} · ${pl(retenues,'retenu')}`} action="Continuer" onPress={()=>ouvrir('habitudes')}/>
    :<LigneCorrection etat="ok" titre="Habitudes et liste" detail={`${pl(retenues,'retenu')} sur ${favoris.length}`} onPress={()=>ouvrir('habitudes')}/>)}
   <LigneCorrection etat="ajout" titre="Extras" detail={extras?pl(extras,'ajouté'):'Un produit hors habitudes'} onPress={()=>ouvrir('exceptions')}/>
  </View>;
