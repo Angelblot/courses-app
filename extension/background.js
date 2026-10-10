@@ -23,6 +23,7 @@ import { fileDeRecherches, pauseEntreRecherches, adresseRecherche, issueRecherch
 import { strategie, indexer } from './lib/equivalences.js';
 import { offresDepuisReleve } from './lib/offres.js';
 import { candidats, RAISONS_SUIVANT } from './lib/alternatives.js';
+import { departager } from './lib/departage.js';
 import { attenteAvantNavigation, ENTRE_PRODUITS_MS, LECTURE_MS } from './lib/rythme.js';
 
 /**
@@ -271,7 +272,7 @@ const RETRYABLE_VIA_SEARCH = new Set([
  * @param {object} item Ligne de courses.
  * @returns {Promise<object>} Compte rendu, enrichi de la voie empruntée.
  */
-async function attempt(tabId, cfg, item, baseOrigin, equivalences = {}) {
+async function attempt(tabId, cfg, item, baseOrigin, equivalences = {}, memoriserDepartage = null) {
   // Un chemin relatif prime quand on connaît l'origine réelle : les drives
   // Leclerc vivent chacun sur le sous-domaine de leur magasin.
   const searchUrl =
@@ -316,7 +317,20 @@ async function attempt(tabId, cfg, item, baseOrigin, equivalences = {}) {
   }
 
   await naviguer(tabId, searchUrl);
-  const found = await runAgent(tabId, cfg, item, 'run');
+  let found = await runAgent(tabId, cfg, item, 'run');
+  // Plusieurs formats d'un même produit à égalité : le libellé exact ou le
+  // format de la référence tranche, quand un seul candidat y répond.
+  if (found.reason === 'ambiguous') {
+    const choix = departager(item, found.candidates);
+    if (choix) {
+      const r = await runAgent(tabId, cfg, { ...item, exactLabel: choix.label }, 'run');
+      if (r.ok) {
+        found = { ...r, via: 'departage', departage: choix.raison, releve: found.releve };
+        // Tranché une fois, retenu : la prochaine commande va droit à ce libellé.
+        if (item.product_id && memoriserDepartage) await memoriserDepartage(item, choix.label);
+      }
+    }
+  }
   // searchUrl est conservée pour pouvoir revenir sur cette page et y choisir
   // un candidat après coup, sans relancer toute la liste.
   const enriched = { ...found, searchUrl };
@@ -423,7 +437,9 @@ async function deroulerJob() {
     let retenu = null;
     let choisie = null;
     for (const essai of essais) {
-      result = await attempt(tabId, cfg, essai, state.baseOrigin, state.equivalences ?? {});
+      result = await attempt(tabId, cfg, essai, state.baseOrigin, state.equivalences ?? {}, state.jobId
+        ? (e, label) => enregistrerEquivalence({ product_id: e.product_id, drive: state.site, search_query: e.name, matched_label: label, product_url: null, ean13: e.ean ?? null, unavailable: false }).catch(() => {})
+        : null);
       retenu = essai;
       // Les offres vues pendant cette recherche alimentent le comparatif ;
       // elles ne font pas partie du compte rendu envoyé au téléphone.

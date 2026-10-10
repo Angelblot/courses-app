@@ -780,7 +780,8 @@ export function pageAgent(cfg, item, mode) {
         message: `Plusieurs produits correspondent à « ${item.name} »`,
         candidates: ranked
           .slice(0, 3)
-          .map((c) => ({ label: c.label.slice(0, 70), score: Number(c.score.toFixed(2)) })),
+          // Le libellé entier : un choix après coup le compare tel quel, format compris.
+          .map((c) => ({ label: c.label.slice(0, 200), score: Number(c.score.toFixed(2)) })),
         ignored,
         releve,
       };
