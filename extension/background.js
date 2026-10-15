@@ -67,7 +67,7 @@ async function activiteCourante() {
   if (enMarche.remplissage && job) {
     return ['remplissage', { fait: job.cursor ?? 0, total: job.items?.length ?? 0, drive: job.site ?? null }];
   }
-  if (job?.status === 'paused') return ['pause', { message: job.pauseReason === 'magasin' ? `Choisis ton magasin sur ${SITES[job.site]?.label ?? 'le drive'}.` : `Vérification demandée sur ${SITES[job.site]?.label ?? 'le drive'}.` }];
+  if (job?.status === 'paused') return ['pause', { message: job.pauseReason === 'magasin' ? `Choisis ton magasin sur ${SITES[job.site]?.label ?? 'le drive'}.` : job.pauseReason === 'manuel' ? 'Remplissage mis en pause depuis l’extension.' : `Vérification demandée sur ${SITES[job.site]?.label ?? 'le drive'}.` }];
   if (rech?.statut === 'pause' && rech.message && rech.cause !== 'erreur') return ['pause', { message: rech.message }];
   return ['prete', { auto: await rechercheAuto() }];
 }
@@ -138,7 +138,8 @@ async function setState(patch) {
   const next = { ...current, ...patch };
   await chrome.storage.local.set({ [STATE_KEY]: next });
   // Le popup s'actualise s'il est ouvert ; sans lui l'erreur est sans effet.
-  chrome.runtime.sendMessage({ type: 'state', state: next }).catch(() => {});
+  // `actif` : un « running » rangé par un worker arrêté n'avance plus ; le popup le dit.
+  chrome.runtime.sendMessage({ type: 'state', state: { ...next, actif: enMarche.remplissage || next.status === 'running' && patch.status === 'running' } }).catch(() => {});
   signaler(patch.status !== undefined);
   return next;
 }
@@ -965,8 +966,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   const handlers = {
     start: () => startJob(msg.payload),
     resume: resumeJob,
+    // Pause demandée depuis le popup : la boucle s'arrête avant le produit suivant.
+    pause: () => setState({ status: 'paused', pauseReason: 'manuel' }).then(() => ({ ok: true })),
     stop: stopJob,
-    getState,
+    getState: async () => { const s = await getState(); return s && { ...s, actif: enMarche.remplissage }; },
     choose: () => chooseCandidate(msg.index, msg.label),
     diagnose: () => diagnose(msg.site),
     travaux: travauxRelevables,

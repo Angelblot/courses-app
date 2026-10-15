@@ -1,312 +1,456 @@
-/** Interface du popup : lancement, suivi, reprise après vérification. */
+/**
+ * Le popup (maquette « L'extension Chrome, repensée ») : un écran par
+ * situation — connexion, prête, en cours, en pause, terminée — et les outils
+ * techniques rangés dans le menu « ⋮ ». Les échanges avec background.js sont
+ * ceux d'avant : seule la présentation change.
+ */
 
 import { SITES } from './content/sites.js';
 import { parseItems } from './lib/liste.js';
 import { connexion, deconnexion, sessionCourante } from './supabase.js';
 
 const $ = (id) => document.getElementById(id);
+const send = (msg) => new Promise((resolve) => chrome.runtime.sendMessage(msg, (r) => resolve(r)));
+const NOM = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' };
+const nom = (d) => NOM[d] ?? d;
+const plat = (t) => String(t ?? '').replace(/\s+/g, ' ').trim();
+/** Environ, par produit : la page, la lecture, la pause à rythme humain. */
+const SECONDES_PAR_PRODUIT = 14;
+/** Un remplissage fini reste à l'écran jusqu'à « Terminer », ou une heure. */
+const FINI_VISIBLE_MS = 60 * 60 * 1000;
 
-/**
- * Présélectionne l'enseigne d'après l'onglet actif.
- *
- * Sans cela, le menu reste sur Carrefour et un diagnostic lancé depuis une page
- * Leclerc teste les sélecteurs de la mauvaise enseigne : le rapport ne renvoie
- * que des zéros, sans que rien n'indique la cause.
- */
-async function detectSite() {
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.url) return;
-    const host = new URL(tab.url).hostname;
-    for (const [key, cfg] of Object.entries(SITES)) {
-      if (cfg.hostPattern?.test(host)) {
-        $('site').value = key;
-        $('site-hint').textContent = `Page ${cfg.label} détectée`;
-        return;
-      }
-    }
-    $('site-hint').textContent = "Aucune page de drive détectée dans l'onglet actif";
-  } catch {
-    // URL illisible (page interne de Chrome) : on garde la sélection par défaut.
+const vue = { pret: false, session: null, job: null, travaux: null, recherches: null, outil: null, finiVu: null, choisis: {}, erreurs: {}, arreter: false, annonce: '' };
+
+// --- Petits constructeurs ---
+
+function el(tag, attrs = {}, ...enfants) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') n.className = v;
+    else if (k === 'text') n.textContent = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? '' : v);
   }
+  for (const e of enfants.flat()) if (e != null) n.append(e);
+  return n;
+}
+const icone = (nomIcone) => el('i', { class: `hgi-stroke hgi-${nomIcone}`, 'aria-hidden': 'true' });
+function bouton(texte, { icon, clair, danger, onclick, disabled, cle } = {}) {
+  return el('button', { class: `bouton${clair ? ' bouton--clair' : ''}${danger ? ' bouton--danger' : ''}`, onclick, disabled, 'data-cle': cle }, icon ? icone(icon) : null, el('span', { text: texte }));
+}
+function ligneDrive(d, texte, fait, total, ton = '') {
+  const pct = total ? Math.round((fait / total) * 100) : 0;
+  return el('div', { class: 'drive' },
+    el('div', { class: 'drive__haut' }, el('span', { class: 'drive__nom', text: nom(d) }), el('span', { class: 'drive__etat', text: texte })),
+    el('div', { class: 'barre', role: 'progressbar', 'aria-label': nom(d), 'aria-valuenow': String(pct), 'aria-valuemin': '0', 'aria-valuemax': '100' },
+      el('div', { class: `barre__plein${ton ? ` barre__plein--${ton}` : ''}`, style: `width:${pct}%` })));
 }
 
-const send = (msg) =>
-  new Promise((resolve) => chrome.runtime.sendMessage(msg, (r) => resolve(r)));
+// --- Lecture de l'état du remplissage ---
 
-const REASON_LABEL = {
-  added: 'ajouté',
-  no_match: 'aucun résultat convaincant',
-  no_results: 'page non reconnue',
-  no_add_button: "bouton d'ajout introuvable",
-  ambiguous: 'plusieurs produits possibles — à choisir toi-même',
-  click_no_effect: 'clic sans effet, rien ajouté',
-  wrong_product: 'la fiche ouverte ne correspond pas',
-  product_unavailable: 'produit non proposé par ce drive',
-  challenge: 'vérification demandée',
-  inject_failed: 'injection impossible',
-  no_result: 'le script injecté n\'a rien renvoyé',
+/** Les drives du remplissage dans l'ordre, avec leurs lignes connues. */
+function drivesDu(job) {
+  if (!job) return [];
+  const total = job.items?.length ?? 0;
+  const faits = Object.entries(job.resultatsParDrive ?? {}).filter(([d]) => d !== job.site)
+    .map(([d, lignes]) => ({ drive: d, lignes: lignes ?? [], total, fini: true }));
+  const courant = { drive: job.site, lignes: job.results ?? [], total, fini: job.status === 'done', courant: true };
+  const restants = (job.drivesRestants ?? []).map((d) => ({ drive: d, lignes: [], total, fini: false }));
+  return [...faits, courant, ...restants];
+}
+const ajoutes = (lignes) => lignes.filter((l) => l.ok).length;
+
+function detailLigne(r) {
+  if (r.ok) {
+    if (r.reason === 'already_in_cart') return `déjà au panier · × ${r.quantityInCart ?? r.quantity ?? 1}`;
+    if (r.via === 'departage') return r.departage === 'format' ? 'ajouté · format de ta référence' : 'ajouté · même libellé';
+    if (r.remplacePar) return `alternative : ${plat(r.remplacePar)}`;
+    const q = r.quantityAdded ?? r.quantity ?? 1;
+    return `ajouté${q > 1 ? ` · × ${q}` : ''}`;
+  }
+  return {
+    ambiguous: 'plusieurs produits · à choisir',
+    product_unavailable: r.autreEnseigne ? 'marque d’une autre enseigne · non vendu ici' : 'non vendu ici ou en rupture',
+    no_add_button: 'en rupture',
+    no_match: 'introuvable sous ce nom',
+    no_results: 'introuvable sous ce nom',
+    click_no_effect: 'le site a refusé l’ajout',
+    wrong_product: 'la fiche ne correspond pas',
+  }[r.reason] ?? 'non ajouté';
+}
+const puceDe = (r) => (r.ok ? ['ok', 'tick-02'] : r.reason === 'ambiguous' ? ['choix', 'alert-circle'] : ['ko', 'cancel-01']);
+
+/** Le format d'un libellé, pour titrer une carte de choix : « 620 g », « x6 ». */
+function formatDe(label) {
+  const t = plat(label);
+  const m = t.match(/(\d{1,3}\s*[x×]\s*)?\d+(?:[.,]\d+)?\s*(?:kg|g|cl|ml|l)\b/i) ?? t.match(/[x×]\s?\d{1,3}\b/i);
+  return m ? m[0].replace(/\s+/g, ' ') : null;
+}
+
+// --- Choix de l'écran ---
+
+function ecranCourant() {
+  const { session, job, outil } = vue;
+  if (!vue.pret) return null;
+  if (!session?.jeton) return 'connexion';
+  if (outil) return outil;
+  // Un « running » sans moteur qui tourne (worker arrêté par Chrome) : interrompu, à reprendre.
+  if (job?.status === 'running') return job.actif === false ? 'pause' : 'cours';
+  if (job?.status === 'paused') return 'pause';
+  if (job?.status === 'done' && job.finishedAt && vue.finiVu !== job.finishedAt && Date.now() - job.finishedAt < FINI_VISIBLE_MS) return 'fini';
+  return 'prete';
+}
+
+const ETATS = {
+  prete: ['Prête', 'vert'], cours: ['Remplissage', 'accent'], pause: ['En pause', 'ambre'], fini: ['Terminé', 'vert'],
+  liste: ['Prête', 'vert'], diagnostic: ['Prête', 'vert'],
 };
 
-function render(state) {
-  // Un travail en cours ou en pause masque la saisie ; terminé ou arrêté, on
-  // affiche les deux — la liste reste consultable et on peut en relancer un.
-  const active = state && ['running', 'paused'].includes(state.status);
-  $('idle').hidden = Boolean(active);
-  $('running').hidden = !state;
+/** Ce qui vaut d'être annoncé au lecteur d'écran : les phases, et l'avancée tous les 5 produits. */
+function annoncer(ecran) {
+  const job = vue.job;
+  const texte = ecran === 'cours' ? `${nom(job.site)} : ${Math.floor(job.cursor / 5) * 5} sur ${job.items.length}`
+    : ecran === 'pause' ? 'Remplissage en pause' : ecran === 'fini' ? 'Remplissage terminé' : '';
+  if (texte && texte !== vue.annonce) { vue.annonce = texte; $('annonce').textContent = texte; }
+}
 
-  if (!state) return;
+function rendre() {
+  // Le focus survit à la reconstruction des boutons (un message « state » par produit).
+  const cleFocus = document.activeElement?.dataset?.cle;
+  rendreEcran();
+  if (cleFocus) document.querySelector(`[data-cle="${CSS.escape(cleFocus)}"]`)?.focus();
+}
 
-  $('site-label').textContent = state.site === 'leclerc' ? 'E.Leclerc' : 'Carrefour';
+function rendreEcran() {
+  const ecran = ecranCourant();
+  if (!ecran) return;
+  annoncer(ecran);
+  for (const e of ['connexion', 'prete', 'cours', 'pause', 'fini', 'liste', 'diagnostic']) $(`ecran-${e}`).hidden = e !== ecran;
+  const connecte = Boolean(vue.session?.jeton);
+  $('compte-email').textContent = connecte ? `${vue.session.email ?? 'Compte'} · connecté` : 'Non connecté';
+  $('menu-email').textContent = vue.session?.email ?? '';
+  $('menu-bouton').hidden = !connecte;
+  let etat = ETATS[ecran];
+  if (ecran === 'prete' && vue.recherches?.etat?.statut === 'en_cours') etat = ['Recherches', 'accent'];
+  $('etat').hidden = !etat;
+  if (etat) { $('etat-texte').textContent = etat[0]; $('etat').className = `etat etat--${etat[1]}`; }
 
-  const total = state.items?.length ?? 0;
-  const done = state.cursor ?? 0;
-  const ok = (state.results ?? []).filter((r) => r.ok).length;
+  const pied = [];
+  if (ecran === 'prete') rendrePrete().catch(() => {});
+  if (ecran === 'cours') {
+    rendreCours();
+    // « Arrêter » est définitif : un second appui le confirme.
+    pied.push(el('div', { class: 'rangee' },
+      bouton('Pause', { icon: 'pause', clair: true, cle: 'pause', onclick: () => send({ type: 'pause' }).then(relireEtat) }),
+      bouton(vue.arreter ? 'Arrêter vraiment ?' : 'Arrêter', { icon: 'stop', clair: true, danger: vue.arreter, cle: 'arreter', onclick: () => {
+        if (!vue.arreter) { vue.arreter = true; rendre(); setTimeout(() => { vue.arreter = false; rendre(); }, 4000); return; }
+        vue.arreter = false; send({ type: 'stop' }).then(relireEtat);
+      } })));
+  }
+  if (ecran === 'pause') {
+    rendrePause();
+    pied.push(bouton(`Ouvrir l’onglet ${nom(vue.job.site)}`, { icon: 'link-square-02', clair: true, cle: 'onglet', onclick: ouvrirOnglet }));
+    const simple = vue.job.pauseReason === 'manuel' || vue.job.status === 'running';
+    pied.push(bouton(simple ? 'Reprendre' : 'C’est fait, reprendre', { icon: 'play', cle: 'reprendre', onclick: () => send({ type: 'resume' }).then(relireEtat) }));
+  }
+  if (ecran === 'fini') {
+    rendreFini();
+    pied.push(el('div', { class: 'rangee' },
+      bouton(`Onglet ${nom(vue.job.site)}`, { icon: 'link-square-02', clair: true, cle: 'onglet', onclick: ouvrirOnglet }),
+      bouton('Terminer', { cle: 'terminer', onclick: terminerFini })));
+  }
+  if (ecran === 'liste') {
+    pied.push(el('div', { class: 'rangee' },
+      bouton('Annuler', { clair: true, onclick: () => { vue.outil = null; rendre(); } }),
+      bouton('Remplir le panier', { icon: 'shopping-cart-01', onclick: lancerListe })));
+  }
+  if (ecran === 'diagnostic') pied.push(bouton('Retour', { clair: true, onclick: () => { vue.outil = null; rendre(); } }));
+  $('pied').replaceChildren(...pied);
+  $('pied').hidden = !pied.length;
+}
 
-  $('bar').style.width = total ? `${Math.round((done / total) * 100)}%` : '0%';
+// --- Écran « prête » ---
 
-  const status =
-    state.status === 'paused'
-      ? 'En pause — vérification à résoudre dans l\'onglet, puis Reprendre.'
-      : state.status === 'done'
-        ? 'Terminé.'
-        : state.status === 'stopped'
-          ? 'Arrêté.'
-          : 'En cours…';
-  $('progress-text').textContent = `${done}/${total} traités · ${ok} ajoutés — ${status}`;
+async function rendrePrete() {
+  const premier = vue.travaux?.enAttente?.[0];
+  if (premier) {
+    const n = premier.items?.length ?? 0, drives = (premier.drives ?? []).map(nom).join(' puis ');
+    $('prete-titre').textContent = 'Une liste attend';
+    $('prete-texte').textContent = `${n} produit${n > 1 ? 's' : ''} pour ${drives}. Le remplissage part de lui-même dans les 30 secondes.`;
+    $('remplir').hidden = false;
+    $('remplir').dataset.jobId = premier.id;
+  } else {
+    $('prete-titre').textContent = 'Tout est prêt';
+    $('prete-texte').textContent = 'Envoie ta liste depuis l’iPhone : le panier se remplit tout seul, dans les 30 secondes.';
+    $('remplir').hidden = true;
+  }
+  rendreRecherches();
 
-  $('resume').hidden = state.status !== 'paused';
+  const job = vue.job;
+  const montrerDernier = job && ['done', 'stopped'].includes(job.status);
+  $('dernier').hidden = !montrerDernier;
+  if (montrerDernier) {
+    const quand = job.finishedAt ? new Date(job.finishedAt) : null;
+    $('dernier-titre').textContent = quand
+      ? `DERNIER REMPLISSAGE · ${quand.toLocaleDateString('fr-FR', { weekday: 'long' }).toUpperCase()} ${quand.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+      : 'DERNIER REMPLISSAGE';
+    $('dernier-drives').replaceChildren(...drivesDu(job).filter((d) => d.lignes.length).map((d) =>
+      ligneDrive(d.drive, `${ajoutes(d.lignes)} sur ${d.total} au panier`, ajoutes(d.lignes), d.total)));
+  }
 
-  $('log').innerHTML = '';
-  // L'index d'origine doit être conservé : le journal est affiché à l'envers
-  // et tronqué, mais la reprise d'un candidat vise la ligne réelle.
-  const entries = (state.results ?? []).map((r, index) => ({ r, index }));
-  for (const { r, index } of entries.slice(-30).reverse()) {
-    const li = document.createElement('li');
-    li.className = r.ok ? 'log__item log__item--ok' : 'log__item log__item--ko';
-    const certain = r.ok && (r.via === 'direct_url' || r.via === 'ean_match');
-    const detail = r.ok
-      ? r.label || ''
-      : r.message || REASON_LABEL[r.reason] || r.reason || '';
-    // Un produit approchant doit se voir : sinon on croit avoir eu ce qu'on
-    // demandait alors qu'un terme a été écarté du rayon.
-    const nuance = certain
-      ? ' (par code-barres)'
-      : r.ignored?.length
-        ? ` (sans « ${r.ignored.join(' ')} »)`
-        : '';
-    // Une alternative a pris le relais : on dit laquelle, et combien.
-    const relais = r.remplacePar ? ` · alternative : ${r.remplacePar} × ${r.quantity}` : '';
-    li.textContent = `${r.item} — ${detail}${nuance}${relais}`;
-    if (r.approximate) li.classList.add('log__item--approx');
+  const { magasins = {} } = await chrome.storage.local.get('magasins');
+  const magasin = magasins.leclerc?.match(/magasin-\d+-\d+-([^/]+)/)?.[1]?.replace(/-/g, ' ');
+  $('tes-drives').replaceChildren(
+    el('div', { class: 'mon-drive' }, icone('store-01'),
+      el('span', { class: 'mon-drive__texte' }, el('b', { text: 'E.Leclerc' }), magasin ? ` · ${magasin}` : ' · magasin pas encore vu'),
+      el('button', { class: 'mon-drive__action', onclick: () => chrome.tabs.create({ url: magasins.leclerc ?? SITES.leclerc.origin }) , text: magasin ? 'Ouvrir' : 'Choisir' })),
+    el('div', { class: 'mon-drive' }, icone('store-01'),
+      el('span', { class: 'mon-drive__texte' }, el('b', { text: 'Carrefour' }), ' · carrefour.fr'),
+      el('button', { class: 'mon-drive__action', onclick: () => chrome.tabs.create({ url: SITES.carrefour.origin }), text: 'Ouvrir' })));
+}
 
-    // Une ambiguïté sans propositions est un cul-de-sac : on liste les
-    // candidats pour que le choix soit possible d'un coup d'œil.
-    if (r.candidates?.length) {
-      const ul = document.createElement('ul');
-      ul.className = 'log__candidates';
-      for (const c of r.candidates) {
-        const label = c.label ?? c;
-        const item = document.createElement('li');
+function rendreRecherches() {
+  const donnees = vue.recherches, etat = donnees?.etat ?? null, aFaire = donnees?.aFaire ?? 0, auto = donnees?.auto !== false;
+  $('recherches-auto').checked = auto;
+  $('menu-auto-detail').textContent = auto ? 'Activées · depuis l’iPhone' : 'Désactivées : à lancer ici';
+  const enCours = etat?.statut === 'en_cours';
+  $('recherches').hidden = !enCours && !aFaire && etat?.statut !== 'pause';
+  if ($('recherches').hidden) return;
+  $('recherches-resume').textContent = enCours
+    ? `${etat.fait ?? 0} sur ${etat.total ?? 0} · ${nom(etat.drive)}${etat.requete ? ` · « ${etat.requete} »` : ''}`
+    : `${aFaire} recherche${aFaire > 1 ? 's' : ''} demandée${aFaire > 1 ? 's' : ''} depuis l’iPhone`;
+  $('recherches-barre-fond').hidden = !enCours;
+  const pctRech = enCours && etat.total ? Math.round(((etat.fait ?? 0) / etat.total) * 100) : 0;
+  $('recherches-barre').style.width = `${pctRech}%`;
+  $('recherches-barre-fond').setAttribute('aria-valuenow', String(pctRech));
+  $('recherches-message').textContent = etat?.message
+    ?? (enCours ? 'Une recherche toutes les 8 à 15 secondes, à rythme humain.' : auto ? 'Elles partent d’elles-mêmes dans les 30 secondes.' : 'Le lancement automatique est désactivé.');
+  $('recherches-lancer').hidden = enCours || !aFaire;
+  $('recherches-lancer').textContent = etat?.statut === 'pause' ? 'Relancer les recherches' : 'Lancer les recherches';
+  $('recherches-pause').hidden = !enCours;
+}
 
-        const texte = document.createElement('span');
-        texte.textContent = label;
-        item.appendChild(texte);
+// --- Écran « en cours » ---
 
-        const bouton = document.createElement('button');
-        bouton.type = 'button';
-        bouton.className = 'log__choose';
-        bouton.textContent = 'Choisir';
-        // Pendant un remplissage, l'onglet est déjà piloté : deux actions
-        // simultanées se disputeraient la même page.
-        bouton.disabled = state.status === 'running';
-        bouton.addEventListener('click', async () => {
-          bouton.disabled = true;
-          bouton.textContent = 'Ajout…';
-          const res = await send({ type: 'choose', index, label });
-          if (!res?.ok) {
-            bouton.textContent = 'Échec';
-            bouton.title = res?.error ?? '';
-          }
-        });
-        item.appendChild(bouton);
+function rendreCours() {
+  const job = vue.job, item = job.items?.[job.cursor];
+  $('actuel-drive').textContent = `EN TRAIN D’AJOUTER · ${nom(job.site).toUpperCase()}`;
+  $('actuel-nom').textContent = item ? plat(item.name) : 'Dernières vérifications';
+  $('actuel-detail').textContent = item ? `× ${item.quantity ?? 1} · ${job.cursor + 1} sur ${job.items.length}` : '';
+  const drives = drivesDu(job);
+  $('cours-drives').replaceChildren(...drives.map((d) => d.courant
+    ? ligneDrive(d.drive, `${job.cursor} sur ${d.total}`, job.cursor, d.total)
+    : d.fini ? ligneDrive(d.drive, `fini · ${ajoutes(d.lignes)} au panier`, d.total, d.total, 'fini')
+      : ligneDrive(d.drive, 'à suivre', 0, d.total)));
+  const reste = (job.items.length - job.cursor) + drives.filter((d) => !d.fini && !d.courant).length * job.items.length;
+  const minutes = Math.max(1, Math.round((reste * SECONDES_PAR_PRODUIT) / 60));
+  $('cours-temps').textContent = `Encore ${minutes} minute${minutes > 1 ? 's' : ''} environ, à rythme humain. Tu peux utiliser Chrome, mais laisse l’onglet du drive tranquille.`;
+  const recents = (job.results ?? []).slice(-5).reverse();
+  $('recents').replaceChildren(...(recents.length ? recents.map((r) => {
+    const [ton, ic] = puceDe(r);
+    return el('div', { class: 'recent' },
+      el('div', { class: 'recent__texte' }, el('p', { class: 'recent__nom', text: plat(r.item) }), el('p', { class: 'recent__detail', text: detailLigne(r) })),
+      el('span', { class: `puce puce--${ton}`, 'aria-label': r.ok ? 'ajouté' : 'non ajouté' }, icone(ic)));
+  }) : [el('p', { class: 'sous', style: 'padding:10px 0', text: 'Les premiers produits arrivent…' })]));
+}
 
-        ul.appendChild(item);
-      }
-      li.appendChild(ul);
-    }
+// --- Écran « en pause » ---
 
-    $('log').appendChild(li);
+function rendrePause() {
+  const job = vue.job, d = nom(job.site);
+  const textes = {
+    challenge: ['user-check-01', `${d} demande une vérification`, `Le site veut s’assurer qu’un humain est là. Fais-la dans l’onglet ${d}, puis reprends : le remplissage repart où il s’est arrêté.`],
+    magasin: ['location-01', `Choisis ton magasin ${d}`, `Ouvre l’onglet ${d}, choisis ton magasin, puis reprends : les recherches viseront ce magasin.`],
+    manuel: ['pause', 'Remplissage en pause', 'Reprends quand tu veux : il repart où il s’est arrêté.'],
+    interrompu: ['pause-circle', 'Remplissage interrompu', 'Chrome a mis l’extension en veille en plein remplissage. Reprends : il repart où il s’est arrêté.'],
+  };
+  const [ic, titre, texte] = textes[job.status === 'running' ? 'interrompu' : job.pauseReason] ?? textes.challenge;
+  $('pause-icone').className = `hgi-stroke hgi-${ic}`;
+  $('pause-titre').textContent = titre;
+  $('pause-texte').textContent = texte;
+  const total = job.items?.length ?? 0;
+  $('pause-drives').replaceChildren(ligneDrive(job.site, `arrêté à ${job.cursor} sur ${total}`, job.cursor, total, 'ambre'));
+}
+
+// --- Écran « terminé » ---
+
+function rendreFini() {
+  const drives = drivesDu(vue.job).filter((d) => d.lignes.length);
+  const total = drives.reduce((n, d) => n + ajoutes(d.lignes), 0);
+  $('fini-titre').textContent = `${total} produit${total > 1 ? 's' : ''} au panier`;
+  $('fini-texte').textContent = drives.map((d) => `${nom(d.drive)} ${ajoutes(d.lignes)} sur ${d.total}`).join(' · ');
+  // Seules les lignes du dernier drive se choisissent ici : son onglet est encore ouvert.
+  const choix = (vue.job.results ?? []).map((r, index) => ({ r, index })).filter(({ r, index }) => (!r.ok && r.candidates?.length) || (r.chosen && vue.choisis[index] === 'fait'));
+  $('choix').hidden = !choix.length;
+  $('choix-titre').textContent = `À CHOISIR TOI-MÊME · ${choix.length}`;
+  $('choix-liste').replaceChildren(...choix.slice(0, 4).map(({ r, index }) => carteChoix(r, index)));
+}
+
+function carteChoix(r, index) {
+  const ref = vue.job.items?.[index];
+  const retenu = vue.choisis[index];
+  const carte = el('div', { class: 'carte' },
+    el('div', {}, el('p', { class: 'choix__nom', text: plat(r.item) }),
+      el('p', { class: 'sous', text: `${nom(vue.job.site)}${ref?.grammage_g ? ` · ta référence fait ${ref.grammage_g} g` : ref?.volume_ml ? ` · ta référence fait ${ref.volume_ml} ml` : ''}` })));
+  if (retenu === 'fait') {
+    carte.append(el('p', { class: 'choix__fait' }, icone('tick-02'), 'Ajouté au panier'));
+    return carte;
+  }
+  const formats = el('div', { class: 'choix__formats', role: 'group', 'aria-label': `Choix pour ${plat(r.item)}` },
+    r.candidates.slice(0, 3).map((c) => {
+      const label = c.label ?? c, f = formatDe(label), on = retenu === label;
+      return el('button', { class: 'format', 'aria-pressed': on ? 'true' : 'false', title: plat(label), 'data-cle': `format-${index}-${label}`,
+        onclick: () => { vue.choisis[index] = on ? undefined : label; rendre(); } },
+        el('span', { class: 'format__titre', text: f ?? plat(label).split(' ').slice(0, 2).join(' ') }),
+        el('span', { class: 'format__sous', text: plat(label) }));
+    }));
+  // Un seul ajout à la fois : deux choix piloteraient le même onglet en même temps.
+  const occupe = vue.job.status === 'running' || Object.values(vue.choisis).includes('envoi');
+  carte.append(formats,
+    bouton(typeof retenu === 'string' && retenu !== 'envoi' ? `Ajouter ${formatDe(retenu) ?? 'ce produit'} au panier` : retenu === 'envoi' ? 'Ajout…' : 'Choisis un produit',
+      { icon: 'add-01', disabled: occupe || !retenu, cle: `ajouter-${index}`, onclick: () => choisir(index, retenu) }));
+  if (vue.erreurs[index]) carte.append(el('p', { class: 'erreur', role: 'alert', text: vue.erreurs[index] }));
+  return carte;
+}
+
+async function choisir(index, label) {
+  vue.choisis[index] = 'envoi'; delete vue.erreurs[index]; rendre();
+  const res = await send({ type: 'choose', index, label });
+  if (res?.ok && res.data?.ok) vue.choisis[index] = 'fait';
+  else { vue.choisis[index] = label; vue.erreurs[index] = 'L’ajout n’a pas pris. Vérifie l’onglet du drive, puis réessaie.'; }
+  await relireEtat();
+}
+
+async function terminerFini() {
+  vue.finiVu = vue.job?.finishedAt ?? null;
+  await chrome.storage.local.set({ popup_fini_vu: vue.finiVu });
+  rendre();
+}
+
+async function ouvrirOnglet() {
+  const job = vue.job;
+  try {
+    const t = await chrome.tabs.update(job.tabId, { active: true });
+    await chrome.windows.update(t.windowId, { focused: true });
+  } catch {
+    chrome.tabs.create({ url: SITES[job.site]?.origin });
   }
 }
 
-const LIBELLE_DRIVE = { carrefour: 'Carrefour', leclerc: 'E.Leclerc' };
+// --- Outils du menu ---
 
-/**
- * Affiche l'état du compte.
- *
- * La saisie manuelle reste visible dans tous les cas : elle ne dépend pas de
- * Supabase, et c'est le seul recours quand la session a expiré ou que le
- * service est injoignable.
- */
-function rendreCompte(session) {
-  const connecte = Boolean(session?.jeton);
-  $('compte-connecte').hidden = !connecte;
-  $('compte-formulaire').hidden = connecte;
-  if (connecte) $('compte-email').textContent = session.email ?? 'Connecté';
+async function lancerListe() {
+  const items = parseItems($('items').value);
+  if (!items.length) { $('liste-erreur').textContent = 'Écris au moins un produit.'; $('liste-erreur').hidden = false; return; }
+  $('liste-erreur').hidden = true;
+  const res = await send({ type: 'start', payload: { site: $('site').value, items } });
+  if (!res?.ok) { $('liste-erreur').textContent = `Impossible de lancer : ${String(res?.error ?? '').replace(/^Error: /, '')}`; $('liste-erreur').hidden = false; return; }
+  vue.outil = null;
+  await relireEtat();
 }
 
-function rendreTravaux(donnees) {
-  const premier = donnees?.enAttente?.[0];
-  if (!premier) {
-    $('travaux').hidden = true;
-    return;
-  }
-  $('travaux').hidden = false;
-  const n = premier.items?.length ?? 0;
-  const enseignes = (premier.drives ?? []).map((d) => LIBELLE_DRIVE[d] ?? d).join(' puis ');
-  const suite = donnees.total > 1 ? ` · ${donnees.total - 1} autre(s) en attente` : '';
-  $('travaux-resume').textContent =
-    `${n} article${n > 1 ? 's' : ''} à mettre au panier — ${enseignes}${suite}`;
-  $('remplir').dataset.jobId = premier.id;
+async function detecterSite() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const host = new URL(tab?.url ?? '').hostname;
+    return Object.entries(SITES).find(([, cfg]) => cfg.hostPattern?.test(host))?.[0] ?? null;
+  } catch { return null; }
 }
 
-async function relireCompte() {
-  const session = await sessionCourante();
-  rendreCompte(session);
-  if (!session?.jeton) {
-    $('travaux').hidden = true;
-    $('recherches').hidden = true;
-    return;
-  }
-  const res = await send({ type: 'travaux' });
-  if (res?.deconnecte) {
-    // Le jeton de rafraîchissement est mort : on le dit plutôt que de laisser
-    // une pastille muette.
-    $('compte-erreur').textContent = 'Session expirée, reconnecte-toi.';
-    $('compte-erreur').hidden = false;
-    rendreCompte(null);
-    return;
-  }
-  if (res?.ok) rendreTravaux(res.data);
-  await relireRecherches();
-}
+function fermerMenu() { $('menu').hidden = true; $('menu-bouton').setAttribute('aria-expanded', 'false'); }
+$('menu-bouton').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const ouvrir = $('menu').hidden;
+  $('menu').hidden = !ouvrir;
+  $('menu-bouton').setAttribute('aria-expanded', String(ouvrir));
+  if (ouvrir) $('menu').querySelector('input, button')?.focus();
+});
+document.addEventListener('click', (e) => { if (!$('menu').contains(e.target)) fermerMenu(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('menu').hidden) { fermerMenu(); $('menu-bouton').focus(); } });
+$('menu').addEventListener('focusout', (e) => { if (!$('menu').contains(e.relatedTarget) && e.relatedTarget !== $('menu-bouton')) fermerMenu(); });
+$('menu-liste').addEventListener('click', async () => {
+  fermerMenu();
+  $('site').value = (await detecterSite()) ?? 'carrefour';
+  vue.outil = 'liste'; rendre(); $('items').focus();
+});
+$('menu-diagnostic').addEventListener('click', async () => {
+  fermerMenu();
+  const site = await detecterSite();
+  vue.outil = 'diagnostic'; rendre();
+  if (!site) { $('diag-resume').textContent = 'Ouvre d’abord une page Carrefour ou E.Leclerc dans l’onglet actif.'; $('diag').textContent = ''; return; }
+  $('diag-resume').textContent = `Page ${nom(site)} : lecture en cours…`;
+  const res = await send({ type: 'diagnose', site });
+  $('diag-resume').textContent = `Ce que l’extension voit sur cette page ${nom(site)}, à copier pour signaler un souci.`;
+  $('diag').textContent = JSON.stringify(res?.data ?? res, null, 2);
+});
+$('recherches-auto').addEventListener('change', async () => { await send({ type: 'reglerAuto', actif: $('recherches-auto').checked }); await relireRecherches(); });
+$('deconnexion').addEventListener('click', async () => { fermerMenu(); await deconnexion(); await relireCompte(); });
+
+// --- Actions des écrans ---
 
 $('connexion').addEventListener('click', async () => {
-  const email = $('email').value.trim();
-  const mdp = $('mdp').value;
-  if (!email || !mdp) {
-    $('compte-erreur').textContent = 'Renseigne ton adresse et ton mot de passe.';
-    $('compte-erreur').hidden = false;
-    return;
-  }
+  const email = $('email').value.trim(), mdp = $('mdp').value;
+  if (!email || !mdp) { $('compte-erreur').textContent = 'Renseigne ton adresse et ton mot de passe.'; $('compte-erreur').hidden = false; return; }
   $('compte-erreur').hidden = true;
-  $('connexion').disabled = true;
-  $('connexion').textContent = 'Connexion…';
+  $('connexion').disabled = true; $('connexion').textContent = 'Connexion…';
   const res = await connexion(email, mdp);
-  $('connexion').disabled = false;
-  $('connexion').textContent = 'Se connecter';
-  if (!res.ok) {
-    $('compte-erreur').textContent = res.erreur;
-    $('compte-erreur').hidden = false;
-    return;
-  }
+  $('connexion').disabled = false; $('connexion').textContent = 'Se connecter';
+  if (!res.ok) { $('compte-erreur').textContent = res.erreur; $('compte-erreur').hidden = false; return; }
   $('mdp').value = '';
   await relireCompte();
 });
-
-$('deconnexion').addEventListener('click', async () => {
-  await deconnexion();
-  await relireCompte();
-});
-
+$('mdp').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('connexion').click(); });
 $('remplir').addEventListener('click', async () => {
   const jobId = $('remplir').dataset.jobId;
   if (!jobId) return;
   $('remplir').disabled = true;
   const res = await send({ type: 'demarrerTravail', jobId });
   $('remplir').disabled = false;
-  if (!res?.ok) {
-    $('travaux-resume').textContent = `Échec : ${res?.error ?? 'inconnu'}`;
-  }
+  if (!res?.ok) $('prete-texte').textContent = `Impossible de démarrer : ${String(res?.error ?? '').replace(/^Error: /, '')}`;
+  await relireEtat();
 });
-
-$('start').addEventListener('click', async () => {
-  const items = parseItems($('items').value);
-  if (!items.length) return;
-  const res = await send({
-    type: 'start',
-    payload: { site: $('site').value, items },
-  });
-  if (!res?.ok) $('progress-text').textContent = `Échec : ${res?.error ?? 'inconnu'}`;
-});
-
-$('diagnose').addEventListener('click', async () => {
-  const res = await send({ type: 'diagnose', site: $('site').value });
-  $('diag').hidden = false;
-  $('diag').textContent = JSON.stringify(res?.data ?? res, null, 2);
-});
-
-const LIBELLE_STATUT = { faite: 'trouvés', vide: 'rien trouvé', echec: 'échec', verification: 'vérification' };
-
-/**
- * Les recherches demandées depuis l'app : combien attendent, l'avancement de
- * la séance, et ce que chacune a donné. Rien ne part sans « Lancer ».
- */
-function rendreRecherches(donnees) {
-  const etat = donnees?.etat ?? null, aFaire = donnees?.aFaire ?? 0, auto = donnees?.auto !== false;
-  const enCours = etat?.statut === 'en_cours';
-  // Toujours visible une fois connecté : c'est là que se règle le lancement automatique.
-  $('recherches').hidden = !donnees;
-  if ($('recherches').hidden) return;
-  $('recherches-auto').checked = auto;
-  $('recherches-resume').textContent = enCours
-    ? `Recherches demandées · ${etat.fait ?? 0} sur ${etat.total ?? 0} — sur ${LIBELLE_DRIVE[etat.drive] ?? etat.drive}, une toutes les 8 à 15 secondes.`
-    : aFaire
-      ? `${aFaire} recherche${aFaire > 1 ? 's' : ''} demandée${aFaire > 1 ? 's' : ''} depuis l'application, sur Carrefour puis E.Leclerc.${auto && etat?.statut !== 'pause' ? ' Elles partent d\'elles-mêmes dans les 30 secondes.' : ''}`
-      : etat?.journal?.length ? 'Recherches terminées : les résultats sont dans l\'application.' : 'Aucune recherche demandée depuis l\'application.';
-  $('recherches-progression').hidden = !enCours;
-  $('recherches-barre').style.width = enCours && etat.total ? `${Math.round(((etat.fait ?? 0) / etat.total) * 100)}%` : '0%';
-  $('recherches-message').textContent = etat?.message ?? (enCours ? '' : 'Si le drive demande une vérification, l\'extension s\'arrête et te rend la main.');
-  $('recherches-lancer').hidden = enCours || !aFaire;
-  $('recherches-lancer').textContent = etat?.statut === 'pause' ? 'Relancer les recherches' : 'Lancer les recherches';
-  $('recherches-pause').hidden = !enCours;
-  $('recherches-journal').innerHTML = '';
-  for (const j of [...(etat?.journal ?? [])].reverse().slice(0, 12)) {
-    const li = document.createElement('li');
-    li.className = j.statut === 'faite' ? 'log__item log__item--ok' : 'log__item log__item--ko';
-    li.textContent = `${j.requete} · ${LIBELLE_DRIVE[j.drive] ?? j.drive} — ${j.statut === 'faite' ? `${j.n} ${LIBELLE_STATUT.faite}` : LIBELLE_STATUT[j.statut] ?? j.statut}`;
-    $('recherches-journal').appendChild(li);
-  }
-}
-
-async function relireRecherches() {
-  const res = await send({ type: 'recherches' });
-  if (res?.ok) rendreRecherches(res.data);
-}
-
 $('recherches-lancer').addEventListener('click', async () => {
   $('recherches-lancer').disabled = true;
   const res = await send({ type: 'lancerRecherches' });
   $('recherches-lancer').disabled = false;
   await relireRecherches();
-  // Après la relecture, qui réécrit le message : sinon l'échec s'effaçait aussitôt.
   if (!res?.ok) $('recherches-message').textContent = `Impossible de lancer : ${String(res?.error ?? 'erreur inconnue').replace(/^Error: /, '')}`;
-});
-$('recherches-auto').addEventListener('change', async () => {
-  await send({ type: 'reglerAuto', actif: $('recherches-auto').checked });
-  await relireRecherches();
 });
 $('recherches-pause').addEventListener('click', async () => { await send({ type: 'pauseRecherches' }); await relireRecherches(); });
 
-$('resume').addEventListener('click', () => send({ type: 'resume' }));
-$('stop').addEventListener('click', () => send({ type: 'stop' }));
+// --- Lectures ---
+
+function recevoirJob(job) {
+  if ((job?.startedAt ?? null) !== (vue.job?.startedAt ?? null)) { vue.choisis = {}; vue.erreurs = {}; }
+  vue.job = job;
+}
+async function relireEtat() { const r = await send({ type: 'getState' }); recevoirJob(r?.data ?? null); rendre(); }
+async function relireRecherches() { const r = await send({ type: 'recherches' }); if (r?.ok) vue.recherches = r.data; rendre(); }
+async function relireCompte() {
+  vue.session = await sessionCourante();
+  if (vue.session?.jeton) {
+    const res = await send({ type: 'travaux' });
+    if (res?.data?.deconnecte || res?.deconnecte) {
+      vue.session = null;
+      $('compte-erreur').textContent = 'Session expirée, reconnecte-toi.';
+      $('compte-erreur').hidden = false;
+    } else if (res?.ok) vue.travaux = res.data?.data ?? null;
+    await relireRecherches();
+  }
+  rendre();
+}
 
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === 'state') render(msg.state);
+  if (msg?.type === 'state') { recevoirJob(msg.state); rendre(); }
   if (msg?.type === 'recherches') relireRecherches();
 });
 
-detectSite();
-relireCompte();
-send({ type: 'getState' }).then((r) => render(r?.data ?? null));
+(async () => {
+  ({ popup_fini_vu: vue.finiVu = null } = await chrome.storage.local.get('popup_fini_vu'));
+  const [etat] = await Promise.all([send({ type: 'getState' }), sessionCourante().then((s) => { vue.session = s; })]);
+  recevoirJob(etat?.data ?? null);
+  // Rien ne s'affiche avant de savoir qui est connecté : pas d'écran de connexion qui clignote.
+  vue.pret = true;
+  await relireCompte();
+})();

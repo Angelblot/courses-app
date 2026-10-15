@@ -2,90 +2,165 @@
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://use.hugeicons.com/font/icons.css" />
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <header class="head">
-      <h1>Courses</h1>
-      <span id="site-label" class="site"></span>
+    <!-- Un écran par situation (maquette « L'extension Chrome, repensée ») :
+         connexion, prête, en cours, en pause, terminée ; les outils dans le menu. -->
+    <header class="tete">
+      <span class="logo" aria-hidden="true"><i class="hgi-stroke hgi-shopping-basket-01"></i></span>
+      <div class="tete__texte">
+        <h1>Courses</h1>
+        <p id="compte-email" class="sous"></p>
+      </div>
+      <span id="etat" class="etat" role="status" hidden><span class="etat__point"></span><span id="etat-texte"></span></span>
+      <button id="menu-bouton" class="icone" aria-label="Menu" aria-controls="menu" aria-expanded="false" hidden>
+        <i class="hgi-stroke hgi-more-vertical"></i>
+      </button>
+      <div id="menu" class="menu" hidden>
+        <label class="menu__item">
+          <i class="hgi-stroke hgi-search-01"></i>
+          <span class="menu__texte"><b>Recherches automatiques</b><small id="menu-auto-detail">Depuis l’iPhone</small></span>
+          <input id="recherches-auto" type="checkbox" class="bascule" />
+        </label>
+        <button id="menu-liste" class="menu__item">
+          <i class="hgi-stroke hgi-note-edit"></i>
+          <span class="menu__texte"><b>Remplir à partir d’une liste</b><small>Coller une liste à la main</small></span>
+        </button>
+        <button id="menu-diagnostic" class="menu__item">
+          <i class="hgi-stroke hgi-search-list-01"></i>
+          <span class="menu__texte"><b>Diagnostiquer cette page</b><small>Pour signaler un souci</small></span>
+        </button>
+        <button id="deconnexion" class="menu__item menu__item--danger">
+          <i class="hgi-stroke hgi-logout-01"></i>
+          <span class="menu__texte"><b>Se déconnecter</b><small id="menu-email"></small></span>
+        </button>
+      </div>
     </header>
 
-    <section id="compte" class="panel compte">
-      <div id="compte-connecte" hidden>
-        <span id="compte-email" class="hint"></span>
-        <button id="deconnexion" class="lien">Se déconnecter</button>
-      </div>
-      <div id="compte-formulaire">
-        <p class="hint">Connecte-toi pour relever les listes envoyées depuis l'application.</p>
-        <label class="field">
-          <span>Adresse e-mail</span>
-          <input id="email" type="email" autocomplete="username" />
-        </label>
-        <label class="field">
-          <span>Mot de passe</span>
-          <input id="mdp" type="password" autocomplete="current-password" />
-        </label>
-        <p id="compte-erreur" class="erreur" hidden></p>
-        <button id="connexion" class="btn">Se connecter</button>
-      </div>
-    </section>
+    <p id="annonce" class="sr-only" aria-live="polite"></p>
+    <main>
+      <!-- Connexion -->
+      <section id="ecran-connexion" class="ecran" hidden>
+        <div class="carte">
+          <div class="titre-icone"><i class="hgi-stroke hgi-user-circle"></i><div>
+            <h2>Connecte l’extension</h2>
+            <p class="sous">Avec le même compte que sur l’iPhone : tes listes arriveront ici d’elles-mêmes.</p>
+          </div></div>
+          <label class="champ"><span>Adresse e-mail</span><input id="email" type="email" autocomplete="username" /></label>
+          <label class="champ"><span>Mot de passe</span><input id="mdp" type="password" autocomplete="current-password" /></label>
+          <p id="compte-erreur" class="erreur" role="alert" hidden></p>
+          <button id="connexion" class="bouton">Se connecter</button>
+        </div>
+      </section>
 
-    <section id="travaux" class="panel" hidden>
-      <p id="travaux-resume" class="hint"></p>
-      <button id="remplir" class="btn">Remplir le panier</button>
-    </section>
+      <!-- Prête -->
+      <section id="ecran-prete" class="ecran" hidden>
+        <div class="carte">
+          <div class="titre-icone"><i class="hgi-stroke hgi-checkmark-circle-02 grand"></i><div>
+            <h2 id="prete-titre">Tout est prêt</h2>
+            <p id="prete-texte" class="sous">Envoie ta liste depuis l’iPhone : le panier se remplit tout seul, dans les 30 secondes.</p>
+          </div></div>
+          <button id="remplir" class="bouton" hidden><i class="hgi-stroke hgi-play"></i><span>Remplir maintenant</span></button>
+        </div>
+        <div id="recherches" hidden>
+          <p class="section">RECHERCHES DEPUIS L’IPHONE</p>
+          <div class="carte">
+            <p id="recherches-resume" class="ligne-forte"></p>
+            <div id="recherches-barre-fond" class="barre" role="progressbar" aria-label="Recherches" aria-valuemin="0" aria-valuemax="100" hidden><div id="recherches-barre" class="barre__plein"></div></div>
+            <p id="recherches-message" class="sous"></p>
+            <div class="rangee">
+              <button id="recherches-lancer" class="bouton bouton--clair" hidden>Lancer les recherches</button>
+              <button id="recherches-pause" class="bouton bouton--clair" hidden><i class="hgi-stroke hgi-pause"></i><span>Pause</span></button>
+            </div>
+          </div>
+        </div>
+        <div id="dernier" hidden>
+          <p class="section" id="dernier-titre">DERNIER REMPLISSAGE</p>
+          <div class="carte">
+            <div id="dernier-drives" class="drives"></div>
+            <p class="lien-iphone"><i class="hgi-stroke hgi-smart-phone-01"></i>Compte rendu et remplacements sur l’iPhone</p>
+          </div>
+        </div>
+        <p class="section">TES DRIVES</p>
+        <div class="carte liste-drives" id="tes-drives"></div>
+      </section>
 
-    <section id="recherches" class="panel" hidden>
-      <p id="recherches-resume" class="hint"></p>
-      <div id="recherches-progression" class="progress" hidden>
-        <div id="recherches-barre" class="progress__bar"></div>
-      </div>
-      <p id="recherches-message" class="hint"></p>
-      <ul id="recherches-journal" class="log"></ul>
-      <label class="interrupteur">
-        <input id="recherches-auto" type="checkbox" checked />
-        <span>Lancer automatiquement les recherches demandées depuis l'iPhone, dans un onglet en arrière-plan</span>
-      </label>
-      <div class="row">
-        <button id="recherches-lancer" class="btn">Lancer les recherches</button>
-        <button id="recherches-pause" class="btn btn--ghost" hidden>Pause</button>
-      </div>
-    </section>
+      <!-- En cours -->
+      <section id="ecran-cours" class="ecran" hidden>
+        <div class="carte">
+          <div class="actuel">
+            <span class="vignette" aria-hidden="true"><i class="hgi-stroke hgi-shopping-cart-01"></i></span>
+            <div class="actuel__texte">
+              <p id="actuel-drive" class="surtitre"></p>
+              <p id="actuel-nom" class="actuel__nom"></p>
+              <p id="actuel-detail" class="sous"></p>
+            </div>
+          </div>
+          <div id="cours-drives" class="drives"></div>
+          <p id="cours-temps" class="sous"></p>
+        </div>
+        <p class="section">À L’INSTANT</p>
+        <div class="carte carte--liste" id="recents"></div>
+      </section>
 
-    <section id="idle" class="panel">
-      <p class="hint">
-        Saisie manuelle — elle reste disponible même sans connexion, et
-        c'est le seul recours si Supabase est injoignable.
-      </p>
-      <label class="field">
-        <span>Enseigne</span>
-        <select id="site">
-          <option value="carrefour">Carrefour</option>
-          <option value="leclerc">E.Leclerc Drive</option>
-        </select>
-        <span id="site-hint" class="hint hint--inline"></span>
-      </label>
-      <label class="field">
-        <span>Liste — un produit ou une URL de fiche par ligne, quantité optionnelle après « x »</span>
-        <textarea id="items" rows="7" placeholder="Spaghetti 500g x2&#10;Lardons fumés&#10;https://www.carrefour.fr/p/…-3443660013046 x2"></textarea>
-      </label>
-      <button id="start" class="btn">Remplir le panier</button>
-      <button id="diagnose" class="btn btn--ghost">Diagnostiquer cette page</button>
-    </section>
+      <!-- En pause -->
+      <section id="ecran-pause" class="ecran" hidden>
+        <div class="carte">
+          <div class="titre-icone"><span class="pastille-ronde pastille-ronde--ambre"><i id="pause-icone" class="hgi-stroke hgi-user-check-01"></i></span><div>
+            <h2 id="pause-titre"></h2>
+            <p id="pause-texte" class="sous"></p>
+          </div></div>
+          <div id="pause-drives" class="drives"></div>
+        </div>
+        <p class="note"><i class="hgi-stroke hgi-information-circle"></i><span>Rien n’est recherché pendant la pause : on ne force jamais une vérification.</span></p>
+      </section>
 
-    <section id="running" class="panel" hidden>
-      <div class="progress">
-        <div id="bar" class="progress__bar"></div>
-      </div>
-      <p id="progress-text" class="hint"></p>
-      <ul id="log" class="log"></ul>
-      <div class="row">
-        <button id="resume" class="btn" hidden>Reprendre</button>
-        <button id="stop" class="btn btn--ghost">Arrêter</button>
-      </div>
-    </section>
+      <!-- Terminé -->
+      <section id="ecran-fini" class="ecran" hidden>
+        <div class="carte">
+          <div class="titre-icone"><i class="hgi-stroke hgi-checkmark-circle-02 grand"></i><div>
+            <h2 id="fini-titre"></h2>
+            <p id="fini-texte" class="sous"></p>
+          </div></div>
+        </div>
+        <div id="choix" hidden>
+          <p class="section"><span id="choix-titre"></span><span class="section__lien">tout voir sur l’iPhone</span></p>
+          <div id="choix-liste" class="choix-liste"></div>
+        </div>
+      </section>
 
-    <pre id="diag" class="diag" hidden></pre>
+      <!-- Remplir à partir d'une liste (menu) -->
+      <section id="ecran-liste" class="ecran" hidden>
+        <div class="carte">
+          <div class="titre-icone"><i class="hgi-stroke hgi-note-edit"></i><div>
+            <h2>Remplir à partir d’une liste</h2>
+            <p class="sous">Un produit ou une adresse de fiche par ligne, quantité après « x ».</p>
+          </div></div>
+          <label class="champ"><span>Drive</span>
+            <select id="site"><option value="carrefour">Carrefour</option><option value="leclerc">E.Leclerc</option></select>
+          </label>
+          <label class="champ"><span>Liste</span>
+            <textarea id="items" rows="6" placeholder="Spaghetti 500g x2&#10;Lardons fumés"></textarea>
+          </label>
+          <p id="liste-erreur" class="erreur" role="alert" hidden></p>
+        </div>
+      </section>
+
+      <!-- Diagnostic (menu) -->
+      <section id="ecran-diagnostic" class="ecran" hidden>
+        <div class="carte">
+          <div class="titre-icone"><i class="hgi-stroke hgi-search-list-01"></i><div>
+            <h2>Diagnostic de la page</h2>
+            <p id="diag-resume" class="sous">Ce que l’extension voit sur l’onglet ouvert, à copier pour signaler un souci.</p>
+          </div></div>
+          <pre id="diag" class="diag"></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer id="pied" class="pied" hidden></footer>
 
     <script type="module" src="popup.js"></script>
   </body>
