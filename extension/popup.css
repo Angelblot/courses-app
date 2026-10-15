@@ -163,4 +163,27 @@ textarea { resize: vertical; }
 .radio { width: 22px; height: 22px; border-radius: 11px; border: 1.5px solid #8f968a; display: grid; place-items: center; font-size: 13px; color: #fff; flex-shrink: 0; }
 .option[aria-checked="true"] .radio { background: var(--accent); border-color: var(--accent); }
 .erreur--marge { margin: 0 16px; }
+.famille { display: flex; align-items: center; gap: 8px; padding: 2px 2px 8px; }
+.famille__texte { flex: 1; min-width: 0; }
+.famille__nom { font-size: 13px; font-weight: 700; }
+.lien-bouton { border: 0; background: none; padding: 6px 0; color: var(--accent); font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.lien-bouton i { font-size: 15px; }
+.lien-bouton--centre { align-self: center; padding: 4px 0; }
+.rang { width: 18px; font-size: 12px; font-weight: 800; color: var(--sourdine); text-align: center; flex-shrink: 0; }
+.option--ref { background: #f3f7ee; }
+.option--ref .rang { color: var(--accent); }
+.badge-ref { font-size: 10px; font-weight: 700; color: var(--accent); margin-left: 4px; }
+.pastilles { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
+.pastille { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 7px; white-space: nowrap; }
+.pastille--ok { color: var(--accent); background: var(--accent-doux); }
+.pastille--ici { color: #fff; background: var(--accent); }
+.pastille--autre { color: var(--ambre); background: var(--ambre-doux); }
+.pastille--aucun, .pastille--absent { color: var(--sourdine); background: var(--off); }
+.inserer { padding-left: 38px; }
+.puces { display: flex; gap: 6px; flex-wrap: wrap; }
+.puce-choix { border: 0; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 14px; background: var(--accent-doux); color: var(--accent); }
+.puce-choix[aria-checked="true"] { background: var(--accent); color: #fff; }
+.case { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.case input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+input.texte { width: 100%; border: 1px solid #8f968a; border-radius: 10px; background: var(--surface); padding: 9px 11px; font-size: 14px; color: var(--texte); }
 .diag { margin: 0; max-height: 260px; overflow: auto; font: 11px/1.4 ui-monospace, SFMono-Regular, monospace; background: var(--fond); border-radius: 10px; padding: 10px; white-space: pre-wrap; word-break: break-word; }

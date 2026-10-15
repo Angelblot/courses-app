@@ -7,8 +7,9 @@
 
 import { SITES } from './content/sites.js';
 import { parseItems } from './lib/liste.js';
-import { connexion, deconnexion, sessionCourante, enregistrerEquivalence, supprimerEquivalence, lireProduits, equivalencesDe } from './supabase.js';
-import { produitsProches, chercherProduits } from './lib/fiche.js';
+import { connexion, deconnexion, sessionCourante, enregistrerEquivalence, supprimerEquivalence, lireProduits, equivalencesDe, creerProduit, majAlternatives, supprimerProduit } from './supabase.js';
+import { chercherProduits } from './lib/fiche.js';
+import { RAYONS, references, classement, familleProche, etatSurDrive, avecAlternative } from './lib/classement.js';
 
 const $ = (id) => document.getElementById(id);
 const send = (msg) => new Promise((resolve) => chrome.runtime.sendMessage(msg, (r) => resolve(r)));
@@ -20,7 +21,7 @@ const SECONDES_PAR_PRODUIT = 14;
 /** Un remplissage fini reste à l'écran jusqu'à « Terminer », ou une heure. */
 const FINI_VISIBLE_MS = 60 * 60 * 1000;
 
-const vue = { fiche: null, catalogue: [], equivalences: new Map(), choixFiche: null, rechercheFiche: '', ficheOk: null, pret: false, session: null, job: null, travaux: null, recherches: null, outil: null, finiVu: null, choisis: {}, erreurs: {}, arreter: false, annonce: '' };
+const vue = { fiche: null, catalogue: [], eqs: { carrefour: new Map(), leclerc: new Map() }, famille: null, choixFiche: null, modeFiche: 'classement', rechercheFiche: '', nouveau: null, ficheEnvoi: false, ficheOk: null, pret: false, session: null, job: null, travaux: null, recherches: null, outil: null, finiVu: null, choisis: {}, erreurs: {}, arreter: false, annonce: '' };
 
 // --- Petits constructeurs ---
 
@@ -101,14 +102,14 @@ function ecranCourant() {
   if (job?.status === 'paused') return 'pause';
   // Sur une fiche produit du drive : la retenir comme référence d'un de tes produits.
   if (vue.ficheOk) return 'ficheok';
-  if (vue.fiche) return 'fiche';
+  if (vue.fiche) return vue.modeFiche === 'nouveau' ? 'nouveau' : 'fiche';
   if (job?.status === 'done' && job.finishedAt && vue.finiVu !== job.finishedAt && Date.now() - job.finishedAt < FINI_VISIBLE_MS) return 'fini';
   return 'prete';
 }
 
 const ETATS = {
   prete: ['Prête', 'vert'], cours: ['Remplissage', 'accent'], pause: ['En pause', 'ambre'], fini: ['Terminé', 'vert'],
-  liste: ['Prête', 'vert'], diagnostic: ['Prête', 'vert'], fiche: ['Fiche', 'accent'], ficheok: ['Fiche', 'accent'],
+  liste: ['Prête', 'vert'], diagnostic: ['Prête', 'vert'], fiche: ['Fiche', 'accent'], ficheok: ['Fiche', 'accent'], nouveau: ['Fiche', 'accent'],
 };
 
 /** Ce qui vaut d'être annoncé au lecteur d'écran : les phases, et l'avancée tous les 5 produits. */
@@ -123,14 +124,17 @@ function rendre() {
   // Le focus survit à la reconstruction des boutons (un message « state » par produit).
   const cleFocus = document.activeElement?.dataset?.cle;
   rendreEcran();
-  if (cleFocus) document.querySelector(`[data-cle="${CSS.escape(cleFocus)}"]`)?.focus();
+  const cible = cleFocus && document.querySelector(`[data-cle="${CSS.escape(cleFocus)}"]`);
+  if (cible) { cible.focus(); if (cible.tagName === 'INPUT') cible.setSelectionRange(cible.value.length, cible.value.length); }
 }
 
 function rendreEcran() {
   const ecran = ecranCourant();
   if (!ecran) return;
   annoncer(ecran);
-  for (const e of ['connexion', 'prete', 'cours', 'pause', 'fini', 'liste', 'diagnostic', 'fiche', 'ficheok']) $(`ecran-${e}`).hidden = e !== ecran;
+  for (const e of ['connexion', 'prete', 'cours', 'pause', 'fini', 'liste', 'diagnostic', 'fiche', 'ficheok', 'nouveau']) $(`ecran-${e}`).hidden = e !== ecran;
+  $('fiche-entete').hidden = !['fiche', 'ficheok', 'nouveau'].includes(ecran);
+  if (!$('fiche-entete').hidden) rendreEnteteFiche();
   const connecte = Boolean(vue.session?.jeton);
   $('compte-email').textContent = connecte ? `${vue.session.email ?? 'Compte'} · connecté` : 'Non connecté';
   $('menu-email').textContent = vue.session?.email ?? '';
@@ -138,7 +142,7 @@ function rendreEcran() {
   let etat = ETATS[ecran];
   if (ecran === 'prete' && vue.recherches?.etat?.statut === 'en_cours') etat = ['Recherches', 'accent'];
   $('etat').hidden = !etat;
-  if (etat && (ecran === 'fiche' || ecran === 'ficheok')) etat = [`Fiche ${nom(vue.fiche.site)}`, 'accent'];
+  if (etat && ['fiche', 'ficheok', 'nouveau'].includes(ecran)) etat = [`Fiche ${nom(vue.fiche.site)}`, 'accent'];
   if (etat) { $('etat-texte').textContent = etat[0]; $('etat').className = `etat etat--${etat[1]}`; }
 
   const pied = [];
@@ -172,16 +176,28 @@ function rendreEcran() {
   }
   if (ecran === 'fiche') {
     rendreFiche();
-    const p = vue.catalogue.find((x) => x.id === vue.choixFiche), eq = p && vue.equivalences.get(p.id);
-    const deja = eq && !eq.unavailable && eq.product_url === vue.fiche.url;
-    pied.push(bouton(!p ? 'Choisis un de tes produits' : deja ? 'Déjà sa référence' : `Retenir pour « ${p.name} »`,
-      { icon: 'tick-02', cle: 'retenir', disabled: !p || deja || vue.ficheEnvoi, onclick: retenirFiche }));
+    if (vue.modeFiche === 'familles') pied.push(bouton('Retour au classement', { clair: true, cle: 'retour-familles', onclick: () => { vue.modeFiche = 'classement'; rendre(); } }));
+    else {
+      const p = vue.catalogue.find((x) => x.id === vue.choixFiche);
+      const deja = p && etatSurDrive(vue.eqs[vue.fiche.site].get(p.id), vue.fiche.url) === 'ici';
+      const n = vue.famille ? classement(vue.famille, vue.catalogue).length + 1 : 0;
+      pied.push(vue.choixFiche === 'alternative'
+        ? bouton(`Ajouter comme alternative n°${n}`, { icon: 'add-01', cle: 'retenir', disabled: vue.ficheEnvoi, onclick: () => creerDepuisFiche({ place: 'alternative' }) })
+        : bouton(!p ? 'Choisis où va cette fiche' : deja ? 'Déjà liée à cette fiche' : `Lier à « ${p.name} »`, { icon: 'link-01', cle: 'retenir', disabled: !p || deja || vue.ficheEnvoi, onclick: lierFiche }));
+      pied.push(el('button', { class: 'lien-bouton lien-bouton--centre', 'data-cle': 'nouveau', onclick: ouvrirNouveau }, icone('add-01'), 'Nouveau produit à partir de cette fiche'));
+    }
+  }
+  if (ecran === 'nouveau') {
+    rendreNouveau();
+    pied.push(el('div', { class: 'rangee' },
+      bouton('Retour', { clair: true, cle: 'retour-nouveau', onclick: () => { vue.modeFiche = 'classement'; rendre(); } }),
+      bouton('Ajouter à mes produits', { icon: 'add-01', cle: 'ajouter-produit', disabled: vue.ficheEnvoi || !vue.nouveau?.nom.trim(), onclick: () => creerDepuisFiche(vue.nouveau) })));
   }
   if (ecran === 'ficheok') {
     rendreFicheOk();
     pied.push(el('div', { class: 'rangee' },
-      bouton('Annuler', { icon: 'arrow-turn-backward', clair: true, cle: 'annuler-fiche', onclick: annulerFiche }),
-      bouton('Terminé', { cle: 'termine-fiche', onclick: () => window.close() })));
+      bouton('Annuler', { icon: 'arrow-turn-backward', clair: true, cle: 'annuler-fiche', disabled: vue.ficheEnvoi, onclick: annulerFiche }),
+      bouton('Terminé', { icon: 'tick-02', cle: 'termine-fiche', onclick: () => window.close() })));
   }
   if (ecran === 'diagnostic') pied.push(bouton('Retour', { clair: true, onclick: () => { vue.outil = null; rendre(); } }));
   $('pied').replaceChildren(...pied);
@@ -389,69 +405,192 @@ async function chargerFiche() {
   const fiche = await detecterFiche();
   if (!fiche) return;
   vue.fiche = fiche;
-  const [prod, eqs] = await Promise.all([lireProduits(), equivalencesDe(fiche.site)]);
+  const [prod, c, l] = await Promise.all([lireProduits(), equivalencesDe('carrefour'), equivalencesDe('leclerc')]);
   vue.catalogue = prod?.ok ? prod.data ?? [] : [];
-  vue.equivalences = new Map((eqs?.ok ? eqs.data ?? [] : []).map((e) => [e.product_id, e]));
-  vue.choixFiche = produitsProches(fiche.titre, vue.catalogue, 1)[0]?.id ?? null;
+  const carte = (r) => new Map((r?.ok ? r.data ?? [] : []).map((e) => [e.product_id, e]));
+  vue.eqs = { carrefour: carte(c), leclerc: carte(l) };
+  vue.famille = familleProche(fiche.titre, vue.catalogue);
+  vue.choixFiche = vue.famille?.id ?? null;
 }
 
-function rendreFiche() {
+function rendreEnteteFiche() {
   const f = vue.fiche, d = nom(f.site);
   $('fiche-image').src = f.image ?? '';
   $('fiche-image').hidden = !f.image;
   $('fiche-surtitre').textContent = `CETTE FICHE · ${d.toUpperCase()}${f.magasin ? ` ${f.magasin.toUpperCase()}` : ''}`;
   $('fiche-titre').textContent = f.titre;
   $('fiche-prix').textContent = [f.prix, f.unite].filter(Boolean).join(' · ');
-  $('fiche-question').textContent = `C’EST LA RÉFÉRENCE ${d.toUpperCase()} DE…`;
-  const autre = Object.keys(NOM).find((x) => x !== f.site);
-  $('fiche-note').textContent = `À la prochaine commande, l’extension ira droit à cette fiche pour ce produit chez ${d}.${autre ? ` ${nom(autre)} n’est pas touché.` : ''}`;
-  const liste = vue.rechercheFiche.trim() ? chercherProduits(vue.rechercheFiche, vue.catalogue) : produitsProches(f.titre, vue.catalogue, 4);
-  $('fiche-liste-titre').textContent = vue.rechercheFiche.trim()
-    ? (liste.length ? 'Tes produits' : `Aucun de tes produits ne contient « ${vue.rechercheFiche.trim()} ».`)
-    : (liste.length ? 'Proches de cette fiche' : 'Aucun de tes produits ne ressemble à cette fiche : cherche-le ci-dessus.');
-  $('fiche-produits').replaceChildren(...liste.map((p) => {
-    const eq = vue.equivalences.get(p.id), on = vue.choixFiche === p.id;
-    const detail = eq?.unavailable ? `${d} : noté absent` : eq?.product_url === f.url ? 'déjà cette fiche' : eq ? `Aujourd’hui : « ${plat(eq.matched_label ?? eq.search_query)} »` : `${d} : pas encore de référence`;
-    return el('button', { class: 'option', role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-cle': `option-${p.id}`,
-      onclick: () => { vue.choixFiche = on ? null : p.id; rendre(); } },
-      p.image_url ? el('img', { class: 'option__photo', src: p.image_url, alt: '' }) : el('span', { class: 'option__photo', 'aria-hidden': 'true' }),
-      el('span', { class: 'option__texte' }, el('span', { class: 'option__nom', text: p.name }), el('span', { class: 'option__detail', text: detail, style: 'display:block' })),
-      el('span', { class: 'radio', 'aria-hidden': 'true' }, on ? icone('tick-02') : null));
+}
+
+/** Les deux pastilles d'un produit : où il en est chez Carrefour et chez E.Leclerc. */
+function pastilles(p) {
+  const textes = { ici: 'cette fiche', autre: 'autre fiche', absent: 'absent', aucun: '—' };
+  return el('span', { class: 'pastilles' }, ['carrefour', 'leclerc'].map((d) => {
+    const etat = etatSurDrive(vue.eqs[d].get(p.id), d === vue.fiche.site ? vue.fiche.url : null);
+    const ok = etat === 'autre' && d !== vue.fiche.site;
+    return el('span', { class: `pastille pastille--${ok ? 'ok' : etat}`, text: `${nom(d)} ${ok ? '✓' : `· ${textes[etat]}`}`.replace('· —', '—') });
   }));
 }
 
-async function retenirFiche() {
+function ligneClassement(p, rang, { choix = true } = {}) {
+  const on = choix && vue.choixFiche === p.id, ref = rang === 1;
+  const contenu = [
+    el('span', { class: 'rang', text: String(rang) }),
+    p.image_url ? el('img', { class: 'option__photo', src: p.image_url, alt: '' }) : el('span', { class: 'option__photo', 'aria-hidden': 'true' }),
+    el('span', { class: 'option__texte' }, el('span', { class: 'option__nom', text: p.name }, ref ? el('span', { class: 'badge-ref', text: 'RÉFÉRENCE' }) : null), pastilles(p)),
+  ];
+  if (!choix) return el('div', { class: `option${ref ? ' option--ref' : ''}` }, ...contenu);
+  return el('button', { class: `option${ref ? ' option--ref' : ''}`, role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-cle': `option-${p.id}`,
+    onclick: () => { vue.choixFiche = on ? null : p.id; rendre(); } }, ...contenu, el('span', { class: 'radio', 'aria-hidden': 'true' }, on ? icone('tick-02') : null));
+}
+
+function rendreFiche() {
+  const f = vue.fiche, d = nom(f.site), carte = $('fiche-carte');
+  if (vue.modeFiche === 'familles') {
+    // « Changer » : choisir un autre de tes produits, par sa référence.
+    $('fiche-question').textContent = 'CHOISIR UN AUTRE PRODUIT';
+    const champ = el('input', { type: 'search', placeholder: 'Chercher dans tes produits', 'aria-label': 'Chercher dans tes produits', value: vue.rechercheFiche, autocomplete: 'off', 'data-cle': 'recherche-famille' });
+    champ.addEventListener('input', () => { vue.rechercheFiche = champ.value; rendre(); });
+    const refs = references(vue.catalogue);
+    const liste = vue.rechercheFiche.trim() ? chercherProduits(vue.rechercheFiche, refs, 8) : refs.slice(0, 0);
+    carte.replaceChildren(el('label', { class: 'recherche' }, icone('search-01'), champ),
+      el('p', { class: 'sous', text: vue.rechercheFiche.trim() ? (liste.length ? 'Tes produits' : `Aucun de tes produits ne contient « ${vue.rechercheFiche.trim()} ».`) : 'Tape quelques lettres du produit.' }),
+      el('div', { class: 'options' }, liste.map((p) => el('button', { class: 'option', 'data-cle': `famille-${p.id}`,
+        onclick: () => { vue.famille = p; vue.choixFiche = p.id; vue.modeFiche = 'classement'; vue.rechercheFiche = ''; rendre(); } },
+        p.image_url ? el('img', { class: 'option__photo', src: p.image_url, alt: '' }) : el('span', { class: 'option__photo', 'aria-hidden': 'true' }),
+        el('span', { class: 'option__texte' }, el('span', { class: 'option__nom', text: p.name }), el('span', { class: 'option__detail', style: 'display:block', text: `${classement(p, vue.catalogue).length} au classement` }))))));
+    return;
+  }
+  $('fiche-question').textContent = 'OÙ VA CETTE FICHE ?';
+  if (!vue.famille) {
+    carte.replaceChildren(el('p', { class: 'sous', text: 'Aucun de tes produits ne ressemble à cette fiche.' }),
+      el('button', { class: 'lien-bouton', 'data-cle': 'changer', onclick: () => { vue.modeFiche = 'familles'; rendre(); } }, icone('search-01'), 'Chercher dans tes produits'));
+    return;
+  }
+  const rangs = classement(vue.famille, vue.catalogue), n = rangs.length + 1, alt = vue.choixFiche === 'alternative';
+  carte.replaceChildren(
+    el('div', { class: 'famille' },
+      el('div', { class: 'famille__texte' }, el('p', { class: 'famille__nom', text: vue.famille.name }), el('p', { class: 'sous', text: 'L’ordre où le panier les essaie' })),
+      el('button', { class: 'lien-bouton', 'data-cle': 'changer', onclick: () => { vue.modeFiche = 'familles'; rendre(); } }, 'Changer')),
+    el('div', { class: 'options', role: 'radiogroup', 'aria-label': `Classement de ${vue.famille.name}` },
+      rangs.map((p, k) => ligneClassement(p, k + 1)),
+      el('button', { class: 'option inserer', role: 'radio', 'aria-checked': alt ? 'true' : 'false', 'data-cle': 'inserer',
+        onclick: () => { vue.choixFiche = alt ? null : 'alternative'; rendre(); } },
+        el('span', { class: 'option__texte' }, el('span', { class: 'option__nom', style: 'color:var(--accent)', text: `Ajouter cette fiche comme alternative n°${n}` }),
+          el('span', { class: 'option__detail', style: 'display:block', text: `Un nouveau produit, lié à cette fiche ${d}` })),
+        el('span', { class: 'radio', 'aria-hidden': 'true' }, alt ? icone('tick-02') : null))),
+    el('p', { class: 'sous', text: alt ? `Le panier l’essaiera en n°${n}, si les précédents manquent.` : `Coché : sa fiche ${d} devient celle-ci. Sa place dans le classement ne change pas.` }));
+}
+
+async function lierFiche() {
   const f = vue.fiche, p = vue.catalogue.find((x) => x.id === vue.choixFiche);
   if (!p || vue.ficheEnvoi) return;
   vue.ficheEnvoi = true; $('fiche-erreur').hidden = true; rendre();
-  const avant = vue.equivalences.get(p.id) ?? null;
+  const avant = vue.eqs[f.site].get(p.id) ?? null;
   const res = await enregistrerEquivalence({ product_id: p.id, drive: f.site, search_query: p.name, matched_label: f.titre, product_url: f.url, ean13: f.ean ?? null, unavailable: false });
   vue.ficheEnvoi = false;
-  if (!res?.ok) { $('fiche-erreur').textContent = res?.deconnecte ? 'Session expirée : reconnecte-toi, puis réessaie.' : 'Impossible d’enregistrer pour le moment. Réessaie.'; $('fiche-erreur').hidden = false; rendre(); return; }
-  vue.ficheOk = { produit: p, avant };
-  vue.equivalences.set(p.id, { product_id: p.id, drive: f.site, matched_label: f.titre, product_url: f.url });
+  if (!res?.ok) { erreurFiche('fiche-erreur', res); return; }
+  vue.eqs[f.site].set(p.id, { product_id: p.id, drive: f.site, matched_label: f.titre, product_url: f.url });
+  vue.ficheOk = { type: 'lien', produit: p, avant };
+  rendre();
+}
+
+function erreurFiche(id, res) {
+  $(id).textContent = res?.deconnecte ? 'Session expirée : reconnecte-toi, puis réessaie.' : 'Impossible d’enregistrer pour le moment. Réessaie.';
+  $(id).hidden = false;
+  rendre();
+}
+
+function ouvrirNouveau() {
+  const f = vue.fiche;
+  vue.nouveau = { nom: f.titre, rayon: vue.famille?.category ?? 'autre', place: vue.famille ? 'alternative' : 'apart', lier: true };
+  vue.modeFiche = 'nouveau';
+  rendre();
+  $('nouveau-nom').focus();
+}
+
+function rendreNouveau() {
+  const nv = vue.nouveau, d = nom(vue.fiche.site);
+  if (document.activeElement !== $('nouveau-nom')) $('nouveau-nom').value = nv.nom;
+  $('nouveau-rayons').replaceChildren(...RAYONS.map(([cle, label]) => el('button', { class: 'puce-choix', role: 'radio', 'aria-checked': nv.rayon === cle ? 'true' : 'false',
+    'data-cle': `rayon-${cle}`, onclick: () => { nv.rayon = cle; rendre(); } }, label)));
+  const places = [['apart', 'Un produit à part', 'Dans tes produits, avec ses habitudes']];
+  if (vue.famille) places.push(['alternative', `Alternative de « ${vue.famille.name} »`, `En n°${classement(vue.famille, vue.catalogue).length + 1}, à la suite du classement`]);
+  $('nouveau-places').replaceChildren(...places.map(([cle, t, sous]) => {
+    const on = nv.place === cle;
+    return el('button', { class: 'option', role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-cle': `place-${cle}`, onclick: () => { nv.place = cle; rendre(); } },
+      el('span', { class: 'option__texte' }, el('span', { class: 'option__nom', text: t }), el('span', { class: 'option__detail', style: 'display:block', text: sous })),
+      el('span', { class: 'radio', 'aria-hidden': 'true' }, on ? icone('tick-02') : null));
+  }));
+  $('nouveau-lier').checked = nv.lier;
+  $('nouveau-lier-texte').textContent = `Vendu chez ${d} : lier à cette fiche`;
+}
+
+/** Crée le produit de la fiche : à part, ou en alternative de la famille ; lié à la fiche si demandé. */
+async function creerDepuisFiche({ nom: nomProduit, rayon, place, lier = true }) {
+  const f = vue.fiche, famille = place === 'alternative' ? vue.famille : null;
+  if (vue.ficheEnvoi) return;
+  vue.ficheEnvoi = true; rendre();
+  const erreurId = vue.modeFiche === 'nouveau' ? 'nouveau-erreur' : 'fiche-erreur';
+  const cree = await creerProduit({ name: (nomProduit ?? f.titre).trim(), image_url: f.image ?? null, ean13: f.ean ?? null, category: rayon ?? famille?.category ?? 'autre' });
+  const produit = cree?.ok ? (Array.isArray(cree.data) ? cree.data[0] : cree.data) : null;
+  if (!produit?.id) { vue.ficheEnvoi = false; erreurFiche(erreurId, cree); return; }
+  if (lier) await enregistrerEquivalence({ product_id: produit.id, drive: f.site, search_query: produit.name, matched_label: f.titre, product_url: f.url, ean13: f.ean ?? null, unavailable: false });
+  let ancienneAlt = null;
+  if (famille) {
+    ancienneAlt = famille.alternatives ?? [];
+    const alternatives = avecAlternative(famille, produit.id);
+    const maj = await majAlternatives(famille.id, alternatives);
+    if (maj?.ok) famille.alternatives = alternatives;
+  }
+  vue.ficheEnvoi = false;
+  vue.catalogue = [...vue.catalogue, produit];
+  if (lier) vue.eqs[f.site].set(produit.id, { product_id: produit.id, drive: f.site, matched_label: f.titre, product_url: f.url });
+  vue.ficheOk = { type: 'cree', produit, famille, ancienneAlt };
+  vue.modeFiche = 'classement';
   rendre();
 }
 
 function rendreFicheOk() {
-  const { produit, avant } = vue.ficheOk, d = nom(vue.fiche.site);
-  $('ficheok-titre').textContent = `Référence ${d} ${avant ? 'changée' : 'retenue'}`;
-  $('ficheok-texte').textContent = `« ${produit.name} » prendra désormais cette fiche chez ${d}${avant && !avant.unavailable && avant.matched_label ? `, au lieu de « ${plat(avant.matched_label)} »` : ''}.`;
+  const ok = vue.ficheOk, d = nom(vue.fiche.site);
+  if (ok.type === 'lien') {
+    $('ficheok-titre').textContent = `Référence ${d} ${ok.avant ? 'changée' : 'retenue'}`;
+    $('ficheok-texte').textContent = `« ${ok.produit.name} » prendra désormais cette fiche chez ${d}${ok.avant && !ok.avant.unavailable && ok.avant.matched_label ? `, au lieu de « ${plat(ok.avant.matched_label)} »` : ''}.`;
+  } else {
+    $('ficheok-titre').textContent = 'Ajouté à tes produits';
+    const rang = ok.famille ? classement(ok.famille, vue.catalogue).findIndex((p) => p.id === ok.produit.id) + 1 : 0;
+    $('ficheok-texte').textContent = ok.famille
+      ? `« ${ok.produit.name} » est l’alternative n°${rang} de « ${ok.famille.name} », liée à cette fiche ${d}.`
+      : `« ${ok.produit.name} » est un nouveau produit, lié à cette fiche ${d}. Tu le retrouves dans tes produits et tes habitudes.`;
+  }
+  const famille = ok.famille ?? (ok.type === 'lien' ? vue.famille : null) ?? ok.produit;
+  $('ficheok-classement').replaceChildren(...classement(famille, vue.catalogue).map((p, k) => ligneClassement(p, k + 1, { choix: false })));
 }
 
 async function annulerFiche() {
-  const { produit, avant } = vue.ficheOk, site = vue.fiche.site;
-  $('ficheok-erreur').hidden = true;
-  const res = avant
-    ? await enregistrerEquivalence({ product_id: produit.id, drive: site, search_query: avant.search_query ?? produit.name, matched_label: avant.matched_label ?? null, product_url: avant.product_url ?? null, ean13: avant.ean13 ?? null, unavailable: !!avant.unavailable })
-    : await supprimerEquivalence(produit.id, site);
-  if (!res?.ok) { $('ficheok-erreur').textContent = 'Impossible d’annuler pour le moment. Réessaie.'; $('ficheok-erreur').hidden = false; return; }
-  if (avant) vue.equivalences.set(produit.id, avant); else vue.equivalences.delete(produit.id);
+  const ok = vue.ficheOk, site = vue.fiche.site;
+  vue.ficheEnvoi = true; $('ficheok-erreur').hidden = true; rendre();
+  let res;
+  if (ok.type === 'lien') {
+    const avant = ok.avant;
+    res = avant
+      ? await enregistrerEquivalence({ product_id: ok.produit.id, drive: site, search_query: avant.search_query ?? ok.produit.name, matched_label: avant.matched_label ?? null, product_url: avant.product_url ?? null, ean13: avant.ean13 ?? null, unavailable: !!avant.unavailable })
+      : await supprimerEquivalence(ok.produit.id, site);
+    if (res?.ok) { if (avant) vue.eqs[site].set(ok.produit.id, avant); else vue.eqs[site].delete(ok.produit.id); }
+  } else {
+    // Le produit créé part, et la famille retrouve son classement d'avant.
+    if (ok.famille) { await majAlternatives(ok.famille.id, ok.ancienneAlt); ok.famille.alternatives = ok.ancienneAlt; }
+    res = await supprimerProduit(ok.produit.id);
+    if (res?.ok) { vue.catalogue = vue.catalogue.filter((p) => p.id !== ok.produit.id); vue.eqs[site].delete(ok.produit.id); }
+  }
+  vue.ficheEnvoi = false;
+  if (!res?.ok) { $('ficheok-erreur').textContent = 'Impossible d’annuler pour le moment. Réessaie.'; $('ficheok-erreur').hidden = false; rendre(); return; }
   vue.ficheOk = null;
   rendre();
 }
 
-$('fiche-recherche').addEventListener('input', (e) => { vue.rechercheFiche = e.target.value; rendre(); });
+$('nouveau-nom').addEventListener('input', (e) => { if (vue.nouveau) { vue.nouveau.nom = e.target.value; rendre(); } });
+$('nouveau-lier').addEventListener('change', (e) => { if (vue.nouveau) vue.nouveau.lier = e.target.checked; });
 
 // --- Outils du menu ---
 

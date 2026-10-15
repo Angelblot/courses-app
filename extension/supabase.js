@@ -219,5 +219,28 @@ export async function supprimerEquivalence(productId, drive) {
 
 /** Le catalogue du foyer, de quoi proposer les produits proches d'une fiche. */
 export async function lireProduits() {
-  return appel('products?select=id,name,brand,image_url,product_type,ean13&order=name.asc&limit=2000');
+  return appel('products?select=id,name,brand,image_url,product_type,ean13,alternatives,category,grammage_g,volume_ml&order=name.asc&limit=2000');
+}
+
+/** Crée un produit dans « Mes produits » à partir d'une fiche du drive ; rend la ligne créée. */
+export async function creerProduit(champs) {
+  return appel('products?select=id,name,brand,image_url,product_type,ean13,alternatives,category', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ unit: 'unité', favorite: false, ...champs }),
+  });
+}
+
+/** Réécrit les alternatives d'une référence (l'ordre où le panier les essaie). */
+export async function majAlternatives(id, alternatives) {
+  return appel(`products?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ alternatives }),
+  });
+}
+
+/** Supprime un produit créé depuis une fiche (annuler) ; ses liens aux drives partent avec lui. */
+export async function supprimerProduit(id) {
+  return appel(`products?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
 }
