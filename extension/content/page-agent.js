@@ -557,9 +557,43 @@ export function pageAgent(cfg, item, mode) {
    *
    * @param {{card: Element, label: string, href: string, ean: ?string, score: number}} choice
    */
+  /**
+   * Un produit déjà au panier n'a plus de bouton « Ajouter » : sa carte montre
+   * un sélecteur « − 6 + » (relevé le 15/10 chez E.Leclerc). On le compte comme
+   * ajouté, et l'on complète seulement la quantité qui manque.
+   */
+  async function dejaAuPanier(choice) {
+    const plus = queryFirstClickable(choice.card, cfg.quantityPlus ?? []);
+    const compteur = queryFirst(choice.card, cfg.quantityCount ?? []);
+    if (!plus || !isVisible(plus) || !compteur) return null;
+    const actuel = parseInt(String(compteur.value ?? textOf(compteur)).replace(/\D+/g, ''), 10);
+    if (!(actuel >= 1)) return null;
+    const wanted = Math.max(1, Math.round(Number(item.quantity) || 1));
+    let ajoutes = 0;
+    if (actuel < wanted) {
+      plus.scrollIntoView({ block: 'center' });
+      await sleep(800);
+      for (let i = actuel; i < wanted && isVisible(plus); i++) { plus.click(); ajoutes += 1; await sleep(700); }
+    }
+    return {
+      ok: true,
+      reason: ajoutes ? 'added' : 'already_in_cart',
+      label: choice.label,
+      ean: choice.ean ?? null,
+      url: choice.href ? new URL(choice.href, location.origin).href : null,
+      score: Number((choice.score ?? 1).toFixed(2)),
+      quantityAdded: ajoutes,
+      quantityWanted: wanted,
+      quantityInCart: actuel + ajoutes,
+      price: textOf(queryFirst(choice.card, cfg.price)).slice(0, 30) || null,
+    };
+  }
+
   async function addToCart(choice) {
     const addBtn = queryFirstClickable(choice.card, cfg.addButton);
     if (!addBtn) {
+      const deja = await dejaAuPanier(choice);
+      if (deja) return deja;
       return {
         ok: false,
         reason: 'no_add_button',

@@ -151,6 +151,8 @@ export const SITES = {
     ],
     // Incrément de quantité propre au site (href="#plus").
     quantityPlus: ['a.aWCRS310_More', 'a[href="#plus"]'],
+    // La quantité déjà au panier, entre « − » et « + » (relevé le 15/10/2026).
+    quantityCount: ['span.spanWCRS310_count', '#spanWCRS310Quantite'],
     // Les liens produit de la liste de résultats n'ont pas de href : la
     // navigation est pilotée en JavaScript. Aucun EAN n'est donc lisible dans
     // l'adresse, contrairement à Carrefour — l'accès direct par code-barres
