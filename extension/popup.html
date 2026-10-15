@@ -131,6 +131,40 @@
         </div>
       </section>
 
+      <!-- Sur une fiche produit du drive : la retenir comme référence d'un de tes produits -->
+      <section id="ecran-fiche" class="ecran" hidden>
+        <div class="carte">
+          <div class="actuel">
+            <img id="fiche-image" class="vignette vignette--photo" alt="" />
+            <div class="actuel__texte">
+              <p id="fiche-surtitre" class="surtitre"></p>
+              <p id="fiche-titre" class="actuel__nom"></p>
+              <p id="fiche-prix" class="sous"></p>
+            </div>
+          </div>
+        </div>
+        <p class="section" id="fiche-question"></p>
+        <div class="carte carte--choix">
+          <label class="recherche"><i class="hgi-stroke hgi-search-01"></i>
+            <input id="fiche-recherche" type="search" placeholder="Chercher dans tes produits" aria-label="Chercher dans tes produits" autocomplete="off" />
+          </label>
+          <p id="fiche-liste-titre" class="sous"></p>
+          <div id="fiche-produits" class="options" role="radiogroup" aria-labelledby="fiche-question"></div>
+        </div>
+        <p class="note"><i class="hgi-stroke hgi-information-circle"></i><span id="fiche-note"></span></p>
+        <p id="fiche-erreur" class="erreur erreur--marge" role="alert" hidden></p>
+      </section>
+
+      <section id="ecran-ficheok" class="ecran" hidden>
+        <div class="carte">
+          <div class="titre-icone"><i class="hgi-stroke hgi-checkmark-circle-02 grand"></i><div>
+            <h2 id="ficheok-titre"></h2>
+            <p id="ficheok-texte" class="sous"></p>
+          </div></div>
+        </div>
+        <p id="ficheok-erreur" class="erreur erreur--marge" role="alert" hidden></p>
+      </section>
+
       <!-- Remplir à partir d'une liste (menu) -->
       <section id="ecran-liste" class="ecran" hidden>
         <div class="carte">

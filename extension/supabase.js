@@ -148,7 +148,9 @@ export async function equivalencesDe(drive) {
  * remplace la précédente au lieu d'échouer.
  */
 export async function enregistrerEquivalence(entree) {
-  return appel('product_equivalents', {
+  // La clé d'unicité est (utilisateur, produit, drive) : sans `on_conflict`,
+  // changer la référence d'un produit qui en avait déjà une échouait en silence.
+  return appel('product_equivalents?on_conflict=user_id,product_id,drive', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates' },
     body: JSON.stringify({ ...entree, last_confirmed_at: new Date().toISOString() }),
@@ -205,4 +207,17 @@ export async function enregistrerFiche(offreId, texte) {
     headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ fiche_texte: texte, fiche_lue_le: new Date().toISOString() }),
   });
+}
+
+/** Retire le lien d'un produit à un drive (annuler un choix fait depuis une fiche). */
+export async function supprimerEquivalence(productId, drive) {
+  return appel(`product_equivalents?product_id=eq.${encodeURIComponent(productId)}&drive=eq.${encodeURIComponent(drive)}`, {
+    method: 'DELETE',
+    headers: { Prefer: 'return=minimal' },
+  });
+}
+
+/** Le catalogue du foyer, de quoi proposer les produits proches d'une fiche. */
+export async function lireProduits() {
+  return appel('products?select=id,name,brand,image_url,product_type,ean13&order=name.asc&limit=2000');
 }

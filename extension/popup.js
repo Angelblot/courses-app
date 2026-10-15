@@ -7,7 +7,8 @@
 
 import { SITES } from './content/sites.js';
 import { parseItems } from './lib/liste.js';
-import { connexion, deconnexion, sessionCourante } from './supabase.js';
+import { connexion, deconnexion, sessionCourante, enregistrerEquivalence, supprimerEquivalence, lireProduits, equivalencesDe } from './supabase.js';
+import { produitsProches, chercherProduits } from './lib/fiche.js';
 
 const $ = (id) => document.getElementById(id);
 const send = (msg) => new Promise((resolve) => chrome.runtime.sendMessage(msg, (r) => resolve(r)));
@@ -19,7 +20,7 @@ const SECONDES_PAR_PRODUIT = 14;
 /** Un remplissage fini reste à l'écran jusqu'à « Terminer », ou une heure. */
 const FINI_VISIBLE_MS = 60 * 60 * 1000;
 
-const vue = { pret: false, session: null, job: null, travaux: null, recherches: null, outil: null, finiVu: null, choisis: {}, erreurs: {}, arreter: false, annonce: '' };
+const vue = { fiche: null, catalogue: [], equivalences: new Map(), choixFiche: null, rechercheFiche: '', ficheOk: null, pret: false, session: null, job: null, travaux: null, recherches: null, outil: null, finiVu: null, choisis: {}, erreurs: {}, arreter: false, annonce: '' };
 
 // --- Petits constructeurs ---
 
@@ -98,13 +99,16 @@ function ecranCourant() {
   // Un « running » sans moteur qui tourne (worker arrêté par Chrome) : interrompu, à reprendre.
   if (job?.status === 'running') return job.actif === false ? 'pause' : 'cours';
   if (job?.status === 'paused') return 'pause';
+  // Sur une fiche produit du drive : la retenir comme référence d'un de tes produits.
+  if (vue.ficheOk) return 'ficheok';
+  if (vue.fiche) return 'fiche';
   if (job?.status === 'done' && job.finishedAt && vue.finiVu !== job.finishedAt && Date.now() - job.finishedAt < FINI_VISIBLE_MS) return 'fini';
   return 'prete';
 }
 
 const ETATS = {
   prete: ['Prête', 'vert'], cours: ['Remplissage', 'accent'], pause: ['En pause', 'ambre'], fini: ['Terminé', 'vert'],
-  liste: ['Prête', 'vert'], diagnostic: ['Prête', 'vert'],
+  liste: ['Prête', 'vert'], diagnostic: ['Prête', 'vert'], fiche: ['Fiche', 'accent'], ficheok: ['Fiche', 'accent'],
 };
 
 /** Ce qui vaut d'être annoncé au lecteur d'écran : les phases, et l'avancée tous les 5 produits. */
@@ -126,7 +130,7 @@ function rendreEcran() {
   const ecran = ecranCourant();
   if (!ecran) return;
   annoncer(ecran);
-  for (const e of ['connexion', 'prete', 'cours', 'pause', 'fini', 'liste', 'diagnostic']) $(`ecran-${e}`).hidden = e !== ecran;
+  for (const e of ['connexion', 'prete', 'cours', 'pause', 'fini', 'liste', 'diagnostic', 'fiche', 'ficheok']) $(`ecran-${e}`).hidden = e !== ecran;
   const connecte = Boolean(vue.session?.jeton);
   $('compte-email').textContent = connecte ? `${vue.session.email ?? 'Compte'} · connecté` : 'Non connecté';
   $('menu-email').textContent = vue.session?.email ?? '';
@@ -134,6 +138,7 @@ function rendreEcran() {
   let etat = ETATS[ecran];
   if (ecran === 'prete' && vue.recherches?.etat?.statut === 'en_cours') etat = ['Recherches', 'accent'];
   $('etat').hidden = !etat;
+  if (etat && (ecran === 'fiche' || ecran === 'ficheok')) etat = [`Fiche ${nom(vue.fiche.site)}`, 'accent'];
   if (etat) { $('etat-texte').textContent = etat[0]; $('etat').className = `etat etat--${etat[1]}`; }
 
   const pied = [];
@@ -164,6 +169,19 @@ function rendreEcran() {
     pied.push(el('div', { class: 'rangee' },
       bouton('Annuler', { clair: true, onclick: () => { vue.outil = null; rendre(); } }),
       bouton('Remplir le panier', { icon: 'shopping-cart-01', onclick: lancerListe })));
+  }
+  if (ecran === 'fiche') {
+    rendreFiche();
+    const p = vue.catalogue.find((x) => x.id === vue.choixFiche), eq = p && vue.equivalences.get(p.id);
+    const deja = eq && !eq.unavailable && eq.product_url === vue.fiche.url;
+    pied.push(bouton(!p ? 'Choisis un de tes produits' : deja ? 'Déjà sa référence' : `Retenir pour « ${p.name} »`,
+      { icon: 'tick-02', cle: 'retenir', disabled: !p || deja || vue.ficheEnvoi, onclick: retenirFiche }));
+  }
+  if (ecran === 'ficheok') {
+    rendreFicheOk();
+    pied.push(el('div', { class: 'rangee' },
+      bouton('Annuler', { icon: 'arrow-turn-backward', clair: true, cle: 'annuler-fiche', onclick: annulerFiche }),
+      bouton('Terminé', { cle: 'termine-fiche', onclick: () => window.close() })));
   }
   if (ecran === 'diagnostic') pied.push(bouton('Retour', { clair: true, onclick: () => { vue.outil = null; rendre(); } }));
   $('pied').replaceChildren(...pied);
@@ -338,6 +356,103 @@ async function ouvrirOnglet() {
   }
 }
 
+// --- Sur une fiche produit ---
+
+/** Lit, dans l'onglet actif, la fiche produit du drive : nom, prix, photo. Null hors d'une fiche. */
+async function detecterFiche() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const u = new URL(tab?.url ?? '');
+    const site = Object.entries(SITES).find(([, cfg]) => cfg.hostPattern?.test(u.hostname))?.[0];
+    const cfg = site && SITES[site], motif = cfg && (cfg.productPagePattern ?? cfg.productUrlPattern);
+    if (!motif || !new RegExp(motif).test(u.pathname)) return null;
+    const [{ result } = {}] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      args: [cfg.productPage ?? {}],
+      func: (sel) => {
+        const premier = (liste) => { for (const s of liste ?? []) { try { const e = document.querySelector(s); if (e?.textContent.trim()) return e; } catch { /* sélecteur propre à l'agent */ } } return null; };
+        const plat = (t) => String(t ?? '').replace(/\s+/g, ' ').trim();
+        const prixTexte = plat(premier(sel.price)?.textContent);
+        const m = prixTexte.match(/(\d+)\s*[€,.]\s*[,.]?\s*(\d{2})/);
+        const unite = plat(document.body.innerText).match(/\d+[,.]\d{2}\s*€\s*\/\s*[a-zA-Z]+/)?.[0] ?? null;
+        const image = document.querySelector('meta[property="og:image"]')?.content ?? null;
+        return { titre: plat((premier(sel.title) ?? document.querySelector('h1'))?.textContent), prix: m ? `${m[1]},${m[2]} €` : null, unite, image };
+      },
+    });
+    if (!result?.titre) return null;
+    const ean = cfg.productUrlPattern ? u.pathname.match(new RegExp(cfg.productUrlPattern))?.[1] ?? null : null;
+    return { ...result, site, url: u.origin + u.pathname, ean, magasin: u.pathname.match(/magasin-\d+-\d+-([^/]+)/)?.[1]?.replace(/-/g, ' ') ?? null };
+  } catch { return null; }
+}
+
+async function chargerFiche() {
+  const fiche = await detecterFiche();
+  if (!fiche) return;
+  vue.fiche = fiche;
+  const [prod, eqs] = await Promise.all([lireProduits(), equivalencesDe(fiche.site)]);
+  vue.catalogue = prod?.ok ? prod.data ?? [] : [];
+  vue.equivalences = new Map((eqs?.ok ? eqs.data ?? [] : []).map((e) => [e.product_id, e]));
+  vue.choixFiche = produitsProches(fiche.titre, vue.catalogue, 1)[0]?.id ?? null;
+}
+
+function rendreFiche() {
+  const f = vue.fiche, d = nom(f.site);
+  $('fiche-image').src = f.image ?? '';
+  $('fiche-image').hidden = !f.image;
+  $('fiche-surtitre').textContent = `CETTE FICHE · ${d.toUpperCase()}${f.magasin ? ` ${f.magasin.toUpperCase()}` : ''}`;
+  $('fiche-titre').textContent = f.titre;
+  $('fiche-prix').textContent = [f.prix, f.unite].filter(Boolean).join(' · ');
+  $('fiche-question').textContent = `C’EST LA RÉFÉRENCE ${d.toUpperCase()} DE…`;
+  const autre = Object.keys(NOM).find((x) => x !== f.site);
+  $('fiche-note').textContent = `À la prochaine commande, l’extension ira droit à cette fiche pour ce produit chez ${d}.${autre ? ` ${nom(autre)} n’est pas touché.` : ''}`;
+  const liste = vue.rechercheFiche.trim() ? chercherProduits(vue.rechercheFiche, vue.catalogue) : produitsProches(f.titre, vue.catalogue, 4);
+  $('fiche-liste-titre').textContent = vue.rechercheFiche.trim()
+    ? (liste.length ? 'Tes produits' : `Aucun de tes produits ne contient « ${vue.rechercheFiche.trim()} ».`)
+    : (liste.length ? 'Proches de cette fiche' : 'Aucun de tes produits ne ressemble à cette fiche : cherche-le ci-dessus.');
+  $('fiche-produits').replaceChildren(...liste.map((p) => {
+    const eq = vue.equivalences.get(p.id), on = vue.choixFiche === p.id;
+    const detail = eq?.unavailable ? `${d} : noté absent` : eq?.product_url === f.url ? 'déjà cette fiche' : eq ? `Aujourd’hui : « ${plat(eq.matched_label ?? eq.search_query)} »` : `${d} : pas encore de référence`;
+    return el('button', { class: 'option', role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-cle': `option-${p.id}`,
+      onclick: () => { vue.choixFiche = on ? null : p.id; rendre(); } },
+      p.image_url ? el('img', { class: 'option__photo', src: p.image_url, alt: '' }) : el('span', { class: 'option__photo', 'aria-hidden': 'true' }),
+      el('span', { class: 'option__texte' }, el('span', { class: 'option__nom', text: p.name }), el('span', { class: 'option__detail', text: detail, style: 'display:block' })),
+      el('span', { class: 'radio', 'aria-hidden': 'true' }, on ? icone('tick-02') : null));
+  }));
+}
+
+async function retenirFiche() {
+  const f = vue.fiche, p = vue.catalogue.find((x) => x.id === vue.choixFiche);
+  if (!p || vue.ficheEnvoi) return;
+  vue.ficheEnvoi = true; $('fiche-erreur').hidden = true; rendre();
+  const avant = vue.equivalences.get(p.id) ?? null;
+  const res = await enregistrerEquivalence({ product_id: p.id, drive: f.site, search_query: p.name, matched_label: f.titre, product_url: f.url, ean13: f.ean ?? null, unavailable: false });
+  vue.ficheEnvoi = false;
+  if (!res?.ok) { $('fiche-erreur').textContent = res?.deconnecte ? 'Session expirée : reconnecte-toi, puis réessaie.' : 'Impossible d’enregistrer pour le moment. Réessaie.'; $('fiche-erreur').hidden = false; rendre(); return; }
+  vue.ficheOk = { produit: p, avant };
+  vue.equivalences.set(p.id, { product_id: p.id, drive: f.site, matched_label: f.titre, product_url: f.url });
+  rendre();
+}
+
+function rendreFicheOk() {
+  const { produit, avant } = vue.ficheOk, d = nom(vue.fiche.site);
+  $('ficheok-titre').textContent = `Référence ${d} ${avant ? 'changée' : 'retenue'}`;
+  $('ficheok-texte').textContent = `« ${produit.name} » prendra désormais cette fiche chez ${d}${avant && !avant.unavailable && avant.matched_label ? `, au lieu de « ${plat(avant.matched_label)} »` : ''}.`;
+}
+
+async function annulerFiche() {
+  const { produit, avant } = vue.ficheOk, site = vue.fiche.site;
+  $('ficheok-erreur').hidden = true;
+  const res = avant
+    ? await enregistrerEquivalence({ product_id: produit.id, drive: site, search_query: avant.search_query ?? produit.name, matched_label: avant.matched_label ?? null, product_url: avant.product_url ?? null, ean13: avant.ean13 ?? null, unavailable: !!avant.unavailable })
+    : await supprimerEquivalence(produit.id, site);
+  if (!res?.ok) { $('ficheok-erreur').textContent = 'Impossible d’annuler pour le moment. Réessaie.'; $('ficheok-erreur').hidden = false; return; }
+  if (avant) vue.equivalences.set(produit.id, avant); else vue.equivalences.delete(produit.id);
+  vue.ficheOk = null;
+  rendre();
+}
+
+$('fiche-recherche').addEventListener('input', (e) => { vue.rechercheFiche = e.target.value; rendre(); });
+
 // --- Outils du menu ---
 
 async function lancerListe() {
@@ -450,6 +565,7 @@ chrome.runtime.onMessage.addListener((msg) => {
   ({ popup_fini_vu: vue.finiVu = null } = await chrome.storage.local.get('popup_fini_vu'));
   const [etat] = await Promise.all([send({ type: 'getState' }), sessionCourante().then((s) => { vue.session = s; })]);
   recevoirJob(etat?.data ?? null);
+  if (vue.session?.jeton) await chargerFiche();
   // Rien ne s'affiche avant de savoir qui est connecté : pas d'écran de connexion qui clignote.
   vue.pret = true;
   await relireCompte();

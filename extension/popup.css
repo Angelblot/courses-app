@@ -132,6 +132,7 @@ h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 
 /* --- Boutons et champs --- */
 .bouton { min-height: 44px; width: 100%; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; }
 .bouton i { font-size: 16px; }
+.bouton span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bouton:hover { filter: brightness(1.06); }
 .bouton:disabled { background: var(--off); color: #636a5e; cursor: default; filter: none; }
 .bouton--clair { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
@@ -146,4 +147,20 @@ textarea { resize: vertical; }
 .erreur { font-size: 12px; color: var(--rouge); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .bouton--danger { color: var(--rouge); border-color: var(--rouge); }
+.vignette--photo { object-fit: contain; background: #fff; border: 1px solid var(--trait-leger); }
+.carte--choix { padding: 12px; gap: 6px; }
+.recherche { display: flex; align-items: center; gap: 8px; border: 1px solid #8f968a; border-radius: 10px; padding: 0 10px; color: var(--sourdine); font-size: 15px; }
+.recherche input { flex: 1; border: 0; outline: 0; padding: 9px 0; font-size: 13px; background: transparent; color: var(--texte); }
+.recherche:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.options { display: flex; flex-direction: column; gap: 4px; }
+.option { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 12px; border: 1.5px solid transparent; background: var(--surface); text-align: left; width: 100%; }
+.option:hover { background: var(--fond); }
+.option[aria-checked="true"] { border-color: var(--accent); background: #fafcf7; }
+.option__photo { width: 34px; height: 34px; border-radius: 9px; background: #f0f2ec; object-fit: contain; flex-shrink: 0; }
+.option__texte { flex: 1; min-width: 0; }
+.option__nom { font-size: 13px; font-weight: 600; }
+.option__detail { font-size: 11px; color: var(--sourdine); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio { width: 22px; height: 22px; border-radius: 11px; border: 1.5px solid #8f968a; display: grid; place-items: center; font-size: 13px; color: #fff; flex-shrink: 0; }
+.option[aria-checked="true"] .radio { background: var(--accent); border-color: var(--accent); }
+.erreur--marge { margin: 0 16px; }
 .diag { margin: 0; max-height: 260px; overflow: auto; font: 11px/1.4 ui-monospace, SFMono-Regular, monospace; background: var(--fond); border-radius: 10px; padding: 10px; white-space: pre-wrap; word-break: break-word; }
