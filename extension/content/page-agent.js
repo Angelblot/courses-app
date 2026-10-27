@@ -352,7 +352,19 @@ export function pageAgent(cfg, item, mode) {
       };
     }
 
-    const btn = queryFirstClickable(document, pp.addButton || []);
+    // La zone d'achat du produit principal : la plus proche du titre (les
+    // suggestions en bas de fiche ont aussi la leur).
+    let haut = queryFirst(document, pp.title || ['h1']);
+    for (let i = 0; i < 8 && haut && !haut.querySelector?.(pp.buyZone ?? '.add-to-cart'); i++) haut = haut.parentElement;
+    const zonePrincipale = haut?.querySelector?.(pp.buyZone ?? '.add-to-cart') ?? null;
+    if (zonePrincipale && quantiteLue(zonePrincipale) != null) {
+      const wantedDeja = Math.max(1, Math.round(Number(item.quantity) || 1)), actuel = quantiteLue(zonePrincipale);
+      const atteinte = actuel < wantedDeja ? await completerQuantite(zonePrincipale, wantedDeja, actuel) : actuel;
+      return { ok: true, reason: atteinte > actuel ? 'added' : 'already_in_cart', label, ean, url: location.href, via: 'product_page',
+        quantityAdded: atteinte - actuel, quantityWanted: wantedDeja, quantityInCart: atteinte };
+    }
+
+    const btn = queryFirstClickable(zonePrincipale ?? document, pp.addButton || []) ?? queryFirstClickable(document, pp.addButton || []);
     if (!btn) {
       // Sans titre ni bouton, la fiche n'existe pas ou le produit n'est pas
       // proposé par ce drive : l'orchestrateur retentera par la recherche.
@@ -570,7 +582,9 @@ export function pageAgent(cfg, item, mode) {
   /** La quantité affichée dans un sélecteur « − n + », ou null si on ne la lit pas. */
   function quantiteLue(zone) {
     const el = queryFirst(zone, cfg.quantityCount ?? []);
-    const n = el ? parseInt(String(el.value ?? textOf(el)).replace(/\D+/g, ''), 10) : NaN;
+    // Le premier nombre seulement : chez Carrefour, la quantité est suivie du nom
+    // du produit (« 1Bière … 5,4 % »), et tous les chiffres donneraient 154.
+    const n = el ? parseInt(String(el.value ?? textOf(el)).match(/\d+/)?.[0] ?? '', 10) : NaN;
     return Number.isFinite(n) && n >= 1 ? n : null;
   }
 
@@ -606,16 +620,14 @@ export function pageAgent(cfg, item, mode) {
    */
   async function dejaAuPanier(choice) {
     const plus = queryFirstClickable(choice.card, cfg.quantityPlus ?? []);
-    const compteur = queryFirst(choice.card, cfg.quantityCount ?? []);
-    if (!plus || !isVisible(plus) || !compteur) return null;
-    const actuel = parseInt(String(compteur.value ?? textOf(compteur)).replace(/\D+/g, ''), 10);
-    if (!(actuel >= 1)) return null;
+    const actuel = quantiteLue(choice.card);
+    if (!plus || !isVisible(plus) || actuel == null) return null;
     const wanted = Math.max(1, Math.round(Number(item.quantity) || 1));
     let ajoutes = 0;
     if (actuel < wanted) {
       plus.scrollIntoView({ block: 'center' });
       await sleep(800);
-      for (let i = actuel; i < wanted && isVisible(plus); i++) { plus.click(); ajoutes += 1; await sleep(700); }
+      ajoutes = (await completerQuantite(choice.card, wanted, actuel)) - actuel;
     }
     return {
       ok: true,
@@ -632,6 +644,12 @@ export function pageAgent(cfg, item, mode) {
   }
 
   async function addToCart(choice) {
+    // Déjà au panier d'abord : le « Ajouter 1 … » de son sélecteur passerait
+    // sinon pour le bouton d'ajout, et un exemplaire de trop entrerait.
+    if (quantiteLue(choice.card) != null) {
+      const deja = await dejaAuPanier(choice);
+      if (deja) return deja;
+    }
     const addBtn = queryFirstClickable(choice.card, cfg.addButton);
     if (!addBtn) {
       const deja = await dejaAuPanier(choice);
