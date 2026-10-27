@@ -75,6 +75,16 @@ export const SITES = {
       "button:has-text('Ajouter')",
       '.add-to-cart',
     ],
+    // Après « Acheter », le bouton devient un sélecteur « − n + » dans la même
+    // zone (.quantity-button). Le « + » porte l'icône c-icon-plus, comme
+    // « Acheter » : on écarte ce dernier par son libellé.
+    quantityPlus: [
+      'button[aria-label*="ugmenter"]',
+      'button[aria-label*="jouter une"]',
+      '.quantity-button button:has(.c-icon-plus):not([label="Acheter"])',
+      '[data-testid="quantity-plus"]',
+    ],
+    quantityCount: ['.quantity-button input', 'input[type="number"]', '.quantity-button [class*="value"]', '.quantity-button [class*="count"]'],
     // Fiche produit : l'accès direct évite toute recherche, donc toute
     // ambiguïté. La recherche par code-barres, elle, ne donne rien — Carrefour
     // n'indexe pas les EAN (vérifié le 18/08/2026, 0 résultat).

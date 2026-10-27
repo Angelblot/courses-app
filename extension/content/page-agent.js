@@ -375,6 +375,9 @@ export function pageAgent(cfg, item, mode) {
     btn.scrollIntoView({ block: 'center' });
     // Le temps de voir le bouton avant de cliquer : pas de clic « surhumain ».
     await sleep(800);
+    // La zone d'achat du produit principal, repérée avant le clic : après, le
+    // bouton est remplacé, et les suggestions ont aussi leurs « .add-to-cart ».
+    const zoneAchat = btn.closest(pp.buyZone ?? '.add-to-cart') ?? btn.parentElement;
     const before = fingerprint(document.body);
     const cartBefore = cartCount();
     btn.click();
@@ -391,6 +394,11 @@ export function pageAgent(cfg, item, mode) {
       return { ok: false, reason: 'click_no_effect', message: `Clic sans effet sur « ${label} »`, label };
     }
 
+    // Quantité > 1 : sur la fiche aussi (elle n'ajoutait qu'un exemplaire). La
+    // zone est celle du bouton d'achat principal, pas celle des suggestions.
+    const wanted = Math.max(1, Math.round(Number(item.quantity) || 1));
+    const atteinte = wanted > 1 && zoneAchat?.isConnected ? await completerQuantite(zoneAchat, wanted) : 1;
+
     // Le prix de la fiche au moment de l'ajout : c'est lui qui nourrit
     // l'historique des prix payés, commande après commande.
     const prix = textOf(queryFirst(document, pp.price || [])).slice(0, 40);
@@ -402,6 +410,8 @@ export function pageAgent(cfg, item, mode) {
       ean,
       url: location.href,
       via: 'product_page',
+      quantityAdded: atteinte,
+      quantityWanted: wanted,
       price: prix.slice(0, 30) || null,
       releve: [{ label: label.slice(0, 200), href: location.href, ean, prix, texte: prix, image, nutri: '' }],
     };
@@ -557,6 +567,38 @@ export function pageAgent(cfg, item, mode) {
    *
    * @param {{card: Element, label: string, href: string, ean: ?string, score: number}} choice
    */
+  /** La quantité affichée dans un sélecteur « − n + », ou null si on ne la lit pas. */
+  function quantiteLue(zone) {
+    const el = queryFirst(zone, cfg.quantityCount ?? []);
+    const n = el ? parseInt(String(el.value ?? textOf(el)).replace(/\D+/g, ''), 10) : NaN;
+    return Number.isFinite(n) && n >= 1 ? n : null;
+  }
+
+  /**
+   * Monte la quantité jusqu'à celle demandée, après un premier ajout (le 27/10,
+   * chez Carrefour, une ligne demandée × 4 n'entrait qu'une fois). Chaque clic
+   * sur « + » doit se voir : la quantité lue monte, ou la zone change ; sinon
+   * on s'arrête plutôt que de cliquer à l'aveugle. Rend la quantité atteinte.
+   */
+  async function completerQuantite(zone, wanted, depart = 1) {
+    let n = quantiteLue(zone) ?? depart;
+    for (let essai = 0; n < wanted && essai < wanted + 2; essai++) {
+      const plus = queryFirstClickable(zone, cfg.quantityPlus ?? []);
+      if (!plus || !isVisible(plus)) break;
+      const avant = fingerprint(zone), lu = quantiteLue(zone);
+      plus.click();
+      let bouge = false;
+      for (let attente = 0; attente < 3000; attente += 300) {
+        await sleep(300);
+        const apres = quantiteLue(zone);
+        if (lu != null ? apres != null && apres > lu : fingerprint(zone) !== avant) { bouge = true; n = apres ?? n + 1; break; }
+      }
+      if (!bouge) break;
+      await sleep(400);
+    }
+    return n;
+  }
+
   /**
    * Un produit déjà au panier n'a plus de bouton « Ajouter » : sa carte montre
    * un sélecteur « − 6 + » (relevé le 15/10 chez E.Leclerc). On le compte comme
@@ -632,22 +674,9 @@ export function pageAgent(cfg, item, mode) {
       };
     }
 
-    // Quantité > 1 : cliquer le « + » autant que nécessaire.
+    // Quantité > 1 : « + » jusqu'à la quantité demandée, chaque clic vérifié.
     const wanted = Math.max(1, Math.round(Number(item.quantity) || 1));
-    let added = 1;
-    if (wanted > 1) {
-      const plus = queryFirstClickable(choice.card, cfg.quantityPlus ?? [
-        '[data-testid="quantity-plus"]',
-        'button[aria-label*="ugmenter"]',
-        '.quantity-plus',
-        "button:has-text('+')",
-      ]);
-      for (let i = 1; i < wanted && plus && isVisible(plus); i++) {
-        plus.click();
-        added += 1;
-        await sleep(500);
-      }
-    }
+    const added = wanted > 1 ? await completerQuantite(choice.card, wanted) : 1;
 
     return {
       ok: true,
