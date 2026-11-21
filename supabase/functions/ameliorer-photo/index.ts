@@ -22,7 +22,8 @@ const URL_SB = Deno.env.get('SUPABASE_URL')!;
 const CLE_PUBLIABLE = Deno.env.get('SUPABASE_ANON_KEY')!;
 const CLE_SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MODELE_IMAGE = Deno.env.get('OPENAI_IMAGE_MODEL') ?? 'gpt-image-1';
-const MODELES_VISION = ['gpt-4.1-mini', 'gpt-4o-mini'];
+// gpt-4.1-mini et gpt-4o-mini sont retirés par OpenAI le 14/01/2027.
+const MODELES_VISION = ['gpt-6-luna', 'gpt-6.1-terra'];
 const SEAU = 'images-produits';
 
 const reponse = (corps: unknown, statut = 200) =>
@@ -46,7 +47,9 @@ async function decrire(cle: string, photo: Uint8Array, type: string, nom: string
       headers: { Authorization: `Bearer ${cle}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: modele,
-        max_tokens: 300,
+        // Les modèles GPT-6 refusent max_tokens ; sans raisonnement, coût et latence restent ceux d'avant.
+        max_completion_tokens: 300,
+        reasoning_effort: 'none',
         messages: [
           { role: 'system', content: CONSIGNE_DESCRIPTION },
           { role: 'user', content: [
