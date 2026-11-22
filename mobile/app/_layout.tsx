@@ -8,6 +8,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { colors } from '../lib/theme';
 import { EcranErreur } from '../components/EcranErreur';
+import { BandeauMiseAJour } from '../components/BandeauMiseAJour';
 
 // Les onglets restent toujours au fond de la pile : un lien profond (Siri,
 // widget, notification) qui ouvre directement /ajout garde un écran où revenir.
@@ -65,6 +66,8 @@ export default function RootLayout() {
       <Stack.Screen name="apercu/[id]" options={{ presentation: 'formSheet', sheetAllowedDetents: 'fitToContents', sheetGrabberVisible: true, sheetCornerRadius: 24 }} />
       <Stack.Screen name="login" options={{ animation: 'fade', gestureEnabled: false }} />
     </Stack>
+    {/* Au-dessus de la pile : une nouvelle version se signale sur n'importe quel écran. */}
+    <BandeauMiseAJour />
   </WizardProvider></GestureHandlerRootView>;
 }
 

@@ -1,0 +1,2 @@
+# Fingerprint iOS du build TestFlight installé. À remettre à jour après chaque build (npx expo-updates fingerprint:generate --platform ios, champ hash).
+5cbca5ed653dcc45a4499d5c35eaf2ba1a5a85dd
