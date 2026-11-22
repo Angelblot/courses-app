@@ -7,6 +7,17 @@
     "icon": "./assets/images/icon.png",
     "scheme": "coursesapp",
     "userInterfaceStyle": "light",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/24873c5c-1cfa-4dc5-967e-c66eaeca0aca",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
+    },
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.coursesapp.mobile",
