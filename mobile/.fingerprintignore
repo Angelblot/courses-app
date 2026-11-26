@@ -1,0 +1,6 @@
+# Podfile.lock est réécrit par `pod install` différemment selon la machine
+# (modules Expo précompilés ou non : la somme de contrôle d'ExpoModulesCore change).
+# Le garder dans l'empreinte donnait une valeur différente sur le Mac, sur Xcode Cloud
+# et dans scripts/cloud-update.sh : les mises à jour n'atteignaient aucun iPhone.
+# Les versions natives restent couvertes par node_modules et le Podfile.
+ios/Podfile.lock
