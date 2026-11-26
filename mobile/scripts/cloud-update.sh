@@ -2,7 +2,7 @@
 # Envoie une mise à jour JavaScript aux iPhone qui ont l'app (Expo Updates), sans nouveau build TestFlight.
 # Usage, depuis la racine du dépôt ou depuis mobile/ :
 #   bash mobile/scripts/cloud-update.sh "Message de la mise à jour"
-# Variable requise : EXPO_TOKEN (jamais dans le dépôt).
+# Authentification : EXPO_TOKEN (jamais dans le dépôt), ou la session `eas login` du Mac.
 # La configuration Supabase du bundle (EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY) vient de
 # l'environnement EAS « production » ; si les deux sont déjà exportées dans le shell, elles sont prises telles quelles.
 # Seuls les builds au même « fingerprint » natif reçoivent la mise à jour : après un changement natif
@@ -10,7 +10,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-[ -n "${EXPO_TOKEN:-}" ] || { echo "Variable manquante : EXPO_TOKEN"; exit 1; }
+# EXPO_TOKEN, ou à défaut la session ouverte par `eas login` sur ce Mac.
+if [ -z "${EXPO_TOKEN:-}" ] && ! npx --yes eas-cli@latest whoami > /dev/null 2>&1; then
+  echo "Ni EXPO_TOKEN ni session EAS (eas login) : mise à jour annulée."; exit 1
+fi
 
 # Garde-fou : la mise à jour n'atteint que les builds au même fingerprint. S'il a changé, personne ne la
 # recevrait : on s'arrête avant de publier.
