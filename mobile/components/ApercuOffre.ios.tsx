@@ -9,7 +9,9 @@ import { colors } from '../lib/theme';
 
 export type ApercuOffreProps = { fiche: FicheProduit; onChoisir: () => void; onVoir: () => void; children: ReactElement;
   /** Largeur de la liste : la ligne s'y étend au lieu de prendre celle de son contenu. */
-  largeur?: number };
+  largeur?: number;
+  /** Faux pour un de tes produits : ses repères ne sont lus qu'à l'ouverture de la fiche complète. */
+  reperes?: boolean };
 
 /**
  * Appui long sur un résultat (variante FD2) : l'aperçu natif d'iOS fait
@@ -17,7 +19,7 @@ export type ApercuOffreProps = { fiche: FicheProduit; onChoisir: () => void; onV
  * avec « Choisir » et « Voir la fiche complète » dessous. Le repli web et
  * Android est dans `ApercuOffre.tsx`.
  */
-export function ApercuOffre({ fiche, onChoisir, onVoir, children, largeur }: ApercuOffreProps) {
+export function ApercuOffre({ fiche, onChoisir, onVoir, children, largeur, reperes = true }: ApercuOffreProps) {
   const fenetre = useWindowDimensions().width, width = largeur || fenetre;
   const d = fiche.details;
   return (
@@ -41,7 +43,7 @@ export function ApercuOffre({ fiche, onChoisir, onVoir, children, largeur }: Ape
                 <PastilleNutri note={fiche.nutriscore} />
                 {!!d?.nova && <Text style={s.nova}>NOVA {d.nova}</Text>}
               </View>
-              {d ? <Reperes d={d} /> : <Text style={s.detail}>Repères nutritionnels inconnus.</Text>}
+              {d ? <Reperes d={d} /> : reperes && <Text style={s.detail}>Repères nutritionnels inconnus.</Text>}
             </View>
           </RNHostView>
         </ContextMenu.Preview>
